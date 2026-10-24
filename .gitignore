@@ -32,7 +32,9 @@ captures/
 
 # Keystore files
 *.jks
+VaamYar.jks
 *.keystore
+*.base64.txt
 !debug.keystore.base64
 
 # External native build folder

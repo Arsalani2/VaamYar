@@ -1,0 +1,172 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Bump Version (version.properties)
+        id: version_bump
+        run: |
+          PROPS_FILE="version.properties"
+          if [ ! -f "$PROPS_FILE" ]; then
+            echo "VERSION_CODE=1" > "$PROPS_FILE"
+            echo "VERSION_NAME=1.0.0" >> "$PROPS_FILE"
+          fi
+
+          # Read current values
+          CURRENT_CODE=$(grep "^VERSION_CODE=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '\r')
+          CURRENT_NAME=$(grep "^VERSION_NAME=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '\r')
+
+          CURRENT_CODE=${CURRENT_CODE:-0}
+          CURRENT_NAME=${CURRENT_NAME:-1.0.0}
+
+          # If triggered by a direct tag push (e.g. v1.0.7), align version with tag
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            NEW_VERSION_NAME="$TAG_VERSION"
+            NEW_VERSION_CODE=$((CURRENT_CODE + 1))
+          else
+            # Increment VERSION_CODE
+            NEW_VERSION_CODE=$((CURRENT_CODE + 1))
+
+            # Increment patch in VERSION_NAME (e.g. 1.0.5 -> 1.0.6)
+            MAJOR_MINOR=$(echo "$CURRENT_NAME" | sed -E 's/\.[0-9]+$//')
+            PATCH=$(echo "$CURRENT_NAME" | awk -F. '{print $NF}')
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION_NAME="${MAJOR_MINOR}.${NEW_PATCH}"
+          fi
+
+          # Update version.properties file
+          echo "VERSION_CODE=${NEW_VERSION_CODE}" > "$PROPS_FILE"
+          echo "VERSION_NAME=${NEW_VERSION_NAME}" >> "$PROPS_FILE"
+
+          echo "Bumping version from ${CURRENT_NAME} (${CURRENT_CODE}) to ${NEW_VERSION_NAME} (${NEW_VERSION_CODE})"
+
+          # Export environment variables for subsequent steps
+          echo "NEW_VERSION_CODE=${NEW_VERSION_CODE}" >> $GITHUB_ENV
+          echo "NEW_VERSION_NAME=${NEW_VERSION_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=v${NEW_VERSION_NAME}" >> $GITHUB_ENV
+
+      - name: Decode Keystore File
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Error: KEYSTORE_BASE64 secret is not set!"
+            exit 1
+          fi
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > VaamYar.jks
+          if [ ! -s VaamYar.jks ]; then
+            echo "Error: Decoded VaamYar.jks is empty!"
+            exit 1
+          fi
+          echo "Keystore successfully decoded to VaamYar.jks"
+
+      - name: Grant Execute Permission to Gradlew
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper
+          fi
+          chmod +x gradlew
+
+      - name: Build Android App (AAB & APK)
+        env:
+          KEYSTORE_FILE: VaamYar.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease assembleRelease --stacktrace
+
+      - name: Upload Build Artifacts to Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: vaamyar-release-${{ env.NEW_VERSION_NAME }}
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit and Push Version Bump
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "chore: bump version to ${{ env.NEW_VERSION_NAME }} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Create and Push Git Tag
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          git tag "${{ env.RELEASE_TAG }}"
+          git push origin "${{ env.RELEASE_TAG }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
+          body: |
+            ## 🚀 انتشار نسخه جدید وام‌یار ${{ env.RELEASE_TAG }}
+
+            - **شماره نسخه (Version Name):** `${{ env.NEW_VERSION_NAME }}`
+            - **کد نسخه (Version Code):** `${{ env.NEW_VERSION_CODE }}`
+            - **تاریخ انتشار:** $(date '+%Y-%m-%d')
+
+            ### 📦 فایل‌های پیوست این انتشار:
+            1. **`app-release.apk`**: فایل نصبی مستقیم جهت نصب و تست روی دستگاه‌های اندرویدی.
+            2. **`app-release.aab`**: بسته Android App Bundle جهت انتشار در گوگل پلی (Google Play Console).
+            3. **`mapping.txt`**: فایل نگاشت Proguard/R8 (در صورت فعال بودن obfuscation).
+          draft: false
+          prerelease: false
+          files: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Secure Cleanup of Keystore
+        if: always()
+        run: |
+          if [ -f VaamYar.jks ]; then
+            rm -f VaamYar.jks
+            echo "VaamYar.jks was securely deleted."
+          else
+            echo "Keystore file does not exist or was already deleted."
+          fi
