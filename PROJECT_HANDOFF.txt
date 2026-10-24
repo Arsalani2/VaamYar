@@ -39,22 +39,45 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
      - رفع باگ جزئی: `$(date ...)` داخل body ریلیز اجرا نمی‌شد؛ حالا با env.RELEASE_DATE مقداردهی می‌شود.
   3) افزودن همین فایل (PROJECT_HANDOFF.txt).
 وضعیت راستی‌آزمایی:
-  - قبل از push: بیلد محلی ممکن نبود (دسترسی شبکه به services.gradle.org و Android SDK در محیط من نیست).
-    فقط تولید wrapper و تغییر YAML انجام شد. اثر نهایی باید از اجرای بعدی workflow تأیید شود.
-  - نتیجه‌ی اجرای بعد از push در بخش «وضعیت فعلی» پایین ثبت می‌شود.
+  - بیلد محلی ممکن نبود (شبکه به services.gradle.org و Android SDK در محیط من نیست)؛
+    همه‌ی راستی‌آزمایی‌ها با اجرای واقعی workflow روی GitHub انجام شد (ادامه در ورودی‌های بعدی).
+
+[2026-10-24 ~10:05 UTC] — Claude Sonnet 5.5
+اقدام: push کامیت 6158fa3 (wrapper 9.3.1 + سخت‌سازی workflow) → run 40084196256.
+نتیجه: Gradle 9.3.1 استفاده شد (طبق Annotation کش) و خطای KSP دیگر دیده نشد، اما مرحله Build همچنان fail شد.
+  لاگ کامل قابل دریافت نبود (403 از blob لاگ‌ها) و Annotation دقیقی نبود.
+
+[2026-10-24 ~10:10 UTC] — Claude Sonnet 5.5
+اقدام: کامیت 0a7b249 — افزودن مرحله «Summarize Build Failure» که خطوط مهم گریدل را با ::error:: به Annotation تبدیل می‌کند
+  (و tee به gradle-build.log). → run 40084497108.
+نتیجه (علت اصلی واقعی):
+  Execution failed for task ':app:validateSigningRelease'.
+  Keystore file '.../app/***.jks' not found for signing config 'release'.
+  دلیل: KEYSTORE_FILE=VaamYar.jks مسیر نسبی بود؛ app/build.gradle.kts آن را نسبت به پوشه app/ حل می‌کند
+  ولی فایل در ریشه ریپو decode شده بود.
+
+[2026-10-24 ~10:15 UTC] — Claude Sonnet 5.5
+اقدام: کامیت ea5d553 — KEYSTORE_FILE اکنون مسیر مطلق ${{ github.workspace }}/VaamYar.jks است. → run 40084737490.
+نتیجه: موفق. همه مراحل (Build، Upload، Commit version bump، Tag، GitHub Release) success شدند.
+  ربات کامیت 0708ba0 (bump به 1.0.1، VERSION_CODE=2) را push کرد و تگ v1.0.1 ساخته شد.
+  Release v1.0.1 شامل app-release.apk (~16.7MB) و app-release.aab (~16.2MB) است.
+  (mapping.txt وجود ندارد چون isMinifyEnabled=false.)
+تأیید: بررسی با gh (وضعیت steps و لیست assets ریلیز).
+
 
 ۳. رویکردهای موفق / ناموفق
 --------------------------
-- ناموفق: `gradle wrapper` داخل ریپوی کامل با --offline (خطای resolve پلاگین‌ها)؛
-  راه‌حل: تولید wrapper در پوشه‌ی موقت تمیز و کپی فایل‌ها.
-- ناموفق: دریافت لاگ کامل با `gh run view --log-failed` (403 Forbidden). جایگزین: `gh api .../check-runs/<id>/annotations`.
+- موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
+- نامشخص: خطای اولیه KSP (ApplicationManager.getApplication() is null) در run اول دیده شد و پس از پین شدن Gradle روی 9.3.1
+  دیگر ظاهر نشد؛ احتمالاً به Gradle 9.8.1 مربوط بود ولی علت قطعی آن اثبات نشده است.
+- ناموفق: `gradle wrapper --offline` داخل ریپو (resolve پلاگین‌ها نشد) → تولید در پوشه موقت تمیز.
+- ناموفق: `gh run view --log-failed` و `gh api .../logs` (403). جایگزین: `gh api repos/.../check-runs/<id>/annotations`.
 
 ۴. وضعیت فعلی و گام‌های بعدی
 ----------------------------
-- وضعیت: (در انتظار نتیجه‌ی اجرای workflow بعد از push — این بخش پس از بررسی به‌روزرسانی می‌شود.)
-- اگر دوباره همان خطای KSP رخ داد، گام‌های پیشنهادی (هنوز امتحان نشده‌اند):
-  * بررسی سازگاری KSP 2.3.5 با AGP 9.1.1 / Kotlin 2.2.10 و بررسی `kotlin.compiler.execution.strategy=in-process`
-    و `org.gradle.configuration-cache=true` در gradle.properties.
-  * اجرای محلی `./gradlew :app:kspReleaseKotlin --stacktrace` روی دستگاهی با Android SDK.
-- مسائل شناخته‌شده: setup-java@v4 و checkout@v4 دچار هشدار deprecation Node 20 هستند (غیرمسدودکننده).
+- آخرین عملیات موفق: run 40084737490 روی main، انتشار v1.0.1.
+- مسائل شناخته‌شده/پیشنهادی (غیرمسدودکننده): هشدار deprecation برای checkout@v4 و setup-java@v4 (Node 20)؛
+  هشدارهای ذخیره کش GitHub (قطعی سرویس کش، ناشی از GitHub)؛ نبود mapping.txt چون minify خاموش است
+  (بدنه ریلیز آن را ذکر می‌کند و upload با if-no-files-found: warn عبور می‌کند).
+- هر push به main یک نسخه جدید می‌سازد و کامیت bump (با [skip ci]) می‌زند؛ قبل از push محلی ابتدا git pull/fetch کنید.
 - هیچ secret‌ای در این فایل ثبت نشده است.
