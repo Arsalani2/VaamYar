@@ -113,7 +113,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew bundleRelease assembleRelease --stacktrace
+          set -o pipefail
+          ./gradlew bundleRelease assembleRelease --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Summarize Build Failure
+        if: failure()
+        run: |
+          # Surface the real Gradle error as workflow annotations so it is visible
+          # without opening the full raw log.
+          if [ -f gradle-build.log ]; then
+            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:" gradle-build.log | head -25 \
+              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+            sed -n '/What went wrong/,/Try:/p' gradle-build.log | head -25 | tr '\n' ' ' | cut -c1-1800 \
+              | while IFS= read -r line; do echo "::error title=Gradle failure::${line}"; done
+          fi
 
       - name: Upload Build Artifacts to Actions
         uses: actions/upload-artifact@v4
