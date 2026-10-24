@@ -1,0 +1,60 @@
+=====================================================================
+PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
+=====================================================================
+
+۱. هدف و معماری پروژه
+---------------------
+- اپلیکیشن اندروید «وام‌یار» (Kotlin + Jetpack Compose، Room، Retrofit/Moshi، Firebase AI).
+- ماژول: :app  |  applicationId: com.aistudio.vamyar.zqnmxk
+- نسخه‌ها از فایل version.properties خوانده می‌شوند (VERSION_CODE / VERSION_NAME).
+- ورک‌فلو انتشار: .github/workflows/android-release.yml
+  (با push به main، تگ v*.*.* یا workflow_dispatch اجرا می‌شود؛ نسخه را افزایش می‌دهد،
+  AAB/APK امضاشده می‌سازد، تگ می‌زند و GitHub Release منتشر می‌کند.)
+- نسخه‌های کلیدی (gradle/libs.versions.toml): AGP 9.1.1، Kotlin 2.2.10، KSP 2.3.5، Room 2.7.0
+- Gradle پین‌شده در gradle/wrapper/gradle-wrapper.properties: 9.3.1
+
+۲. ورودی‌های ثبت‌شده (تاریخ‌ها به وقت UTC طبق ساعت محیط اجرا)
+---------------------------------------------------------------
+
+[2026-10-24 ~10:00 UTC] — مدل/عامل: Claude Sonnet 5.5 (claude-sonnet-5-5)
+اقدام: بررسی خطای ورک‌فلو «Android Build & Release» (run شماره 40083693731، commit 32a4dcf).
+یافته‌ها:
+  - مرحله‌ی شکست‌خورده: «Build Android App (AAB & APK)» (مرحله‌های قبل از آن موفق بودند).
+  - خطای Annotation در GitHub:
+      Cannot invoke "ksp.com.intellij.openapi.application.Application.getService(java.lang.Class)"
+      because the return value of "ksp.com.intellij.openapi.application.ApplicationManager.getApplication()" is null
+  - فایل gradlew و gradle-wrapper.jar در ریپو commit نشده بودند (فقط gradle-wrapper.properties بود).
+    مرحله‌ی «Grant Execute Permission to Gradlew» در این حالت دستور `gradle wrapper` را اجرا می‌کرد
+    و Wrapper را با Gradle نصب‌شده روی runner می‌ساخت. طبق Annotation کش، نسخه‌ی استفاده‌شده
+    Gradle 9.8.1 بود، نه 9.3.1 که در پروژه پین شده است.
+  - لاگ کامل job از محیط من قابل دریافت نبود (Forbidden از سمت results-receiver)؛ فقط Annotationها خوانده شد.
+  - هشدارهای «Failed to save cache entry … Our services aren't available» مربوط به قطعی سرویس کش GitHub است
+    و علت شکست نیست.
+تغییرات انجام‌شده:
+  1) افزودن gradlew، gradlew.bat و gradle/wrapper/gradle-wrapper.jar (ساخته‌شده با
+     `gradle wrapper --gradle-version 9.3.1 --distribution-type bin` در یک پوشه‌ی تمیز).
+  2) .github/workflows/android-release.yml:
+     - حذف fallback مربوط به `gradle wrapper`؛ اگر gradlew/jar وجود نداشته باشد، job با پیام واضح fail می‌شود.
+     - افزودن `./gradlew --version` برای ثبت نسخه‌ی واقعی Gradle در لاگ.
+     - رفع باگ جزئی: `$(date ...)` داخل body ریلیز اجرا نمی‌شد؛ حالا با env.RELEASE_DATE مقداردهی می‌شود.
+  3) افزودن همین فایل (PROJECT_HANDOFF.txt).
+وضعیت راستی‌آزمایی:
+  - قبل از push: بیلد محلی ممکن نبود (دسترسی شبکه به services.gradle.org و Android SDK در محیط من نیست).
+    فقط تولید wrapper و تغییر YAML انجام شد. اثر نهایی باید از اجرای بعدی workflow تأیید شود.
+  - نتیجه‌ی اجرای بعد از push در بخش «وضعیت فعلی» پایین ثبت می‌شود.
+
+۳. رویکردهای موفق / ناموفق
+--------------------------
+- ناموفق: `gradle wrapper` داخل ریپوی کامل با --offline (خطای resolve پلاگین‌ها)؛
+  راه‌حل: تولید wrapper در پوشه‌ی موقت تمیز و کپی فایل‌ها.
+- ناموفق: دریافت لاگ کامل با `gh run view --log-failed` (403 Forbidden). جایگزین: `gh api .../check-runs/<id>/annotations`.
+
+۴. وضعیت فعلی و گام‌های بعدی
+----------------------------
+- وضعیت: (در انتظار نتیجه‌ی اجرای workflow بعد از push — این بخش پس از بررسی به‌روزرسانی می‌شود.)
+- اگر دوباره همان خطای KSP رخ داد، گام‌های پیشنهادی (هنوز امتحان نشده‌اند):
+  * بررسی سازگاری KSP 2.3.5 با AGP 9.1.1 / Kotlin 2.2.10 و بررسی `kotlin.compiler.execution.strategy=in-process`
+    و `org.gradle.configuration-cache=true` در gradle.properties.
+  * اجرای محلی `./gradlew :app:kspReleaseKotlin --stacktrace` روی دستگاهی با Android SDK.
+- مسائل شناخته‌شده: setup-java@v4 و checkout@v4 دچار هشدار deprecation Node 20 هستند (غیرمسدودکننده).
+- هیچ secret‌ای در این فایل ثبت نشده است.

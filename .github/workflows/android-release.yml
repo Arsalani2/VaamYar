@@ -79,6 +79,7 @@ jobs:
           echo "NEW_VERSION_CODE=${NEW_VERSION_CODE}" >> $GITHUB_ENV
           echo "NEW_VERSION_NAME=${NEW_VERSION_NAME}" >> $GITHUB_ENV
           echo "RELEASE_TAG=v${NEW_VERSION_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_DATE=$(date '+%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Decode Keystore File
         run: |
@@ -95,10 +96,15 @@ jobs:
 
       - name: Grant Execute Permission to Gradlew
         run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper
+          # The Gradle wrapper must be committed so the build uses the pinned
+          # Gradle version (gradle/wrapper/gradle-wrapper.properties) instead of
+          # whatever Gradle happens to be installed on the runner.
+          if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Error: gradlew / gradle-wrapper.jar is missing from the repository!"
+            exit 1
           fi
           chmod +x gradlew
+          ./gradlew --version
 
       - name: Build Android App (AAB & APK)
         env:
@@ -146,7 +152,7 @@ jobs:
 
             - **شماره نسخه (Version Name):** `${{ env.NEW_VERSION_NAME }}`
             - **کد نسخه (Version Code):** `${{ env.NEW_VERSION_CODE }}`
-            - **تاریخ انتشار:** $(date '+%Y-%m-%d')
+            - **تاریخ انتشار:** ${{ env.RELEASE_DATE }}
 
             ### 📦 فایل‌های پیوست این انتشار:
             1. **`app-release.apk`**: فایل نصبی مستقیم جهت نصب و تست روی دستگاه‌های اندرویدی.
