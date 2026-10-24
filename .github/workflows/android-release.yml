@@ -108,7 +108,8 @@ jobs:
 
       - name: Build Android App (AAB & APK)
         env:
-          KEYSTORE_FILE: VaamYar.jks
+          # Absolute path: app/build.gradle.kts resolves relative paths against the app/ module dir.
+          KEYSTORE_FILE: ${{ github.workspace }}/VaamYar.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
