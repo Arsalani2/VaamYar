@@ -26,7 +26,7 @@
   "app": "VaamYar",
   "appIdentifier": "com.aistudio.vamyar",
   "schemaVersion": 1,
-  "appVersion": "1.0.1",
+  "appVersion": "1.0.3",
   "exportTimestamp": 1729854000000,
   "exportDateShamsi": "۳ آبان ۱۴۰۵",
   "checksum": "a3f5b7c891e44293f019058b874416db92ef88b14e64f7b605809f67a21f7c32",
@@ -212,14 +212,24 @@ root.put("checksum", checksum)
 اگر در نسخه ۲ یا ۳ فیلد جدیدی به وام‌ها اضافه شد (مثلاً `interestRate: Double` یا `bankBranch: String`):
 - خواندن فایل باید با `optDouble("interestRate", 0.0)` و `optString("bankBranch", "")` انجام شود تا فایل‌های قدیمی نسخه ۱ بدون باگ یا کرش خوانده شوند.
 
-### قانون ۲: تصحیح خودکار سهم کاربر مبنا (Self-Repairing Partner Shares)
-اگر فایلی ایمپورت شد که در آن شریک تمام مبلغ وام را می‌دهد (`shareAmount == monthlyAmount`) اما در نسخه قدیمی مقدار `myShareAmount` روی کل وام باقی مانده بود:
-- متد `parseAndValidateBackup` به صورت خودکار محاسبه را اصلاح می‌کند:
+### قانون ۲: تصحیح خودکار و بازسازی سهم کاربر مبنا (Self-Repairing Partner Shares)
+اگر فایلی ایمپورت شد که در آن شریک تمام مبلغ وام را می‌دهد (`shareAmount == monthlyAmount`) اما در نسخه قدیمی مقدار `myShareAmount` روی کل وام باقی مانده بود، یا اصلاً کلید `myShareAmount` در فایل نبود (بکاپ‌های بسیار قدیمی):
+- متد `parseAndValidateBackup` سهم کاربر مبنا را به‌صورت خودکار و سه‌مسیره بازسازی می‌کند (فیکس bug.md/P2-14، کامیت `7235d33`):
 ```kotlin
-val othersTotal = sharesList.filter { it.loanId == loanId }.sumOf { it.shareAmount }
-val calculatedMyShare = if (hasPartners) (monthlyAmount - othersTotal).coerceAtLeast(0L) else monthlyAmount
+val hasPartnersInJson = if (l.has("hasPartners")) l.getBoolean("hasPartners")
+    else sharesList.filter { it.loanId == loanId }.isNotEmpty()
+val migratedMyShare = when {
+    !hasPartnersInJson -> {                                   // وام بدون شریک → ۱۰۰٪ قسط ماهانه
+        val raw = l.optLong("myShareAmount", 0L)
+        if (raw == 0L) monthlyAmount else raw
+    }
+    l.has("myShareAmount") -> l.optLong("myShareAmount", 0L)  // مقدار صریح فایل عیناً حفظ می‌شود
+    else -> (monthlyAmount - sharesList.filter { it.loanId == loanId }
+        .sumOf { it.shareAmount }).coerceAtLeast(0L)          // بازسازی: قسط منهای سهم شرکا
+}
 ```
-این کار مانع از دوباره بروز کردن باگ "محاسبه ۸۰۰ در دو حساب" می‌شود.
+- یعنی: کلیدِ موجود → همان مقدار دقیق فایل؛ کلیدِ غایب + شریک → `monthlyAmount − Σ سهم شرکا` (clamp در ≥۰ تا سهم‌های خراب سهم من را منفی نکنند)؛ کلیدِ غایب + بی‌شریک → کل قسط ماهانه. پرچم `hasPartners` غایب هم از خودِ سهم‌های همان وام استنتاج می‌شود.
+- این کار هم مانع از دوباره بروز کردن باگ «محاسبه ۸۰۰ در دو حساب» می‌شود و هم وام شراکتیِ قدیمیِ فاقد این فیلد دیگر با سهمِ صفر بازیابی نمی‌شود — صفرِ «نبودِ کلید» هرگز «سهم من صفر است» تلقی نمی‌شود.
 
 ### قانون ۳: تضمین وجود کاربر مبنا (Primary User Guarantee)
 اگر فایل پشتیبان به هر دلیلی کاربری به عنوان `isPrimary: true` نداشت (یا جدول کاربران خالی بود):
@@ -229,6 +239,7 @@ val calculatedMyShare = if (hasPartners) (monthlyAmount - othersTotal).coerceAtL
 در زمان بازیابی در پایگاه‌داده:
 - شناسه‌ها به صورت پیوسته ثبت می‌شوند تا تداخل کلیدهای خارجی با دیتابیس فعلی رخ ندهد.
 - ابتدا جداول فعلی پاکسازی امن می‌شوند (`clearAllDataAndReset`) و سپس داده‌های پشتیبان با اتوژنریت ترتیبی درج می‌گردند.
+- تطبیق نام‌ها از این پس با استانداردسازی `PersianNameNormalizer` انجام می‌شود (فیکس bug.md/P3-1): نام کاربران و شرکا هنگام بازگردانی یکسان‌سازی می‌شوند (ي→ی، ك→ک، ة→ه، فاصله‌ها/نیم‌فاصله) تا بکاپِ دارای حروف عربی بعد از restore هم‌نامِ تکراری یا سهمِ یتیم نسازد. هویت نام‌پایه باقی می‌ماند (بدون userId، طبق تصمیم A4 در bug.md).
 
 ### قانون ۵: کنترل نسخه اسکیما (Schema Versioning Barrier)
 - اگر `fileSchemaVersion <= CURRENT_SCHEMA_VERSION`: فایل پشتیبان معتبر است و با توابع Migration لود می‌شود.
