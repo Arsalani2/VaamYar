@@ -18,6 +18,7 @@ import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.ThemePreset
 import com.example.util.AppPreferences
 import com.example.util.NumberFormatter
+import com.example.util.PersianNameNormalizer
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.flow.*
@@ -147,7 +148,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getUserShareForLoan(loan: Loan, shares: List<DebtorShare>, activeUser: String, primaryUserName: String = activeUser): Long {
         val loanShares = shares.filter { it.loanId == loan.id }
-        val isPrimary = activeUser.trim().equals(primaryUserName.trim(), ignoreCase = true) || activeUser == "من" || activeUser == "شما"
+        // فیکس bug.md/P3-1: تطبیق هویت نام‌پایه از کلید استاندارد نام عبور می‌کند (ي/ك
+        // عربی، فاصله/نیم‌فاصله) تا سهم شریک با کوچک‌ترین تفاوتِ تایپی صفر حساب نشود.
+        // (استثنای «من»/«شما» فعلاً همان P3-11 می‌ماند.)
+        val isPrimary = PersianNameNormalizer.namesMatch(activeUser, primaryUserName) || activeUser == "من" || activeUser == "شما"
 
         return if (isPrimary) {
             if (loanShares.isNotEmpty()) {
@@ -159,7 +163,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loan.monthlyAmount
             }
         } else {
-            val userDebtorShare = loanShares.find { it.personName.trim().equals(activeUser.trim(), ignoreCase = true) }
+            val userDebtorShare = loanShares.find { PersianNameNormalizer.namesMatch(it.personName, activeUser) }
             userDebtorShare?.shareAmount ?: 0L
         }
     }
@@ -177,7 +181,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val userPaidThisMonth = activeLoans.filter { it.isCurrentMonthPaid }.sumOf { getUserShareForLoan(it, shares, activeUserName, activeUserName) }
         val userUnpaidRemainingThisMonth = (userMonthlyShare - userPaidThisMonth).coerceAtLeast(0L)
 
-        val relevantShares = shares.filter { it.personName != activeUserName }
+        // فیکس bug.md/P3-1: تشخیص «سهمِ خودم یا دیگران» با کلید استاندارد نام، نه مقایسهٔ خام
+        val relevantShares = shares.filter { !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
 
         val othersMonthlyReceivables = relevantShares.sumOf { it.shareAmount }
         val othersReceivedThisMonth = relevantShares.filter { it.isPaidForCurrentMonth }.sumOf { it.shareAmount }
@@ -218,8 +223,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         primaryUser
     ) { shares, primary ->
         val activeUserName = primary?.name ?: "کاربر من"
-        val otherShares = shares.filter { it.personName != activeUserName }
-        otherShares.groupBy { it.personName }.map { (person, personShares) ->
+        // فیکس bug.md/P3-1: سهم‌های خودِ کاربر با کلید استاندارد نام جدا می‌شوند و
+        // گروه‌بندی هم بر همان شکل استاندارد است تا دو املای متفاوتِ یک نفر، دو نفر
+        // نشان داده نشوند.
+        val otherShares = shares.filter { !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
+        otherShares.groupBy { PersianNameNormalizer.canonicalName(it.personName) }.map { (person, personShares) ->
             val totalShare = personShares.sumOf { it.shareAmount }
             val paidThisMonth = personShares.filter { it.isPaidForCurrentMonth }.sumOf { it.shareAmount }
             val remainingUnpaid = (totalShare - paidThisMonth).coerceAtLeast(0L)
@@ -276,7 +284,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // 2. Collection Reminder from debtors with clean formatted numbers
-        val unpaidShares = shares.filter { it.personName != activeUserName && !it.isPaidForCurrentMonth }
+        // فیکس bug.md/P3-1: تشخیص «سهمِ خودم یا دیگران» با کلید استاندارد نام
+        val unpaidShares = shares.filter { !PersianNameNormalizer.namesMatch(it.personName, activeUserName) && !it.isPaidForCurrentMonth }
         if (unpaidShares.isNotEmpty()) {
             val totalPending = unpaidShares.sumOf { it.shareAmount }
             val formattedPending = NumberFormatter.formatPrice(totalPending, usePersian = usePersian, compactThousands = compact)
