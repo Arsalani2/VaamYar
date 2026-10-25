@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.VamyarApp
 import com.example.data.UserDeleteCheckResult
 import com.example.model.DebtorShare
@@ -108,7 +109,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     val currentShamsiDate: StateFlow<ShamsiDate> = _currentShamsiDate.asStateFlow()
 
-    val isCustomDateActive: StateFlow<Boolean> = MutableStateFlow(appPreferences.isCustomDateEnabled)
+    // فیکس bug.md/P2-12: این فلو قبلاً یک val فریز‌شده در لحظهٔ ساختِ ViewModel بود؛
+    // چون exportBackupJson از آن می‌خواند، خروجیِ بکاپ در همان نشستی که کاربر تاریخ
+    // سفارشی را تغییر می‌داد، پرچم کهنه می‌نوشت. حالا در syncDateWithSystem و
+    // setCustomShamsiDate به‌روز می‌شود و همیشه با AppPreferences هم‌گام است.
+    private val _isCustomDateActive = MutableStateFlow(appPreferences.isCustomDateEnabled)
+    val isCustomDateActive: StateFlow<Boolean> = _isCustomDateActive.asStateFlow()
 
     init {
         // فیکس bug.md/P2-8: تاریخ جاری قبلاً فقط یک‌بار در ساختِ ViewModel مقدار می‌گرفت؛ با
@@ -340,11 +346,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Date Sync & Custom Date Override Methods
     fun syncDateWithSystem() {
         appPreferences.clearCustomDate()
+        _isCustomDateActive.value = false
         _currentShamsiDate.value = ShamsiDateHelper.getSystemShamsiDate()
     }
 
     fun setCustomShamsiDate(date: ShamsiDate) {
         appPreferences.setCustomDate(date.year, date.month, date.day)
+        _isCustomDateActive.value = true
         _currentShamsiDate.value = date
     }
 
@@ -507,7 +515,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             shares = currentShares,
             records = currentRecords,
             preferences = prefs,
-            appVersion = "1.0.1",
+            // فیکس bug.md/P2-13: نسخهٔ درج‌شده در فایل بکاپ دیگر هاردکد نیست؛ از
+            // BuildConfig.VERSION_NAME خوانده می‌شود که در زمان بیلد از version.properties
+            // (تنها منبع حقیقت نسخهٔ اپ) تزریق می‌شود.
+            appVersion = BuildConfig.VERSION_NAME,
             shamsiDateFormatted = _currentShamsiDate.value.toStandardFormat(usePersianDigits = false)
         )
     }
@@ -530,11 +541,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             // Restore preferences
+            // فیکس bug.md/P2-12: تنظیماتِ بازیابی‌شده قبلاً فقط در StateFlowها نوشته می‌شد
+            // و در AppPreferences ذخیره نمی‌شد؛ بعد از restart به حالت قبل برمی‌گشت. اکنون
+            // همان setterهای دائمی (که هم StateFlow و هم AppPreferences را می‌نویسند)
+            // فراخوانی می‌شوند. enumها هم دفاعی parse می‌شوند تا مقدار نامعتبر در فایل
+            // بکاپ، بازیابی بقیهٔ تنظیمات را نیمه‌کاره رها نکند (قبلاً یک رشتهٔ خرابِ
+            // themeMode، ارقام و فشرده‌سازی را هم از پا درمی‌آورد).
             try {
-                _themeMode.value = AppThemeMode.valueOf(data.preferences.themeMode)
-                _themePreset.value = ThemePreset.valueOf(data.preferences.themePreset)
-                _usePersianDigits.value = data.preferences.usePersianDigits
-                _compactThousands.value = data.preferences.compactThousands
+                setThemeMode(runCatching { AppThemeMode.valueOf(data.preferences.themeMode) }.getOrDefault(_themeMode.value))
+                setThemePreset(runCatching { ThemePreset.valueOf(data.preferences.themePreset) }.getOrDefault(_themePreset.value))
+                setUsePersianDigits(data.preferences.usePersianDigits)
+                setCompactThousands(data.preferences.compactThousands
 
                 if (data.preferences.isCustomDateEnabled) {
                     setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
