@@ -551,7 +551,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 setThemeMode(runCatching { AppThemeMode.valueOf(data.preferences.themeMode) }.getOrDefault(_themeMode.value))
                 setThemePreset(runCatching { ThemePreset.valueOf(data.preferences.themePreset) }.getOrDefault(_themePreset.value))
                 setUsePersianDigits(data.preferences.usePersianDigits)
-                setCompactThousands(data.preferences.compactThousands
+                setCompactThousands(data.preferences.compactThousands)
 
                 if (data.preferences.isCustomDateEnabled) {
                     setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
