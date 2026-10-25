@@ -1,4 +1,3 @@
-
 # 🐛 گزارش باگ‌های وام‌یار — bug.md
 
 > تاریخ ثبت: ۲۰۲۶-۱۰-۲۵ (۱۴۰۵/۰۸/۰۳) — بازبینی کامل سورس در دو دور، بر پایه نسخه 1.0.2
@@ -33,9 +32,9 @@
 
 ## 🟠 P2 — مهم (تنظیمات و بکاپ)
 
-- [ ] **P2-9 | سوییچ صدا خراب است** — `MainViewModel.setSoundEnabled`: `_soundEnabled.value = false` هاردکد؛ پارامتر `enabled` نادیده گرفته می‌شود → کاربر نمی‌تواند صدا/لرزش را روشن کند.
-- [ ] **P2-10 | صدا persist نمی‌شود** — `AppPreferences` کلیدی برای `soundEnabled` ندارد؛ بعد از restart همیشه خاموش است.
-- [ ] **P2-11 | فونت persist نمی‌شود** — `setAppFontStyle` فقط StateFlow را آپدیت می‌کند؛ در `AppPreferences` کلید `fontStyle` وجود ندارد (در حالی که `BackupHelper` فونت را در بکاپ ذخیره می‌کند — ناسازگار).
+- [x] **P2-9 | سوییچ صدا خراب است** — `MainViewModel.setSoundEnabled`: `_soundEnabled.value = false` هاردکد؛ پارامتر `enabled` نادیده گرفته می‌شود → کاربر نمی‌تواند صدا/لرزش را روشن کند. — ✅ **رفع شد (حذف امکان، کامیت `2a3b89a` + حذف SoundHelper.kt در `c264263`):** طبق تصمیم کاربر، این باگ باقیمانده‌ی حذف ناقصِ قبلیِ امکان صدا بود؛ به‌جای فیکس، کل لوله‌کشی صدا حذف شد — سوییچ/پارامترهای مرده در SettingsScreen و MainActivity، StateFlow و setter خراب و ۱۹ فراخوانی SoundHelper در MainViewModel و خود فایل SoundHelper.kt.
+- [x] **P2-10 | صدا persist نمی‌شود** — `AppPreferences` کلیدی برای `soundEnabled` ندارد؛ بعد از restart همیشه خاموش است. — ✅ **رفع شد (حذف امکان، کامیت `2a3b89a`):** چون امکان صدا کلاً حذف شد، چیزی برای persist کردن نماند؛ فیلد soundEnabled هم از فرمت بکاپ پاک شد. بکاپ‌های قدیمی همچنان سالم import می‌شوند (org.json کلیدهای ناشناخته را نادیده می‌گیرد و checksum روی همان payload فایل محاسبه می‌شود).
+- [x] **P2-11 | فونت persist نمی‌شود** — `setAppFontStyle` فقط StateFlow را آپدیت می‌کند؛ در `AppPreferences` کلید `fontStyle` وجود ندارد (در حالی که `BackupHelper` فونت را در بکاپ ذخیره می‌کند — ناسازگار). — ✅ **رفع شد (حذف امکان، کامیت `2a3b89a`):** امکان انتخاب فونت کلاً حذف شد — enum AppFontStyle و getAppTypography در Type.kt، پارامتر fontStyle در MyApplicationTheme، StateFlow و setAppFontStyle و فیلد fontStyle بکاپ. تایپوگرافی اکنون ثابت و همیشه فونت استاندارد سیستم (FontFamily.Default) است — همان حالت عملیِ همیشگیِ اپ.
 - [ ] **P2-12 | تنظیمات بازیابی‌شده از بکاپ بعد از restart می‌پرند** — `importBackupJson` فقط StateFlowها را آپدیت می‌کند و در `appPreferences` نمی‌نویسد؛ تم/ارقام/فشرده‌سازی import شده برگشت می‌زند.
 - [ ] **P2-13 | appVersion هاردکد در بکاپ** — `exportBackupJson` مقدار `"1.0.1"` را هاردکد می‌کند (نسخه فعلی 1.0.2)؛ باید از `version.properties` خوانده شود.
 - [ ] **P2-14 | مسیر legacy بکاپ می‌تواند سهم را صفر کند** — `BackupHelper` فقط برای وام بدون شریک `myShareAmount` را با `monthlyAmount` پر می‌کند؛ وام شراکتی قدیمی بدون این فیلد → سهم من 0.
