@@ -17,6 +17,12 @@ interface DebtorShareDao {
     @Query("SELECT * FROM debtor_shares WHERE loanId = :loanId")
     suspend fun getSharesForLoanOnce(loanId: Long): List<DebtorShare>
 
+    // فیکس bug.md/P3-1: خواندن یک‌باره (غیر-Flow) از همهٔ سهم‌ها برای تطبیق نامِ
+    // استانداردشده در LoanRepository (هم‌گام‌سازی rename و چک حذف کاربر)؛ نام‌ها
+    // را نمی‌توان با تطبیق بایت‌به‌بایتِ SQL جست‌وجو کرد (ي/ك عربی، فاصله/نیم‌فاصله)
+    @Query("SELECT * FROM debtor_shares")
+    suspend fun getAllSharesOnce(): List<DebtorShare>
+
     @Query("SELECT * FROM debtor_shares WHERE personName = :personName")
     suspend fun getSharesForPerson(personName: String): List<DebtorShare>
 
