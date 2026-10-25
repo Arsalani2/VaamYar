@@ -35,6 +35,19 @@
             android:name=".notification.InstallmentAlarmReceiver"
             android:exported="false" />
 
+        <!-- فیکس bug.md/P2-1: آلارم‌های AlarmManager با ری‌بوت پاک می‌شوند؛ این Receiver
+             بعد از بوت (و تغییر ساعت/منطقهٔ زمانیِ سیستم) چکِ روزانه را دوباره زمان‌بندی
+             می‌کند. BOOT_COMPLETED یک protected broadcast است و فقط سیستم می‌تواند بفرستد. -->
+        <receiver
+            android:name=".notification.BootCompletedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

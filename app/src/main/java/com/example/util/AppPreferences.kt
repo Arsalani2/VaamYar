@@ -22,6 +22,8 @@ class AppPreferences(context: Context) {
         private const val KEY_CUSTOM_MONTH = "key_custom_month"
         private const val KEY_CUSTOM_DAY = "key_custom_day"
         private const val KEY_LAST_ROLLOVER_MONTH = "key_last_rollover_month" // فیکس bug.md/P1-6
+        private const val KEY_REMINDER_HOUR = "key_reminder_hour" // فیکس bug.md/P2-7
+        private const val KEY_REMINDER_MINUTE = "key_reminder_minute" // فیکس bug.md/P2-7
     }
 
     var loanViewMode: LoanViewMode
@@ -97,6 +99,22 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_LAST_ROLLOVER_MONTH, "") ?: ""
         set(value) {
             prefs.edit().putString(KEY_LAST_ROLLOVER_MONTH, value).apply()
+        }
+
+    // فیکس bug.md/P2-7: ساعتِ چکِ روزانهٔ اعلان‌ها دیگر هاردکد نیست و اینجا persist
+    // می‌شود (پیش‌فرض ۱۰:۰۰، مثل رفتار قبلی). برای تغییر کافی است این دو کلید نوشته
+    // و NotificationHelper.scheduleDailyCheck(context) دوباره فراخوانی شود —
+    // Receiver و BootCompletedRouter هر دو از همین منبع می‌خوانند.
+    var reminderHour: Int
+        get() = prefs.getInt(KEY_REMINDER_HOUR, 10)
+        set(value) {
+            prefs.edit().putInt(KEY_REMINDER_HOUR, value.coerceIn(0, 23)).apply()
+        }
+
+    var reminderMinute: Int
+        get() = prefs.getInt(KEY_REMINDER_MINUTE, 0)
+        set(value) {
+            prefs.edit().putInt(KEY_REMINDER_MINUTE, value.coerceIn(0, 59)).apply()
         }
 
     fun setCustomDate(year: Int, month: Int, day: Int) {

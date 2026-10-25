@@ -91,6 +91,11 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                 }
             } catch (_: Exception) {
             } finally {
+                // فیکس bug.md/P2-1/P2-7: چون آلارم روزانه اکنون «یک‌باره و exact» است،
+                // پس از هر چک، نوبتِ فردا (با ساعتِ ذخیره‌شده در تنظیمات) دوباره
+                // زمان‌بندی می‌شود تا زنجیرهٔ یادآوری ادامه پیدا کند؛ بعد از ری‌بوت هم
+                // BootCompletedReceiver همین زنجیره را از نو برپا می‌کند.
+                NotificationHelper.scheduleDailyCheck(context)
                 pendingResult.finish()
             }
         }

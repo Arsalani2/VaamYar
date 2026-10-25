@@ -27,7 +27,9 @@ class VamyarApp : Application() {
         )
 
         NotificationHelper.createNotificationChannel(this)
-        NotificationHelper.scheduleDailyCheck(this, hour = 10, minute = 0)
+        // فیکس bug.md/P2-7: ساعت چکِ روزانه دیگر هاردکد نیست؛ از AppPreferences
+        // خوانده می‌شود (پیش‌فرض ۱۰:۰۰) و هر اجرای اپ هم آلارم را دوباره برپا می‌کند.
+        NotificationHelper.scheduleDailyCheck(this)
 
         // فیکس bug.md/P1-6: رِسِت خودکار پرچم‌های «پرداخت ماه جاری»
         // وقتی ماه شمسی عوض شده باشد — قبل از seed اجرا می‌شود
