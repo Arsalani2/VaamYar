@@ -241,11 +241,22 @@ object BackupHelper {
                     existingSharesForLoan.isNotEmpty()
                 }
 
-                val rawMyShare = l.optLong("myShareAmount", 0L)
-                val migratedMyShare = if (!hasPartnersInJson && rawMyShare == 0L) {
-                    monthlyAmount // Legacy fix: if no partners, my share was 100%
-                } else {
-                    rawMyShare
+                // فیکس bug.md/P2-14: بکاپ‌های قدیمی اصلاً کلید myShareAmount ندارند و optLong
+                // برای کلیدِ غایب صفر برمی‌گرداند؛ صفرِ «نبودِ کلید» نباید «سهم من صفر است» تلقی
+                // شود — قبلاً وام شراکتیِ قدیمیِ بدون این کلید با سهمِ صفر بازیابی می‌شد و محاسبات
+                // سهم من (Loan.effectiveMyShare) روی صفر می‌رفت. اکنون برای بکاپ‌های بدون این کلید،
+                // سهم من بازسازی می‌شود:
+                //  • وام بدون شریک → همان ۱۰۰٪ همیشگی (رفعِ موجود از قبل، حفظ شد)
+                //  • وام شراکتی → قسط ماهانه منهای مجموع سهم شرکا (clamp در ≥۰ تا جمعِ
+                //    سهم‌های خراب در فایل، سهم من را منفی نکند)
+                // اگر کلید وجود دارد، مقدار صریحِ ذخیره‌شده عیناً می‌ماند.
+                val migratedMyShare = when {
+                    !hasPartnersInJson -> {
+                        val rawMyShare = l.optLong("myShareAmount", 0L)
+                        if (rawMyShare == 0L) monthlyAmount else rawMyShare
+                    }
+                    l.has("myShareAmount") -> l.optLong("myShareAmount", 0L)
+                    else -> (monthlyAmount - existingSharesForLoan.sumOf { it.shareAmount }).coerceAtLeast(0L)
                 }
 
                 loansList.add(
