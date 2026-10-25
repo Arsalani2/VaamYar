@@ -252,25 +252,40 @@ class LoanRepository(
     ): Long = withContext(Dispatchers.IO) {
         // ذخیره‌ی وام + شرکا یک تراکنش اتمیک است (حذف و درج دوباره‌ی سهم‌ها نباید وسط کار قطع شود)
         database.withTransaction {
-            if (loan.id == 0L) {
+            // فیکس bug.md/P1-9 (دفاع در عمق): هیچ مسیری — حتی فراخوانی‌های آینده — نباید بتواند
+            // وامی با paidMonths > totalMonths ذخیره کند؛ UI همین قاعده را با هشدار و مسدودسازیِ
+            // دکمه‌ی ذخیره اعمال می‌کند و اینجا صرفاً تضمین نهایی است. وامِ تسویه‌شده همیشه
+            // پرچم «پرداخت ماه جاری» = true می‌گیرد و رکوردهای تاریخچه‌ی فراتر از کل اقساط پاک می‌شوند.
+            val safeTotalMonths = loan.totalMonths.coerceIn(1, 120)
+            val safePaidMonths = loan.paidMonths.coerceIn(0, safeTotalMonths)
+            val settled = safePaidMonths >= safeTotalMonths
+            val safeLoan = loan.copy(
+                totalMonths = safeTotalMonths,
+                paidMonths = safePaidMonths,
+                isCurrentMonthPaid = if (settled) true else loan.isCurrentMonthPaid
+            )
+            if (safeLoan.id == 0L) {
                 // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند درج می‌شوند
-                val newLoanId = loanDao.insertLoan(loan)
+                val newLoanId = loanDao.insertLoan(safeLoan)
                 shares.forEach { share ->
                     debtorShareDao.insertShare(
                         share.copy(
                             loanId = newLoanId,
-                            loanTitle = loan.title,
-                            dueDay = loan.dueDay
+                            loanTitle = safeLoan.title,
+                            dueDay = safeLoan.dueDay
                         )
                     )
                 }
                 newLoanId
             } else {
-                loanDao.updateLoan(loan)
+                loanDao.updateLoan(safeLoan)
+                // رکوردهای تاریخچه با شماره‌ی بالاتر از کل اقساط (باقی‌مانده از داده‌ی قدیمی
+                // یا کاهشِ مدت وام) معنایی ندارند و حذف می‌شوند تا تاریخچه با وام سازگار بماند.
+                paymentRecordDao.deleteRecordsAboveInstallment(safeLoan.id, safeTotalMonths)
                 val existingByName = debtorShareDao
-                    .getSharesForLoanOnce(loan.id)
+                    .getSharesForLoanOnce(safeLoan.id)
                     .associateBy { it.personName.trim() }
-                debtorShareDao.deleteSharesForLoan(loan.id)
+                debtorShareDao.deleteSharesForLoan(safeLoan.id)
 
                 shares.forEach { newShare ->
                     val matched = existingByName[newShare.personName.trim()]
@@ -284,13 +299,13 @@ class LoanRepository(
                     }
                     debtorShareDao.insertShare(
                         toInsert.copy(
-                            loanId = loan.id,
-                            loanTitle = loan.title,
-                            dueDay = loan.dueDay
+                            loanId = safeLoan.id,
+                            loanTitle = safeLoan.title,
+                            dueDay = safeLoan.dueDay
                         )
                     )
                 }
-                loan.id
+                safeLoan.id
             }
         }
     }

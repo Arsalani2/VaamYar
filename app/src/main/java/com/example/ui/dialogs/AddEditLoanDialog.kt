@@ -151,6 +151,10 @@ fun AddEditLoanDialog(
     val sharesExceedMonthly = hasPartners && othersTotalShare > rawMonthlyAmount
     val primaryUserName = allUsers.firstOrNull { it.isPrimary }?.name?.trim()
 
+    // فیکس bug.md/P1-9: کاهش «مدت وام» زیر «اقساط پرداخت‌شده» دیگر بی‌صدا ذخیره نمی‌شود؛
+    // ذخیره مسدود و دلیلش به کاربر نمایش داده می‌شود تا داده‌ی ناسازگار ساخته نشود.
+    val paidExceedsTotal = paidMonths > totalMonths
+
     val endDate = remember(startDate, totalMonths) {
         ShamsiDateHelper.calculateEndDate(startDate.year, startDate.month, totalMonths)
     }
@@ -502,6 +506,15 @@ fun AddEditLoanDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 10.sp
                             )
+
+                            // فیکس bug.md/P1-9: هشدار ناسازگاریِ «اقساط پرداخت‌شده > کل اقساط»
+                            if (paidExceedsTotal) {
+                                Text(
+                                    text = "⚠️ تعداد اقساط پرداخت‌شده (${NumberFormatter.formatNumber(paidMonths, usePersianDigits)}) از کل اقساط (${NumberFormatter.formatNumber(totalMonths, usePersianDigits)}) بیشتر است؛ مدت وام را بیشتر کنید یا با لمس دایره‌ها اقساط پرداخت‌شده را کاهش دهید.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
 
@@ -652,21 +665,37 @@ fun AddEditLoanDialog(
                     }
 
                     Button(
-                        // فیکس bug.md/P1-8: ذخیره‌ی وامی که سهم شرکایش از مبلغ قسط بیشتر است مسدود است
-                        enabled = !sharesExceedMonthly,
+                        // فیکس bug.md/P1-8/P1-9: ذخیره‌ی وامِ ناسازگار (سهم شرکا > مبلغ قسط،
+                        // یا اقساط پرداخت‌شده > کل اقساط) مسدود است
+                        enabled = !sharesExceedMonthly && !paidExceedsTotal,
                         onClick = {
+                            // فیکس bug.md/P1-9: شمارنده‌ی پرداخت‌شده‌ها همیشه درون بازه‌ی
+                            // 0..totalMonths نگه داشته می‌شود (دکمه در حالت ناسازگار غیرفعال است
+                            // و این coerceIn صرفاً دفاع در عمق است)…
+                            val effectivePaidMonths = paidMonths.coerceIn(0, totalMonths)
+                            // …و پرچمِ «پرداخت ماه جاری» با ویرایشِ کاربر روی شمارنده sync می‌شود:
+                            // اگر کاربر شمارنده را تغییر داده باشد، مقدار قطعی از مقایسه‌ی پرداخت‌شده‌ها
+                            // با اقساطِ رسیده/کل اقساط محاسبه می‌شود؛ اگر فقط مشخصات دیگر را ویرایش کرده
+                            // باشد، پرچم فعلی وام دست‌نخورده می‌ماند.
+                            val paidCountChanged = effectivePaidMonths != (loanToEdit?.paidMonths ?: 0)
+                            val effectiveCurrentMonthPaid = when {
+                                effectivePaidMonths >= totalMonths -> true // وام تسویه شده است
+                                paidCountChanged -> autoElapsed > 0 && effectivePaidMonths >= autoElapsed
+                                else -> loanToEdit?.isCurrentMonthPaid ?: false
+                            }
                             val loan = (loanToEdit ?: Loan(
                                 title = title.ifBlank { "وام جدید" },
                                 dueDay = startDate.day,
                                 monthlyAmount = rawMonthlyAmount,
                                 totalMonths = totalMonths,
-                                paidMonths = paidMonths
+                                paidMonths = effectivePaidMonths
                             )).copy(
                                 title = title.ifBlank { "وام جدید" },
                                 dueDay = startDate.day,
                                 monthlyAmount = rawMonthlyAmount,
                                 totalMonths = totalMonths,
-                                paidMonths = paidMonths,
+                                paidMonths = effectivePaidMonths,
+                                isCurrentMonthPaid = effectiveCurrentMonthPaid,
                                 startYear = startDate.year,
                                 startMonth = startDate.month,
                                 endYear = endDate.year,

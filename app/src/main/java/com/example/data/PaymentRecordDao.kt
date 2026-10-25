@@ -23,6 +23,11 @@ interface PaymentRecordDao {
     @Query("DELETE FROM payment_records WHERE loanId = :loanId AND installmentNumber = :installmentNumber")
     suspend fun deleteRecordsForInstallment(loanId: Long, installmentNumber: Int)
 
+    // فیکس bug.md/P1-9: حذف رکوردهای تاریخچه‌ای که شماره‌شان از کل اقساط وام بیشتر است
+    // (مثلاً رکورد قسط ۱۳ در وام ۱۲قسطی) تا تاریخچه همیشه با مدت وام سازگار بماند.
+    @Query("DELETE FROM payment_records WHERE loanId = :loanId AND installmentNumber > :maxInstallment")
+    suspend fun deleteRecordsAboveInstallment(loanId: Long, maxInstallment: Int)
+
     @Query("DELETE FROM payment_records")
     suspend fun clearAllRecords()
 }
