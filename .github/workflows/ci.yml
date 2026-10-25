@@ -1,0 +1,70 @@
+name: CI (Compile & Unit Tests)
+
+# Validation only: no signing, no version bump, no release.
+# Catches compile/manifest/KSP errors on branches and PRs BEFORE they reach `main`
+# (every push to `main` triggers a public release in android-release.yml).
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+    tags-ignore:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Compile & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Verify Gradle Wrapper
+        run: |
+          if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "::error::gradlew / gradle-wrapper.jar is missing from the repository"
+            exit 1
+          fi
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Compile (debug + release Kotlin) and run unit tests
+        run: |
+          set -o pipefail
+          ./gradlew compileDebugKotlin compileReleaseKotlin testDebugUnitTest --stacktrace 2>&1 | tee gradle-ci.log
+
+      - name: Summarize Failure
+        if: failure()
+        run: |
+          if [ -f gradle-ci.log ]; then
+            grep -n -E "^e: |FAILED$|What went wrong|Execution failed|Caused by" gradle-ci.log | head -25 \
+              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+          fi
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7

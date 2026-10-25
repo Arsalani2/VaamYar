@@ -60,7 +60,6 @@ class LoanRepository(
                     UserProfile(
                         id = 0L,
                         name = "من",
-                        phoneNumber = "",
                         isPrimary = true,
                         avatarColorHex = 0xFF10B981L,
                         notes = "کاربر مبنا"
@@ -70,7 +69,6 @@ class LoanRepository(
                     UserProfile(
                         id = 0L,
                         name = "علی",
-                        phoneNumber = "",
                         isPrimary = false,
                         avatarColorHex = 0xFF3B82F6L,
                         notes = "شریک وام"
