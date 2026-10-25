@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.data.AppDatabase
+import com.example.util.AppPreferences
 import com.example.util.NumberFormatter
 import com.example.util.MonthlyRolloverHelper
 import com.example.util.ShamsiDateHelper
@@ -39,7 +40,11 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
 
                 val db = AppDatabase.getDatabase(context)
                 val loans = db.loanDao().getAllActiveLoans().firstOrNull() ?: emptyList()
-                val currentShamsi = ShamsiDateHelper.getCurrentShamsiDate()
+                // فیکس bug.md/P2-4: Receiver همیشه از ساعت سیستم می‌خواند و تاریخ سفارشیِ تنظیمات را
+                // نادیده می‌گرفت؛ اکنون از همان «تاریخ مؤثر» اپ (getEffectiveShamsiDate از فیکس P1-6)
+                // استفاده می‌کند تا اعلان‌های «امروز/فردا» دقیقاً هماهنگ با منطق داخلی اپ باشد
+                // (رِسِت ماهانهٔ P1-6 از قبل مؤثر بود؛ این اعلان‌ها هم مؤثر شدند).
+                val currentShamsi = ShamsiDateHelper.getEffectiveShamsiDate(AppPreferences(context))
                 val today = currentShamsi.day
 
                 // فیکس bug.md/P2-2: «فردا» با تقویم شمسیِ واقعی محاسبه می‌شود، نه today+1 ساده.

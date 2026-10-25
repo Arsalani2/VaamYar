@@ -21,29 +21,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.model.DebtorShare
 import com.example.util.NumberFormatter
-import com.example.util.ShamsiDateHelper
+import com.example.util.ShamsiDate
 
 @Composable
 fun ReminderShareDialog(
     debtorName: String,
     shares: List<DebtorShare>,
+    currentShamsiDate: ShamsiDate,
     senderName: String = "",
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val currentShamsi = remember { ShamsiDateHelper.getCurrentShamsiDate() }
+    // فیکس bug.md/P2-4: نام ماه در پیامِ یادآوری از «تاریخ مؤثر» اپ (ViewModel) می‌آید؛
+    // قبلاً مستقیماً ساعت سیستم خوانده می‌شد و با فعال بودن تاریخ سفارشی، ماهِ غلط
+    // در متنِ پیامِ آماده به شریک ارسال می‌شد.
     val totalAmount = remember(shares) { shares.sumOf { it.shareAmount } }
 
     val detailsText = shares.joinToString("\n") { share ->
         "• ${share.loanTitle}: ${NumberFormatter.formatPrice(share.shareAmount)} (موعد روز ${NumberFormatter.toPersianDigits(share.dueDay)} ماه)"
     }
 
-    val defaultMessage = remember(debtorName, totalAmount, detailsText, senderName) {
+    val defaultMessage = remember(debtorName, totalAmount, detailsText, senderName, currentShamsiDate) {
         val signOff = if (senderName.isNotBlank()) "\n($senderName)" else ""
         """
 سلام ${debtorName} عزیز،
 امیدوارم خوب باشی.
-یادآوری مبلغ سهم اقساط وام‌های این ماه (${currentShamsi.monthName}):
+یادآوری مبلغ سهم اقساط وام‌های این ماه (${currentShamsiDate.monthName}):
 
 $detailsText
 

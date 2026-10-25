@@ -309,6 +309,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                     AppTab.RECEIVABLES -> ReceivablesScreen(
                         personSummaries = personSummaries,
                         activeUserName = activeUserName,
+                        currentShamsiDate = currentShamsiDate,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
                         onToggleSharePaid = { id, isPaid -> viewModel.toggleDebtorPaid(id, isPaid) },

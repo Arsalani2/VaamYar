@@ -22,6 +22,8 @@ import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
 import com.example.util.SoundHelper
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class FinancialOverview(
@@ -109,6 +111,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentShamsiDate: StateFlow<ShamsiDate> = _currentShamsiDate.asStateFlow()
 
     val isCustomDateActive: StateFlow<Boolean> = MutableStateFlow(appPreferences.isCustomDateEnabled)
+
+    init {
+        // فیکس bug.md/P2-8: تاریخ جاری قبلاً فقط یک‌بار در ساختِ ViewModel مقدار می‌گرفت؛ با
+        // باز ماندن اپ، عبور از نیمه‌شب/مرز ماه شمسی در محاسبات منعکس نمی‌شد و «امروز»
+        // همان دیروز می‌ماند. این چک دوره‌ای «تاریخ مؤثر» را دوباره می‌خواند و در صورت تغییر،
+        // StateFlow را تازه می‌کند تا SmartTips و همه‌ی مصرف‌کنندگان تاریخ دوباره محاسبه شوند.
+        // (تاریخ سفارشی ثابت است و تغییری نمی‌کند؛ تغییر دستی ساعت سیستم هم پوشش داده می‌شود.)
+        viewModelScope.launch {
+            while (isActive) {
+                delay(60_000) // چک سبکِ هر دقیقه — فقط خواندن SharedPreferences از حافظه
+                refreshCurrentShamsiDate()
+            }
+        }
+    }
 
     // Persistent Theme Mode (default SYSTEM)
     private val _themeMode = MutableStateFlow(appPreferences.themeMode)
@@ -315,6 +331,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         tips
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * فیکس bug.md/P2-8: «تاریخ مؤثر» اپ (تاریخ سفارشی تنظیمات اگر فعال باشد، وگرنده
+     * ساعت سیستم) را دوباره می‌خواند و در صورت تغییر، [currentShamsiDate] را تازه می‌کند.
+     * توسط چک دوره‌ای init بالا فراخوانی می‌شود تا عبور از نیمه‌شب/مرز ماه، وقتی اپ باز
+     * است، در همه‌ی محاسبات (SmartTips، قسط رسیده، روزهای مانده و …) منعکس شود.
+     */
+    fun refreshCurrentShamsiDate() {
+        val effective = ShamsiDateHelper.getEffectiveShamsiDate(appPreferences)
+        if (effective != _currentShamsiDate.value) {
+            _currentShamsiDate.value = effective
+        }
+    }
 
     // Date Sync & Custom Date Override Methods
     fun syncDateWithSystem() {

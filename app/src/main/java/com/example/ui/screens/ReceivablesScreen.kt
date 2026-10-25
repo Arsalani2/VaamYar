@@ -21,12 +21,13 @@ import com.example.model.DebtorShare
 import com.example.ui.PersonReceivableSummary
 import com.example.ui.dialogs.ReminderShareDialog
 import com.example.util.NumberFormatter
-import com.example.util.ShamsiDateHelper
+import com.example.util.ShamsiDate
 
 @Composable
 fun ReceivablesScreen(
     personSummaries: List<PersonReceivableSummary>,
     activeUserName: String = "شما",
+    currentShamsiDate: ShamsiDate,
     usePersianDigits: Boolean = true,
     compactThousands: Boolean = false,
     onToggleSharePaid: (Long, Boolean) -> Unit,
@@ -35,7 +36,10 @@ fun ReceivablesScreen(
     modifier: Modifier = Modifier
 ) {
     var personToRemind by remember { mutableStateOf<PersonReceivableSummary?>(null) }
-    val currentShamsi = remember { ShamsiDateHelper.getCurrentShamsiDate() }
+    // فیکس bug.md/P2-4: متغیر مردهٔ currentShamsi (ساعتِ سیستم، نادیده‌گرفتنِ تاریخ سفارشی،
+    // بدون هیچ مصرفی) حذف شد؛ تاریخ جاری حالا از ViewModel به‌صورت پارامتر currentShamsiDate
+    // می‌آید و به ReminderShareDialog هم پاس داده می‌شود تا نام ماهِ پیامِ یادآوری همیشه
+    // با تاریخ مؤثر اپ یکی باشد، نه با ساعت دستگاه.
 
     val totalReceivableAmount = remember(personSummaries) {
         personSummaries.sumOf { it.totalMonthlyShare }
@@ -185,6 +189,7 @@ fun ReceivablesScreen(
     personToRemind?.let { person ->
         ReminderShareDialog(
             debtorName = person.personName,
+            currentShamsiDate = currentShamsiDate,
             shares = person.shares,
             senderName = activeUserName,
             onDismiss = { personToRemind = null }

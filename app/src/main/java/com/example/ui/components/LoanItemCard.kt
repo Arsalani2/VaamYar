@@ -28,6 +28,7 @@ import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.util.LoanIconDisplay
 import com.example.util.NumberFormatter
+import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
 
 enum class LoanViewMode(val titleFa: String) {
@@ -39,6 +40,7 @@ enum class LoanViewMode(val titleFa: String) {
 @Composable
 fun LoanItemCard(
     loan: Loan,
+    currentShamsiDate: ShamsiDate,
     viewMode: LoanViewMode = LoanViewMode.RECTANGLE,
     debtorShares: List<DebtorShare> = emptyList(),
     usePersianDigits: Boolean = true,
@@ -56,9 +58,12 @@ fun LoanItemCard(
         label = "loanProgress"
     )
 
-    val currentShamsi = remember { ShamsiDateHelper.getCurrentShamsiDate() }
-    val daysRemaining = remember(loan.dueDay, currentShamsi.day) {
-        loan.dueDay - currentShamsi.day
+    // فیکس bug.md/P2-8 (و P2-4): تاریخ جاری از ViewModel می‌آید (منبعِ واحدِ تاریخ اپ —
+    // شامل تاریخ سفارشی و به‌روزرسانی خودکار)؛ قبلاً هر کارت مستقیماً ساعت سیستم را
+    // می‌خواند و در remember فریز می‌شد — بعد از نیمه‌شب/مرز ماه (یا با فعال بودن تاریخ
+    // سفارشی) «روز مانده» با روزِ غلط محاسبه می‌شد.
+    val daysRemaining = remember(loan.dueDay, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
+        loan.dueDay - currentShamsiDate.day
     }
 
     val loanAccentColor = Color(loan.colorHex)

@@ -101,6 +101,7 @@ fun HomeScreen(
                     LoanItemCard(
                         loan = loan,
                         viewMode = LoanViewMode.SQUARE,
+                        currentShamsiDate = currentShamsiDate,
                         debtorShares = loanShares,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
@@ -211,6 +212,7 @@ fun HomeScreen(
                         LoanItemCard(
                             loan = loan,
                             viewMode = viewMode,
+                            currentShamsiDate = currentShamsiDate,
                             debtorShares = loanShares,
                             usePersianDigits = usePersianDigits,
                             compactThousands = compactThousands,
