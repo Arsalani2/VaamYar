@@ -45,7 +45,10 @@ abstract class AppDatabase : RoomDatabase() {
                     "vamyar_database"
                 )
                     .addMigrations(MIGRATION_2_3)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    // فیکس bug.md/P1-1: fallbackToDestructiveMigration(dropAllTables = true) حذف شد.
+                    // هر تغییر اسکیمای آینده بدون Migration واقعی، دیگر داده‌های مالی کاربر را
+                    // بی‌سروصدا پاک نمی‌کند؛ بلکه Room خطای IllegalStateException می‌دهد تا در زمان
+                    // توسعه الزاماً Migration نوشته شود.
                     .build()
                 INSTANCE = instance
                 instance
