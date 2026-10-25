@@ -319,3 +319,38 @@
 - دو تست رگرسیون به `LoanRepositoryIntegrityTest` اضافه شد: (۱) نصب تمیز → حذف همه‌ی وام‌های دمو → اجرای بعدی نباید دوباره seed کند؛ (۲) کاربر قدیمیِ دارای داده نباید وام دمو بگیرد و پس از حذف داده‌هایش هم seed برنگردد.
 
 ⚠️ مانند فیکس‌های قبلی، بیلد و تست در محیط تهیه‌ی این گزارش ممکن نبود؛ پیش از merge/ریلیز یک‌بار `./gradlew testDebugUnitTest` اجرا شود.
+
+## حذف P3-5 — قابلیت شماره تلفن شریک کامل حذف شد (طبق تصمیم کاربر)
+
+**مشکل:** فیلد `UserProfile.phoneNumber` (و لیبل «شماره تماس» در `ReminderShareDialog`) هیچ نقشی در هیچ مسیری نداشت؛ یادآوری فقط متن عمومی با `ACTION_SEND` است و شماره تلفن هیچ‌جا خوانده نمی‌شد.
+
+**راه‌حل (کامیت `f5f19fa`) — حذف کامل به‌جای تکمیل (پیشنهاد F4/`smsto:` منتفی شد):**
+- فیلد `phoneNumber` از `UserProfile`، فیلد ورودی تلفن + state مربوطه از `AddEditUserDialog` و خط کپی آن در مسیر ذخیره حذف شد؛ دو سازندهٔ تستی در `LoanRepositoryIntegrityTest` هم اصلاح شدند.
+- اسکمای Room از نسخه ۳ به ۴ ارتقا یافت: `MIGRATION_3_4` جدول `user_profiles` را با ساختار بدون ستون تلفن بازسازی می‌کند (DROP COLUMN در SQLite اندروید ۸–۱۱ پشتیبانی نمی‌شود) — نام، پرچم کاربر مبنا، رنگ آواتار و یادداشت‌ها حفظ می‌شوند.
+- `BackupHelper` دیگر `phoneNumber` را export/import نمی‌کند؛ بکاپ‌های قدیمیِ حاوی این کلید همچنان بدون خطا import می‌شوند (کلید نادیده گرفته می‌شود) — سند «Structure Backup and import.md» به‌روز شد.
+- نکته: `shareDescription` (یادداشت سهم شرکا) قابلیت زنده است و دست نخورد — دامنهٔ P3-5 فقط شماره تلفن بود.
+
+## حذف P3-7 — مسیر مردهٔ پیامک مستقیم (TelephonyHelper) پاک شد
+
+**مشکل:** `TelephonyHelper.sendDirectSms` هیچ‌جا صدا زده نمی‌شد و پرمیشن `SEND_SMS` هم در Manifest نبود؛ کد کاملاً مرده بود.
+
+**راه‌حل (کامیت `2e1920e`):** فایل `TelephonyHelper.kt` کلاً حذف شد (جستجوی کل ریپو پیش از حذف: صفر ارجاع). طبق تصمیم A2 قابلیت پیامک از راه دور ساخته نمی‌شود و یادآوری‌ها صرفاً با اعلان محلی (AlarmManager، حل A3) کار می‌کنند.
+
+## حذف P3-8 — allowBackup=false و حذف فایل‌های Backup Rules
+
+**مشکل:** `allowBackup="true"` باعث می‌شد دیتابیس مالی (اسامی، مبالغ، تاریخچه) به Auto Backup گوگل qualify شود — در تناقض با ادعای «کاملاً آفلاین» README.
+
+**راه‌حل (کامیت `f5f19fa` + حذف فایل‌ها در کامیت‌های `9ad1b5c` و `e151553`):** `allowBackup` به `false` تغییر کرد و ارجاع‌های `dataExtractionRules`/`fullBackupContent` از Manifest حذف شدند؛ چون دیگر ارجاعی به آن‌ها نبود، `backup_rules.xml` و `data_extraction_rules.xml` هم پاک شدند. از این پس هیچ داده‌ای از اپ به زیرساخت گوگل منتقل نمی‌شود؛ مسیر بکاپ رسمی، همان بکاپ JSON دستی اپ است.
+
+## حذف P3-9 — زیرسیستم مردهٔ ReminderRule/RemoteCommand/RemoteLog/AppUser و Onboarding مرده پاک شد (طبق تصمیم A2)
+
+**مشکل:** چهار Entity (`ReminderRule`، `RemoteCommand`، `RemoteLog`، `AppUser`) و DAOهایشان در `@Database` ثبت نشده بودند → جدول‌شان هرگز ساخته نمی‌شد و کل «سیستم کنترل/یادآوری از راه دور SMS-driven» باقی‌ماندهٔ مرده بود؛ `showOnboarding` هاردکد `false` بود و `completeOnboarding` + `FirstLaunchOnboardingDialog` غیرقابل دسترس بودند.
+
+**راه‌حل (اصلاحات کامیت `f5f19fa` + حذف ۹ فایل در کامیت‌های `9b017fe` تا `3869a12`):**
+- Entityهای مرده پاک شدند: `model/ReminderRule.kt` (`9b017fe`)، `model/RemoteCommand.kt` (`cd805ca`)، `model/RemoteLog.kt` (`ecf95fe`)، `model/AppUser.kt` (`8fc6e88`).
+- DAOهای مرده پاک شدند: `data/ReminderRuleDao.kt` (`94e8bb4`)، `data/RemoteCommandDao.kt` (`42c70d4`)، `data/RemoteLogDao.kt` (`0a1b2f2`)، `data/AppUserDao.kt` (`a3f0fd7`).
+- `ui/dialogs/FirstLaunchOnboardingDialog.kt` (`3869a12`) — دیالوگ غیرقابل دسترس — حذف و مسیرهای مردهٔ `showOnboarding` (StateFlow هاردکد false) و `completeOnboarding` از `MainViewModel` پاک شدند.
+- راهنمای زندهٔ اولین اجرا (`AppGuideDialog` با پرچم persisted `hasSeenAppGuide` که در `MainActivity` صدا زده می‌شود) دست‌نخورده ماند — فقط کد مرده حذف شد.
+- پیش از هر حذف، کل ریپو برای ارجاع جستجو شد: هیچ فایلی به این ۹ فایل ارجاع نداشت؛ حذف‌ها بدون هیچ تغییر رفتاری در اپ است.
+
+⚠️ مانند فیکس‌های قبلی، بیلد و تست در محیط تهیهٔ این گزارش ممکن نبود؛ پیش از merge/ریلیز یک‌بار `./gradlew testDebugUnitTest` اجرا شود.
