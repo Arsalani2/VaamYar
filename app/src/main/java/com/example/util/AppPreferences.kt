@@ -21,6 +21,7 @@ class AppPreferences(context: Context) {
         private const val KEY_CUSTOM_YEAR = "key_custom_year"
         private const val KEY_CUSTOM_MONTH = "key_custom_month"
         private const val KEY_CUSTOM_DAY = "key_custom_day"
+        private const val KEY_LAST_ROLLOVER_MONTH = "key_last_rollover_month" // فیکس bug.md/P1-6
     }
 
     var loanViewMode: LoanViewMode
@@ -89,6 +90,14 @@ class AppPreferences(context: Context) {
     var customDay: Int
         get() = prefs.getInt(KEY_CUSTOM_DAY, 1)
         set(value) = prefs.edit().putInt(KEY_CUSTOM_DAY, value).apply()
+
+    // فیکس bug.md/P1-6: کلید ماهِ آخرین رِسِت خودکار (مثل "1405-08")؛
+    // خالی یعنی هنوز هیچ رِسِتی ثبت نشده (اولین اجرای اپ).
+    var lastRolloverMonthKey: String
+        get() = prefs.getString(KEY_LAST_ROLLOVER_MONTH, "") ?: ""
+        set(value) {
+            prefs.edit().putString(KEY_LAST_ROLLOVER_MONTH, value).apply()
+        }
 
     fun setCustomDate(year: Int, month: Int, day: Int) {
         prefs.edit()

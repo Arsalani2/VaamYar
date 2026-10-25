@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.example.data.AppDatabase
 import com.example.util.NumberFormatter
+import com.example.util.MonthlyRolloverHelper
 import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,10 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // فیکس bug.md/P1-6: چک روزانهٔ تغییر ماه — حتی اگر اپ مدتی باز نشده باشد،
+                // پرچم‌های «پرداخت ماه جاری» با عوض شدن ماه شمسی رِسِت می‌شوند.
+                MonthlyRolloverHelper.rolloverIfNeeded(context)
+
                 val db = AppDatabase.getDatabase(context)
                 val loans = db.loanDao().getAllActiveLoans().firstOrNull() ?: emptyList()
                 val currentShamsi = ShamsiDateHelper.getCurrentShamsiDate()

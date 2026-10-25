@@ -37,4 +37,9 @@ interface LoanDao {
 
     @Query("SELECT COUNT(*) FROM loans")
     suspend fun getCount(): Int
+
+    // فیکس bug.md/P1-6: صفر کردن پرچم «پرداخت ماه جاری» همهٔ وام‌ها
+    // (رِسِت خودکار ماهانه + دکمهٔ دستی «شروع ماه جدید»)
+    @Query("UPDATE loans SET isCurrentMonthPaid = 0 WHERE isCurrentMonthPaid = 1")
+    suspend fun resetCurrentMonthPaidFlags()
 }

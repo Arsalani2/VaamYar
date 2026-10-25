@@ -38,7 +38,9 @@ interface DebtorShareDao {
     @Query("UPDATE debtor_shares SET isPaidForCurrentMonth = :isPaid, lastPaidMonthName = :monthName WHERE id = :id")
     suspend fun updatePaidStatus(id: Long, isPaid: Boolean, monthName: String)
 
-    @Query("UPDATE debtor_shares SET isPaidForCurrentMonth = 0")
+    // فیکس bug.md/P1-6: رِسِت پرچم ماه جاری + پاک کردن lastPaidMonthName برای
+    // حذف وضعیت متناقض (پرچم صفر ولی نام ماه پرداخت باقی‌مانده)
+    @Query("UPDATE debtor_shares SET isPaidForCurrentMonth = 0, lastPaidMonthName = ''")
     suspend fun resetMonthlyPaidStatus()
 
     @Query("UPDATE debtor_shares SET personName = :newName WHERE personName = :oldName")

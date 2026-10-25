@@ -118,25 +118,12 @@ fun AddEditLoanDialog(
         )
     }
 
-    // Interactive paid installments (defaults to existing or auto-detected)
+    // فیکس bug.md/P1-5: «قسط رسیده» با «قسط پرداخت‌شده» یکی نیست.
+    // autoElapsed فقط تعداد اقساطِ سررسیدرسیده را «نمایش» می‌دهد؛ paidMonths تنها با
+    // تأیید صریح کاربر (دکمهٔ ثبتِ رسیده‌ها یا لمس دایرهٔای اقساط) تغییر می‌کند؛
+    // افکت قدیمی که هنگام تغییر تاریخ شروع/مدت، paidMonths را بازنویسی می‌کرد حذف شد.
     var paidMonths by remember {
-        mutableIntStateOf(loanToEdit?.paidMonths ?: autoElapsed)
-    }
-
-    // Whenever user changes start date or total months on a new loan, sync paid months automatically
-    LaunchedEffect(startDate.year, startDate.month, startDate.day, totalMonths, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
-        if (loanToEdit == null) {
-            val freshElapsed = ShamsiDateHelper.calculateElapsedInstallments(
-                startYear = startDate.year,
-                startMonth = startDate.month,
-                startDay = startDate.day,
-                curYear = currentShamsiDate.year,
-                curMonth = currentShamsiDate.month,
-                curDay = currentShamsiDate.day,
-                totalMonths = totalMonths
-            )
-            paidMonths = freshElapsed
-        }
+        mutableIntStateOf(loanToEdit?.paidMonths ?: 0)
     }
 
     // Dynamic list of debtor shares (سهم شرکا)
@@ -444,12 +431,12 @@ fun AddEditLoanDialog(
                             ) {
                                 Column {
                                     Text(
-                                        text = "اقساط پرداخت‌شده تا الان:",
+                                        text = "اقساط پرداخت‌شده (ثبت‌شده توسط شما):",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "تشخیص هوشمند: ${NumberFormatter.formatNumber(autoElapsed, usePersianDigits)} قسط تا امروز (${currentShamsiDate.monthName} ${currentShamsiDate.year})",
+                                        text = "اقساط رسیده تا امروز: ${NumberFormatter.formatNumber(autoElapsed, usePersianDigits)} قسط (${currentShamsiDate.monthName} ${currentShamsiDate.year}) — صرفاً محاسبهٔ سررسید؛ پرداخت‌شده‌ها را جداگانه ثبت کنید",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -481,7 +468,7 @@ fun AddEditLoanDialog(
                                     ) {
                                         Icon(Icons.Default.AutoMode, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("تنظیم خودکار به $autoElapsed قسط گذشته", style = MaterialTheme.typography.labelSmall)
+                                        Text("ثبت ${autoElapsed} قسط رسیده به‌عنوان پرداخت‌شده", style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -693,18 +680,8 @@ fun AddEditLoanDialog(
             onDateSelected = { pickedDate ->
                 startDate = pickedDate
                 showCalendarPicker = false
-                if (loanToEdit == null) {
-                    val calculated = ShamsiDateHelper.calculateElapsedInstallments(
-                        startYear = pickedDate.year,
-                        startMonth = pickedDate.month,
-                        startDay = pickedDate.day,
-                        curYear = currentShamsiDate.year,
-                        curMonth = currentShamsiDate.month,
-                        curDay = currentShamsiDate.day,
-                        totalMonths = totalMonths
-                    )
-                    paidMonths = calculated
-                }
+                // فیکس bug.md/P1-5: انتخاب تاریخ شروع دیگر paidMonths را به‌صورت خودکار
+                // برابر «اقساط رسیده» نمی‌کند؛ پرداخت‌شده‌ها فقط با تأیید صریح کاربر ثبت می‌شوند.
             }
         )
     }

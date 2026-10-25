@@ -155,4 +155,18 @@ object ShamsiDateHelper {
             (30 - currentDay) + dueDay
         }
     }
+
+    /**
+     * فیکس bug.md/P1-6: کلید ماه شمسی مثل "1405-08" برای تشخیص تغییر ماه
+     * (پایهٔ رِسِت خودکار ماهانهٔ پرچم‌های «پرداخت ماه جاری»).
+     */
+    fun monthKey(date: ShamsiDate): String = "%04d-%02d".format(date.year, date.month)
+
+    /**
+     * فیکس bug.md/P1-6 (و P2-4): تاریخ مؤثر اپ — تاریخ سفارشی تنظیمات اگر فعال باشد،
+     * وگرنده ساعت سیستم. منطقِ «ماه جاری» باید از همین تاریخ پیروی کند.
+     */
+    fun getEffectiveShamsiDate(prefs: AppPreferences): ShamsiDate =
+        if (prefs.isCustomDateEnabled) ShamsiDate(prefs.customYear, prefs.customMonth, prefs.customDay)
+        else getSystemShamsiDate()
 }

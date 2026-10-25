@@ -391,7 +391,15 @@ class LoanRepository(
         debtorShareDao.updatePaidStatus(shareId, isPaid, monthName)
     }
 
+    /**
+     * رِسِت دستی «شروع ماه جدید» — فیکس bug.md/P1-6:
+     * قبلاً فقط پرچم سهم شرکا صفر می‌شد و پرچم ماه جاری خود وام‌ها تیک‌خورده ماند می‌شد.
+     * اکنون هر دو درون یک تراکنش اتمیک رِسِت می‌شوند.
+     */
     suspend fun resetMonthlyDebtorStatus() = withContext(Dispatchers.IO) {
-        debtorShareDao.resetMonthlyPaidStatus()
+        database.withTransaction {
+            loanDao.resetCurrentMonthPaidFlags()
+            debtorShareDao.resetMonthlyPaidStatus()
+        }
     }
 }
