@@ -36,12 +36,11 @@ fun ShamsiDatePickerDialog(
     var selectedMonth by remember { mutableIntStateOf(initialDate.month) }
     var selectedDay by remember { mutableIntStateOf(initialDate.day) }
 
-    val daysInMonth = remember(selectedMonth) {
-        when (selectedMonth) {
-            in 1..6 -> 31
-            in 7..11 -> 30
-            else -> 29
-        }
+    // فیکس bug.md/P2-5: طول ماه از تقویم شمسیِ واقعی خوانده می‌شود — قبلاً اسفند همیشه
+    // ۲۹ روز بود و سررسید ۳۰ اسفند در سال‌های کبیسه (۱۴۰۳، ۱۴۰۸، …) غیرقابل انتخاب بود.
+    // کبیسه بودن اسفند به سال بستگی دارد، پس `daysInMonth` به سال هم وابسته شد.
+    val daysInMonth = remember(selectedMonth, selectedYear) {
+        ShamsiDateHelper.getDaysInShamsiMonth(selectedYear, selectedMonth)
     }
 
     LaunchedEffect(daysInMonth) {

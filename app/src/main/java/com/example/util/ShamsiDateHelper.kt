@@ -146,13 +146,24 @@ object ShamsiDateHelper {
     }
 
     /**
-     * Calculates days until due day in current Shamsi month or next month.
+     * فیکس bug.md/P2-6: «چند روز تا سررسید» با تقویم شمسیِ واقعی محاسبه می‌شود — قبلاً همه‌ی
+     * ماه‌ها ۳۰ روز فرض می‌شدند و در ماه‌های ۳۱روزه (فروردین–شهریور) و اسفند ۱ تا ۲ روز
+     * خطا می‌داد. اگر سررسیدِ ماه جاری گذشته باشد، فاصله تا سررسیدِ ماه بعد با طول واقعی
+     * هر دو ماه حساب می‌شود. سررسیدِ بزرگ‌تر از طول ماه (مثل ۳۱ در مهر) روی آخرین روزِ
+     * همان ماه منطبق می‌شود.
      */
-    fun daysUntilDue(dueDay: Int, currentDay: Int): Int {
-        return if (dueDay >= currentDay) {
-            dueDay - currentDay
+    fun daysUntilDue(dueDay: Int, currentDate: ShamsiDate): Int {
+        val daysThisMonth = getDaysInShamsiMonth(currentDate.year, currentDate.month)
+        val effectiveDueDay = dueDay.coerceIn(1, daysThisMonth)
+        return if (effectiveDueDay >= currentDate.day) {
+            effectiveDueDay - currentDate.day
         } else {
-            (30 - currentDay) + dueDay
+            val daysNextMonth = if (currentDate.month == 12) {
+                getDaysInShamsiMonth(currentDate.year + 1, 1)
+            } else {
+                getDaysInShamsiMonth(currentDate.year, currentDate.month + 1)
+            }
+            (daysThisMonth - currentDate.day) + dueDay.coerceIn(1, daysNextMonth)
         }
     }
 

@@ -241,7 +241,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val shareAmount = getUserShareForLoan(nextLoan, shares, activeUserName)
             val formattedShare = NumberFormatter.formatPrice(shareAmount, usePersian = usePersian, compactThousands = compact)
             val dueDayFormatted = NumberFormatter.formatNumber(nextLoan.dueDay, usePersian)
-            val daysDiff = nextLoan.dueDay - curDate.day
+            // فیکس bug.md/P2-6: فاصله تا سررسید با تقویم شمسیِ واقعی محاسبه می‌شود
+            // (ماه‌های ۳۱روزه، اسفند ۲۹/۳۰روزه و سررسیدِ افتاده در ماه بعد) — قبلاً فقط
+            // dueDay - day بود و روزهای منفی یا شمارشِ اشتباه می‌داد.
+            val daysDiff = ShamsiDateHelper.daysUntilDue(nextLoan.dueDay, curDate)
 
             val timingText = when {
                 daysDiff == 0 -> "امروز موعد پرداخت است!"
