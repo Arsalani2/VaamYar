@@ -1,0 +1,85 @@
+# 🐛 گزارش باگ‌های وام‌یار — bug.md
+
+> تاریخ ثبت: ۲۰۲۶-۱۰-۲۵ (۱۴۰۵/۰۸/۰۳) — بازبینی کامل سورس در دو دور، بر پایه نسخه 1.0.2
+> این فایل یک **TODO List زنده** است: با رفع هر مورد، تیک بزنید، شماره کامیتِ رفع را کنارش بنویسید و در Update.md ثبتش کنید.
+> شماره‌گذاری: **P1** (بحرانی) → **P2** (مهم) → **P3** (متوسط) → **P4** (زیرساخت/مستندات)
+
+---
+
+## 🔴 P1 — بحرانی (ریسک از دست رفتن داده یا رفتار غلط مالی)
+
+- [ ] **P1-1 | بمب ساعتیِ destructive migration** — `AppDatabase.kt` از `fallbackToDestructiveMigration(dropAllTables = true)` استفاده می‌کند. اولین تغییر اسکیمای آینده بدون Migration، کل داده کاربر (وام‌ها، سهم‌ها، تاریخچه پرداخت) را پاک می‌کند. حذف شود؛ فقط Migration واقعی.
+- [ ] **P1-2 | ویرایش وام = پاک شدن وضعیت پرداخت شرکا** — `LoanRepository.saveLoanWithShares` موقع آپدیت اول `deleteSharesForLoan` می‌زند بعد از نو insert می‌کند؛ `isPaidForCurrentMonth` و `lastPaidMonthName` همه شرکا false/خالی می‌شوند. فیکس: مقایسه سهم‌های قدیم/جدید و حفظ وضعیت پرداخت سهم‌های یکسان.
+- [ ] **P1-3 | آلوده شدن تاریخچه پرداخت** — `toggleCurrentMonthPaid` موقع تیک زدن `PaymentRecord` ثبت می‌کند ولی موقع برداشتن تیک حذفش نمی‌کند؛ تیک‌زدنِ دوباره = رکورد تکراری. علاوه بر آن ناسازگاری مبلغ: `toggleCurrentMonthPaid` مبلغ `effectiveMyShare` و `recordInstallmentPayment` مبلغ `monthlyAmount` ثبت می‌کند — تاریخچه وام شراکتی ترکیبی از سهم و مبلغ کامل می‌شود.
+- [ ] **P1-4 | restore غیرتراکنشی** — `restoreDatabaseSnapshot` چهار جدول را پاک/درج می‌کند بدون `db.withTransaction`. کشته شدن اپ وسط restore = داده‌ی نصفه. باید اتمیک باشد.
+- [ ] **P1-5 | «قسط رسیده» = «قسط پرداخت‌شده» فرض می‌شود** — `AddEditLoanDialog` برای وام جدید `paidMonths = autoElapsed` می‌گذارد؛ وامی که ۶ ماه پیش شروع شده، از همان لحظه ۶ قسط «پرداخت‌شده» ثبت می‌شود. باید دو مفهوم جدا شود: `dueMonths` (محاسبه‌ای) و `paidMonths` (فقط با تأیید کاربر).
+- [ ] **P1-6 | عدم رِسِت خودکار ماهانه** — `isCurrentMonthPaid` وام‌ها و `isPaidForCurrentMonth` سهم‌ها هیچ‌جا با تغییر ماه شمسی خودکار reset نمی‌شوند (فقط دکمه دستی هست). راه‌حل: `monthKey` (مثل 1405/08) روی Loan/Share و چک در شروع اپ/آلارم. ضمناً `resetMonthlyPaidStatus` پرچم را صفر می‌کند ولی `lastPaidMonthName` را پاک نمی‌کند (وضعیت متناقض).
+- [ ] **P1-7 | امکان دو کاربر مبنا + انتخاب غیرقطعی primary** — `completeOnboarding` UserProfile جدید با `isPrimary=true` insert می‌کند بدون پاک کردن پرچم قبلی؛ `getPrimaryUser` با `LIMIT 1` **بدون ORDER BY** است. نتیجه: کاربر مبنا می‌تواند عوض شود بدون اینکه کاربر بخواهد.
+- [ ] **P1-8 | اعتبارسنجی سهم شرکا سه‌لایه گم شده** — در دیالوگ افزودن شریک: (الف) مجموع سهم شرکا می‌تواند از `monthlyAmount` بیشتر شود → `calculatedMyShare` بی‌صدا 0 می‌شود (بازگشت «باگ سهم صفر»)، (ب) یک نفر می‌تواند دو بار شریکِ همان وام شود، (ج) خود کاربر مبنا هم می‌شود شریک شد (شمارش دوبرابر). هر سه باید چک شوند.
+- [ ] **P1-9 | ویرایش وام می‌تواند داده ناسازگار بسازد** — کاهش `totalMonths` زیر `paidMonths` فعلی بدون clamp ذخیره می‌شود (۱۲ قسط پرداخت‌شده در وام ۱۰قسطی)؛ `isCurrentMonthPaid` هم با ویرایش `paidMonths` sync نمی‌شود.
+
+## 🟠 P2 — مهم (اعلان‌ها و تاریخ شمسی)
+
+- [ ] **P2-1 | آلارم‌ها بعد از ری‌بوت گوشی می‌میرند** — `setInexactRepeating` با ری‌بوت پاک می‌شود؛ پرمیشن `RECEIVE_BOOT_COMPLETED` در Manifest هست ولی هیچ Receiver برایش تعریف نشده. راه‌حل اصولی: WorkManager + یک BOOT receiver.
+- [ ] **P2-2 | اعلان «سررسید فردا» آخر هر ماه کار نمی‌کند** — `InstallmentAlarmReceiver`: `dueTomorrow = dueDay == today + 1`؛ روز آخر ماه، فردا = روز ۱ ماه بعد → یادآوری قسط اول ماه بعد هرگز نمی‌آید.
+- [ ] **P2-3 | اعلان برای وامِ همین‌ماه-پرداخت‌شده** — Receiver فقط `!isCompleted` را چک می‌کند نه `isCurrentMonthPaid`؛ کاربر بعد از پرداخت هم «امروز موعد پرداخت» می‌گیرد.
+- [ ] **P2-4 | ناهماهنگی تاریخ Receiver و اپ** — اپ از تاریخ سفارشی (custom) پشتیبانی می‌کند ولی Receiver همیشه از ساعت سیستم می‌خواند.
+- [ ] **P2-5 | اسفند ۳۰ روزه در تقویم انتخاب تاریخ نیست** — `ShamsiDatePickerDialog` ماه ۱۲ را همیشه ۲۹ روز می‌گیرد؛ در سال کبیسه (۱۴۰۳، ۱۴۰۷، …) اسفند ۳۰ روز است و سررسید ۳۰ اسفند **قابل انتخاب نیست**. سال کبیسه هیچ‌جا چک نمی‌شود.
+- [ ] **P2-6 | فرض ۳۰روزه بودن همه ماه‌ها** — `ShamsiDateHelper.daysUntilDue` و `daysDiff` در SmartTips: ماه‌های ۳۱روزه (فروردین–شهریور) و اسفند ۱–۲ روز خطا دارند. جدول طول ماه شمسی + کبیسه لازم است.
+- [ ] **P2-7 | آلارم غیردقیق و هاردکد** — `setInexactRepeating` زیر Doze ساعت‌ها عقب می‌افتد؛ `SCHEDULE_EXACT_ALARM` گرفته شده ولی `canScheduleExactAlarms()` هیچ‌جا چک نمی‌شود؛ ساعت چک روزانه هم ۱۰:۰۰ هاردکد است (قانون `ReminderRule.hour` مرده است).
+- [ ] **P2-8 | تاریخ جاری فریز می‌شود** — `_currentShamsiDate` فقط یک‌بار در ساخت ViewModel مقدار می‌گیرد؛ عبور از نیمه‌شب/مرز ماه در حالت باز بودن اپ = محاسبات با دیروز.
+
+## 🟠 P2 — مهم (تنظیمات و بکاپ)
+
+- [ ] **P2-9 | سوییچ صدا خراب است** — `MainViewModel.setSoundEnabled`: `_soundEnabled.value = false` هاردکد؛ پارامتر `enabled` نادیده گرفته می‌شود → کاربر نمی‌تواند صدا/لرزش را روشن کند.
+- [ ] **P2-10 | صدا persist نمی‌شود** — `AppPreferences` کلیدی برای `soundEnabled` ندارد؛ بعد از restart همیشه خاموش است.
+- [ ] **P2-11 | فونت persist نمی‌شود** — `setAppFontStyle` فقط StateFlow را آپدیت می‌کند؛ در `AppPreferences` کلید `fontStyle` وجود ندارد (در حالی که `BackupHelper` فونت را در بکاپ ذخیره می‌کند — ناسازگار).
+- [ ] **P2-12 | تنظیمات بازیابی‌شده از بکاپ بعد از restart می‌پرند** — `importBackupJson` فقط StateFlowها را آپدیت می‌کند و در `appPreferences` نمی‌نویسد؛ تم/ارقام/فشرده‌سازی import شده برگشت می‌زند.
+- [ ] **P2-13 | appVersion هاردکد در بکاپ** — `exportBackupJson` مقدار `"1.0.1"` را هاردکد می‌کند (نسخه فعلی 1.0.2)؛ باید از `version.properties` خوانده شود.
+- [ ] **P2-14 | مسیر legacy بکاپ می‌تواند سهم را صفر کند** — `BackupHelper` فقط برای وام بدون شریک `myShareAmount` را با `monthlyAmount` پر می‌کند؛ وام شراکتی قدیمی بدون این فیلد → سهم من 0.
+
+## 🟡 P3 — متوسط (منطق و داده)
+
+- [ ] **P3-1 | هویت کاربر با «نام» تطبیق داده می‌شود نه ID** — `getUserShareForLoan`، `checkCanDeleteUser` و `renamePersonInShares` همه name-matching رشته‌ای‌اند؛ ی/ي و ک/ك عربی، دو هم‌نام، یا تغییر نام = حساب اشتباه. `DebtorShare` باید `userId: Long` بگیرد.
+- [ ] **P3-2 | دو منبع حقیقت برای «سهم من»** — فیلد `loan.myShareAmount` و محاسبه `monthlyAmount − Σ shares` دو مسیر جدا هستند؛ ریشه‌ی خانواده باگ‌های سهم. تا یک منبع حقیقت نشود، فیکس‌های تک‌تکی برمی‌گردند.
+- [ ] **P3-3 | مطالبات شامل وام‌های تسویه‌شده** — `personSummaries` و `financialOverview` از `allShares` فیلترنشده استفاده می‌کنند. ضمناً `isArchived` فیلد مرده است: `getAllActiveLoans` هیچ‌جا استفاده نمی‌شود و راهی برای archive کردن هم نیست.
+- [ ] **P3-4 | parseInt overflow بی‌صدا** — `NumberFormatter.parseInt` = `parseAmount(input).toInt()`؛ عدد بزرگ‌تر از Int.MAX می‌پیچد. سرریز باید reject شود.
+- [ ] **P3-5 | شماره تلفن شریک هیچ‌جا استفاده نمی‌شود** — `UserProfile.phoneNumber` و `shareDescription` (لیبل «شماره تماس») در `ReminderShareDialog` نقشی ندارند؛ یادآوری فقط متن عمومی با `ACTION_SEND` است. یک intent `smsto:${phone}` با متن آماده کافی است.
+- [ ] **P3-6 | ریسک OOM در آیکون وام** — `LoanIconHelper` با `BitmapFactory.decodeStream` بدون `inSampleSize` عکس فول‌سایز را دکود می‌کند بعد به ۳۰۰×۳۰۰ کوچک می‌کند؛ در گوشی‌های کم‌RAM محل crash است. باید bounds اول خوانده شود.
+- [ ] **P3-7 | مسیر پیامک مستقیم مرده** — `TelephonyHelper.sendDirectSms` وجود دارد ولی `SEND_SMS` در Manifest نیست → همیشه به شاخه «Simulating SMS dispatch» می‌افتد. یا پرمیشن + rationale یا حذف مسیر.
+- [ ] **P3-8 | `allowBackup="true"`** — دیتابیس مالی (اسامی، شماره‌ها، مبالغ) به Auto Backup گوگل qualify می‌شود؛ با ادعای «کاملاً آفلاین» README تناقض دارد. `allowBackup=false` یا مستثنا کردن DB در `dataExtractionRules`.
+- [ ] **P3-9 | کد مرده: سیستم یادآوری/کنترل از راه دور** — `ReminderRule`، `RemoteCommand`، `RemoteLog` و `AppUser` (Entity + DAO) در `@Database` ثبت نشده‌اند → جدول‌شان هرگز ساخته نمی‌شود و کل این زیرسیستم مرده است. همچنین `showOnboarding` هاردکد `false` است و `completeOnboarding` + `FirstLaunchOnboardingDialog` غیرقابل دسترس‌اند.
+- [ ] **P3-10 | داده دمو در نصب تمیز** — `checkAndSeedInitialData` کاربران «من»/«علی» و ۳ وام جعلی با تاریخ ثابت ۱۴۰۲–۱۴۰۵ seed می‌کند؛ با فلسفه zero-state و onboarding تضاد دارد و با گذر زمان اقساط عقب‌افتاده جعلی نشان می‌دهد. (⚠️ اگر عمداً برای نمایش است، حداقل پشت یک toggle «حالت نمایشی» برود — سوال A1)
+- [ ] **P3-11 | تعریف خاص نام «من»** — `getUserShareForLoan`: `activeUser == "من" || activeUser == "شما"` → هر کسی با این نام‌ها همیشه primary حساب می‌شود؛ شکننده.
+- [ ] **P3-12 | `totalMonths` بی‌صدا clamp می‌شود** — ورودی مدت وام `coerceIn(1, 120)` بدون هیچ هشدار UI؛ ۲۰۰ ماه ورودی = ۱۲۰ ذخیره. ضمناً وام با `monthlyAmount = 0` هم قابل ذخیره است.
+
+## 🔵 P4 — زیرساخت، CI و سازگاری مستندات
+
+- [ ] **P4-1 | هر push به main = ریلیز عمومی بدون تست** — ورک‌فلو فقط بیلد می‌کند؛ `testDebugUnitTest`/`lint` اجرا نمی‌شود و تنها تست‌های template اندروید استودیو در ریپو هستند. حداقل: گام تست + ریلیز فقط روی tag.
+- [ ] **P4-2 | تست واحد برای منطق خالص** — `ShamsiDateHelper` و `NumberFormatter` هر دو `object` خالص‌اند؛ ۲۰ تست ساده، کل باگ‌های P2-5/P2-6/P3-4 را می‌گرفت. سریع‌ترین برداشت پروژه.
+- [ ] **P4-3 | تضاد نسخه‌ها در README** — README می‌گوید Android 8.0+ (API 26) ولی `minSdk = 24`؛ بج Kotlin 2.0.0 ولی واقعی 2.2.10؛ URL کلون `your-username/vamyar` placeholder. اصلاح شود.
+- [ ] **P4-4 | package naming** — `applicationId = com.aistudio.vamyar.zqnmxk` و namespace `com.example`؛ قبل از انتشار جدی باید rename شود (برای Play هم الزامی است).
+- [ ] **P4-5 | وابستگی‌های آنلاین در اپ آفلاین** — `firebase.ai`، `firebase-appcheck`، retrofit/okhttp/moshi در اپ «کاملاً آفلاین» حجم و مجوز شبکه می‌آورند؛ یا حذف یا اصلاح ادعای حریم خصوصی.
+- [ ] **P4-6 | فایل‌های غول‌پیکر** — `SettingsScreen.kt` (47KB)، `LoanItemCard.kt` (38KB)، `AddEditLoanDialog.kt` (41KB)؛ افزودن ktlint/detekt به CI تقسیم را اجباری می‌کند.
+
+---
+
+## ❓ سوال‌های باز (پاسخ بده تا مسیر فیکس مشخص شود)
+
+1. **A1 — داده دمو:** seed سه وام نمایشی عمدی است یا از نسخه‌های اولیه جا مانده؟ حذف کامل یا toggle «حالت نمایشی»؟
+2. **A2 — سیستم RemoteCommand/ReminderRule:** قرار بوده قابلیت کنترل/یادآوری از راه دور (SMS-driven) پیاده شود؟ اگر بله باید Entityها در `@Database` ثبت و با WorkManager زنده شوند؛ اگر نه، حذف کامل (P3-9).
+3. **A3 — یادآوری‌ها:** مهاجرت به WorkManager (پیشنهاد من، resilient و reboot-proof) یا ادامه AlarmManager با BOOT receiver و exact alarm؟
+4. **A4 — هویت شرکا:** تغییر `DebtorShare` به `userId` FK نیازمند Migration و اصلاح چند تابع است؛ انجام شود در همین نسخه یا بعد از P1؟
+5. **A5 — rename پکیج (`com.example` → `com.aistudio.vamyar`):** الان انجام شود (قبل از هر انتشار وسیع‌تر) یا بعداً؟
+
+## ✨ پیشنهاد امکانات (جانبی، خارج از باگ‌ها)
+
+- [ ] **F1 — جدول `LoanInstallment`** به جای شمارنده `paidMonths`: رکورد به‌ازای هر قسط (loanId، شماره، ماه شمسی، مبلغ، تاریخ واقعی). ریشه‌کارِ P1-3، P1-5 و P1-9 و پیش‌نیاز هر گزارش‌گیری.
+- [ ] **F2 — بکاپ خودکار زمان‌بندی‌شده + رمزنگاری AES-256-GCM** فایل بکاپ (به سبک گاوصندوق AvaTTS).
+- [ ] **F3 — شبیه‌ساز تسویه (What-if):** «اگر ماهی X اضافه بپردازم چند ماه زودتر تمام می‌شود؟»
+- [ ] **F4 — دکمه ارسال مستقیم به شماره شریک** (`smsto:`) در کنار متن آماده یادآوری.
+- [ ] **F5 — گزارش ماهانه قابل اشتراک (PDF/عکس)** برای شرکا.
+
+---
+
+*این فایل با کامیت `[skip ci]` push شده تا ورک‌فلو انتشارِ خودکار trigger نشود.*
