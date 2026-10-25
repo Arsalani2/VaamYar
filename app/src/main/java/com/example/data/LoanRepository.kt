@@ -198,28 +198,57 @@ class LoanRepository(
         userProfileDao.deleteUserById(userId)
     }
 
+    /**
+     * فیکس bug.md/P1-2:
+     * در مسیر ویرایش، قبل از حذف سهم‌های قدیمی، وضعیت پرداخت ماه جاری شرکای پابرجا
+     * (isPaidForCurrentMonth و lastPaidMonthName) بر اساس نام شخص استخراج و روی
+     * سهم جدید همان شخص بازگردانده می‌شود تا ویرایش وام (مثلاً تغییر عنوان یا مبلغ)
+     * وضعیت پرداخت شرکا را پاک نکند. شرکای حذف‌شده/تازه‌اضافه‌شده حالت اولیه را می‌گیرند.
+     */
     suspend fun saveLoanWithShares(
         loan: Loan,
         shares: List<DebtorShare>
     ): Long = withContext(Dispatchers.IO) {
-        val loanId = if (loan.id == 0L) {
-            loanDao.insertLoan(loan)
+        if (loan.id == 0L) {
+            // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند درج می‌شوند
+            val newLoanId = loanDao.insertLoan(loan)
+            shares.forEach { share ->
+                debtorShareDao.insertShare(
+                    share.copy(
+                        loanId = newLoanId,
+                        loanTitle = loan.title,
+                        dueDay = loan.dueDay
+                    )
+                )
+            }
+            newLoanId
         } else {
             loanDao.updateLoan(loan)
+            val existingByName = debtorShareDao
+                .getSharesForLoanOnce(loan.id)
+                .associateBy { it.personName.trim() }
             debtorShareDao.deleteSharesForLoan(loan.id)
+
+            shares.forEach { newShare ->
+                val matched = existingByName[newShare.personName.trim()]
+                val toInsert = if (matched != null) {
+                    newShare.copy(
+                        isPaidForCurrentMonth = matched.isPaidForCurrentMonth,
+                        lastPaidMonthName = matched.lastPaidMonthName
+                    )
+                } else {
+                    newShare
+                }
+                debtorShareDao.insertShare(
+                    toInsert.copy(
+                        loanId = loan.id,
+                        loanTitle = loan.title,
+                        dueDay = loan.dueDay
+                    )
+                )
+            }
             loan.id
         }
-
-        shares.forEach { share ->
-            debtorShareDao.insertShare(
-                share.copy(
-                    loanId = loanId,
-                    loanTitle = loan.title,
-                    dueDay = loan.dueDay
-                )
-            )
-        }
-        loanId
     }
 
     suspend fun deleteLoan(loanId: Long) = withContext(Dispatchers.IO) {

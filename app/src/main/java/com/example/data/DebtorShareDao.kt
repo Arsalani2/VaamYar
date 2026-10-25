@@ -12,6 +12,11 @@ interface DebtorShareDao {
     @Query("SELECT * FROM debtor_shares WHERE loanId = :loanId")
     fun getSharesForLoan(loanId: Long): Flow<List<DebtorShare>>
 
+    // فیکس bug.md/P1-2: خواندن یک‌باره (غیر-Flow) سهم‌های یک وام برای حفظ
+    // وضعیت پرداخت شرکا هنگام ویرایش وام در LoanRepository.saveLoanWithShares
+    @Query("SELECT * FROM debtor_shares WHERE loanId = :loanId")
+    suspend fun getSharesForLoanOnce(loanId: Long): List<DebtorShare>
+
     @Query("SELECT * FROM debtor_shares WHERE personName = :personName")
     suspend fun getSharesForPerson(personName: String): List<DebtorShare>
 
