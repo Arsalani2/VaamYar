@@ -75,6 +75,37 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
 ۶) حذف پرانتزهای زائد نظیر (من) در کنار اسامی.
 ۷) ایجاد سند جامع «Structure Backup and import.md» و فایل انتشار «Update.md».
 
+[2026-10-25 ~12:45 UTC] — Claude Sonnet 5.5 (claude-sonnet-5-5)
+اقدام: رفع دو باگ بحرانی P1-3 و P1-4 از فایل bug.md (روی شاخه‌ی fix/p1-3-p1-4، کامیت 6ccaf77).
+نکته: P1-1 و P1-2 پیش‌تر (کامیت‌های 2fa03bf و 77018be) توسط عامل قبلی رفع شده‌اند و در bug.md تیک خورده‌اند؛
+  ورودی مربوط به آن‌ها در این فایل ثبت نشده بود (فقط در bug.md و Update.md هست).
+دلیل و جزئیات:
+  P1-3 (آلوده شدن تاریخچه پرداخت):
+    - toggleCurrentMonthPaid موقع برداشتن تیک رکورد PaymentRecord را حذف نمی‌کرد؛ recordInstallmentPayment
+      (دکمه‌ی −) هم همین‌طور. تیک دوباره = رکورد تکراری.
+    - مبلغ ناسازگار بود: مسیر تیک effectiveMyShare و مسیر +/− monthlyAmount ثبت می‌کرد.
+    - اصلاح: PaymentRecordDao.deleteRecordsForInstallment(loanId, installmentNumber)؛
+      LoanDao.getLoanByIdOnce(id)؛ در LoanRepository توابع خصوصی buildPaymentRecord (منبع واحد مبلغ = monthlyAmount،
+      هم‌خوان با Loan.totalPaidAmount) و upsertInstallmentRecord (ابتدا حذف رکورد هم‌شماره، سپس درج).
+      هر دو تابع پرداخت داخل database.withTransaction اجرا می‌شوند و وضعیت وام را از DB می‌خوانند نه از نسخه‌ی کهنه‌ی UI.
+      در وام تسویه‌شده (clamp شمارنده) رکورد جدید ثبت نمی‌شود.
+    - تصمیم طراحی (قابل برگشت): مبلغ تاریخچه = کل قسط ماهانه. فقط در buildPaymentRecord تغییر می‌کند.
+  P1-4 (restore غیرتراکنشی):
+    - restoreDatabaseSnapshot اکنون داخل RoomDatabase.withTransaction است (rollback کامل در صورت خطا).
+    - همین اتمیک‌سازی برای saveLoanWithShares، deleteLoan، clearAllLoansAndReset و clearAllDataAndReset (هم‌ریشه، کم‌ریسک).
+    - LoanRepository پارامتر سازنده‌ی جدید `database: RoomDatabase` گرفت؛ VamyarApp.kt و ExampleRobolectricTest.kt به‌روز شدند.
+  فایل‌های تغییر کرده: app/src/main/java/com/example/data/{LoanRepository,LoanDao,PaymentRecordDao}.kt،
+    app/src/main/java/com/example/VamyarApp.kt، app/src/test/java/com/example/ExampleRobolectricTest.kt،
+    فایل جدید app/src/test/java/com/example/LoanRepositoryIntegrityTest.kt (8 تست)، و مستندات bug.md و Update.md.
+وضعیت راستی‌آزمایی:
+  - بیلد و اجرای تست انجام نشد: در محیط این نشست به services.gradle.org و dl.google.com دسترسی شبکه نبود (curl کد 000)
+    و Android SDK / kotlinc نصب نبود. بنابراین کد فقط با مرور دستی بررسی شد و «تأییدنشده توسط کامپایلر» است.
+  - ریسک کامپایل شناخته‌شده: استفاده از database.withTransaction<Unit> { ... return@withTransaction } و
+    androidx.room.withTransaction (از room-ktx که در app/build.gradle.kts هست).
+  - ورک‌فلو CI تست اجرا نمی‌کند (bug.md/P4-1)، پس merge به main بدون اجرای دستی `./gradlew testDebugUnitTest` تأییدی ندارد.
+  - برای جلوگیری از ریلیز عمومی تأییدنشده، تغییرات روی شاخه‌ی جدا push شد نه main (هر push به main ریلیز می‌سازد).
+محدودیت‌ها: رکوردهای تکراری ازقبل‌موجود در دیتابیس کاربران پاک‌سازی نمی‌شوند (نیازمند Migration نسخه 4؛ موکول به F1).
+
 ۳. رویکردهای موفق / ناموفق
 --------------------------
 - موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
@@ -83,10 +114,16 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
   دیگر ظاهر نشد؛ احتمالاً به Gradle 9.8.1 مربوط بود ولی علت قطعی آن اثبات نشده است.
 - ناموفق: `gradle wrapper --offline` داخل ریپو (resolve پلاگین‌ها نشد) → تولید در پوشه موقت تمیز.
 - ناموفق: `gh run view --log-failed` و `gh api .../logs` (403). جایگزین: `gh api repos/.../check-runs/<id>/annotations`.
+- موفق (طراحی، تأییدنشده با بیلد): تراکنش اتمیک برای restore و ثبت پرداخت؛ حذف رکورد هم‌شماره پیش از درج برای جلوگیری از تکراری.
+- ناموفق/غیرممکن در این نشست: بیلد و اجرای تست محلی (نبود شبکه به Gradle/Google Maven و نبود Android SDK). تکرار بدون دسترسی شبکه بی‌فایده است.
 
 ۴. وضعیت فعلی و گام‌های بعدی
 ----------------------------
 - آخرین عملیات موفق: ارتقای نسخه به 1.0.2، آماده‌سازی فایل‌های مستندات و تست‌های محلی.
+- آخرین وضعیت (2026-10-25 ~12:45 UTC): P1-1 و P1-2 روی main رفع شده‌اند؛ P1-3 و P1-4 روی شاخه‌ی fix/p1-3-p1-4
+  (کامیت 6ccaf77 + کامیت مستندات) هستند و منتظر بیلد/تست و merge. باقی‌مانده‌ی بحرانی‌ها: P1-5 تا P1-9 در bug.md.
+- گام بعدی پیشنهادی: ۱) اجرای `./gradlew testDebugUnitTest` روی شاخه‌ی fix/p1-3-p1-4 و رفع هر خطای کامپایل؛
+  ۲) merge به main (توجه: merge باعث ریلیز و bump نسخه می‌شود)؛ ۳) سپس P1-5 (جدا کردن dueMonths از paidMonths) و ادامه‌ی لیست.
 - فایل مرجع بکاپ: Structure Backup and import.md
 - فایل گزارش تغییرات: Update.md
 - مسائل شناخته‌شده/پیشنهادی (غیرمسدودکننده): هشدار deprecation برای checkout@v4 و setup-java@v4 (Node 20)؛
