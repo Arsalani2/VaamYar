@@ -94,4 +94,52 @@ object NumberFormatter {
     fun parseInt(input: String): Int {
         return parseAmount(input).toInt()
     }
+
+    /**
+     * Converts a numeric amount to Persian words (e.g. 800000 -> هشتصد هزار تومان)
+     */
+    fun toPersianWords(amount: Long): String {
+        if (amount == 0L) return "صفر تومان"
+        if (amount < 0L) return "منفی " + toPersianWords(-amount)
+
+        val yekan = arrayOf("", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه")
+        val dahha = arrayOf("", "ده", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود")
+        val dahTaNoozdah = arrayOf("ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده", "شانزده", "هفده", "هجده", "نوزده")
+        val sadha = arrayOf("", "صد", "دویست", "سیصد", "چهارصد", "پانصد", "ششصد", "هفتصد", "هشتصد", "نهصد")
+        val steps = arrayOf("", "هزار", "میلیون", "میلیارد", "تریلیون")
+
+        fun sectionToWords(num: Int): String {
+            val s = num / 100
+            val d = (num % 100) / 10
+            val y = num % 10
+            val parts = mutableListOf<String>()
+
+            if (s > 0) parts.add(sadha[s])
+            if (d == 1) {
+                parts.add(dahTaNoozdah[y])
+            } else {
+                if (d > 1) parts.add(dahha[d])
+                if (y > 0) parts.add(yekan[y])
+            }
+            return parts.joinToString(" و ")
+        }
+
+        var temp = amount
+        var stepIndex = 0
+        val groupWords = mutableListOf<String>()
+
+        while (temp > 0) {
+            val chunk = (temp % 1000).toInt()
+            if (chunk > 0) {
+                val words = sectionToWords(chunk)
+                val suffix = steps[stepIndex]
+                val combined = if (suffix.isNotEmpty()) "$words $suffix" else words
+                groupWords.add(0, combined)
+            }
+            temp /= 1000
+            stepIndex++
+        }
+
+        return groupWords.joinToString(" و ") + " تومان"
+    }
 }

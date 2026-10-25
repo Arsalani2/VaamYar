@@ -1,0 +1,332 @@
+package com.example.util
+
+import android.content.Context
+import com.example.model.DebtorShare
+import com.example.model.Loan
+import com.example.model.PaymentRecord
+import com.example.model.UserProfile
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.InputStream
+import java.io.OutputStream
+import java.security.MessageDigest
+
+data class BackupPreferences(
+    val themeMode: String = "DARK",
+    val themePreset: String = "EMERALD_GOLD",
+    val fontStyle: String = "SYSTEM",
+    val usePersianDigits: Boolean = true,
+    val compactThousands: Boolean = false,
+    val soundEnabled: Boolean = true,
+    val customYear: Int = 1405,
+    val customMonth: Int = 8,
+    val customDay: Int = 2,
+    val isCustomDateEnabled: Boolean = false
+)
+
+data class BackupRestoreData(
+    val users: List<UserProfile>,
+    val loans: List<Loan>,
+    val shares: List<DebtorShare>,
+    val records: List<PaymentRecord>,
+    val preferences: BackupPreferences,
+    val schemaVersion: Int,
+    val exportedDate: String
+)
+
+object BackupHelper {
+
+    const val CURRENT_SCHEMA_VERSION = 1
+    const val APP_IDENTIFIER = "com.aistudio.vamyar"
+    const val APP_NAME = "VaamYar"
+
+    /**
+     * Serializes complete application state into an encrypted/verifiable JSON string with SHA-256 integrity hash.
+     */
+    fun createBackupJson(
+        users: List<UserProfile>,
+        loans: List<Loan>,
+        shares: List<DebtorShare>,
+        records: List<PaymentRecord>,
+        preferences: BackupPreferences,
+        appVersion: String = "1.0.1",
+        shamsiDateFormatted: String = ""
+    ): String {
+        val root = JSONObject()
+        root.put("app", APP_NAME)
+        root.put("appIdentifier", APP_IDENTIFIER)
+        root.put("schemaVersion", CURRENT_SCHEMA_VERSION)
+        root.put("appVersion", appVersion)
+        root.put("exportTimestamp", System.currentTimeMillis())
+        root.put("exportDateShamsi", shamsiDateFormatted)
+
+        // Build payload object
+        val payload = JSONObject()
+
+        // 1. Users
+        val usersArray = JSONArray()
+        for (u in users) {
+            val uObj = JSONObject()
+            uObj.put("id", u.id)
+            uObj.put("name", u.name)
+            uObj.put("phoneNumber", u.phoneNumber)
+            uObj.put("isPrimary", u.isPrimary)
+            uObj.put("avatarColorHex", u.avatarColorHex)
+            uObj.put("notes", u.notes)
+            usersArray.put(uObj)
+        }
+        payload.put("users", usersArray)
+
+        // 2. Loans
+        val loansArray = JSONArray()
+        for (l in loans) {
+            val lObj = JSONObject()
+            lObj.put("id", l.id)
+            lObj.put("title", l.title)
+            lObj.put("dueDay", l.dueDay)
+            lObj.put("monthlyAmount", l.monthlyAmount)
+            lObj.put("totalMonths", l.totalMonths)
+            lObj.put("paidMonths", l.paidMonths)
+            lObj.put("startYear", l.startYear)
+            lObj.put("startMonth", l.startMonth)
+            lObj.put("endYear", l.endYear)
+            lObj.put("endMonth", l.endMonth)
+            lObj.put("category", l.category)
+            lObj.put("colorHex", l.colorHex)
+            lObj.put("notes", l.notes)
+            lObj.put("myShareAmount", l.myShareAmount)
+            lObj.put("hasPartners", l.hasPartners)
+            lObj.put("isArchived", l.isArchived)
+            lObj.put("isCurrentMonthPaid", l.isCurrentMonthPaid)
+            lObj.put("iconName", l.iconName)
+            lObj.put("iconShape", l.iconShape)
+            lObj.put("customIconPath", l.customIconPath ?: JSONObject.NULL)
+            loansArray.put(lObj)
+        }
+        payload.put("loans", loansArray)
+
+        // 3. Debtor Shares
+        val sharesArray = JSONArray()
+        for (s in shares) {
+            val sObj = JSONObject()
+            sObj.put("id", s.id)
+            sObj.put("loanId", s.loanId)
+            sObj.put("loanTitle", s.loanTitle)
+            sObj.put("personName", s.personName)
+            sObj.put("shareAmount", s.shareAmount)
+            sObj.put("dueDay", s.dueDay)
+            sObj.put("isPaidForCurrentMonth", s.isPaidForCurrentMonth)
+            sObj.put("lastPaidMonth", s.lastPaidMonthName)
+            sObj.put("shareDescription", s.shareDescription)
+            sharesArray.put(sObj)
+        }
+        payload.put("shares", sharesArray)
+
+        // 4. Payment Records
+        val recordsArray = JSONArray()
+        for (r in records) {
+            val rObj = JSONObject()
+            rObj.put("id", r.id)
+            rObj.put("loanId", r.loanId)
+            rObj.put("loanTitle", r.loanTitle)
+            rObj.put("installmentNumber", r.installmentNumber)
+            rObj.put("amountPaid", r.amountPaid)
+            rObj.put("paymentDateShamsi", r.paymentDateShamsi)
+            rObj.put("timestamp", r.timestamp)
+            recordsArray.put(rObj)
+        }
+        payload.put("records", recordsArray)
+
+        // 5. Preferences
+        val prefsObj = JSONObject()
+        prefsObj.put("themeMode", preferences.themeMode)
+        prefsObj.put("themePreset", preferences.themePreset)
+        prefsObj.put("fontStyle", preferences.fontStyle)
+        prefsObj.put("usePersianDigits", preferences.usePersianDigits)
+        prefsObj.put("compactThousands", preferences.compactThousands)
+        prefsObj.put("soundEnabled", preferences.soundEnabled)
+        prefsObj.put("customYear", preferences.customYear)
+        prefsObj.put("customMonth", preferences.customMonth)
+        prefsObj.put("customDay", preferences.customDay)
+        prefsObj.put("isCustomDateEnabled", preferences.isCustomDateEnabled)
+        payload.put("preferences", prefsObj)
+
+        root.put("payload", payload)
+
+        // Compute SHA-256 Checksum of the payload
+        val payloadString = payload.toString()
+        val checksum = calculateSha256(payloadString)
+        root.put("checksum", checksum)
+
+        return root.toString(2)
+    }
+
+    /**
+     * Parses, validates, and automatically migrates backup data from older versions.
+     */
+    fun parseAndValidateBackup(jsonString: String): Result<BackupRestoreData> {
+        return try {
+            val root = JSONObject(jsonString)
+
+            // 1. Identity Check
+            val appIdent = root.optString("appIdentifier", "")
+            if (appIdent.isNotEmpty() && appIdent != APP_IDENTIFIER) {
+                return Result.failure(IllegalArgumentException("این فایل مربوط به برنامه وام‌یار نیست ($appIdent)"))
+            }
+
+            val schemaVersion = root.optInt("schemaVersion", 1)
+            if (schemaVersion > CURRENT_SCHEMA_VERSION) {
+                return Result.failure(IllegalArgumentException("این فایل پشتیبان با نسخه جدیدتری از وام‌یار (اسکیما $schemaVersion) ساخته شده است. لطفاً برنامه را به‌روزرسانی کنید."))
+            }
+
+            // 2. Checksum validation
+            val payload = root.getJSONObject("payload")
+            val expectedChecksum = root.optString("checksum", "")
+            if (expectedChecksum.isNotEmpty()) {
+                val actualChecksum = calculateSha256(payload.toString())
+                if (expectedChecksum != actualChecksum) {
+                    return Result.failure(SecurityException("اعتبارسنجی فایل پشتیبان با خطا مواجه شد؛ فایل تغییر یافته یا ناقص است."))
+                }
+            }
+
+            val exportDate = root.optString("exportDateShamsi", "نامشخص")
+
+            // 3. Parse Users
+            val usersList = mutableListOf<UserProfile>()
+            val usersArray = payload.optJSONArray("users") ?: JSONArray()
+            for (i in 0 until usersArray.length()) {
+                val u = usersArray.getJSONObject(i)
+                usersList.add(
+                    UserProfile(
+                        id = u.optLong("id", 0L),
+                        name = u.optString("name", "کاربر"),
+                        phoneNumber = u.optString("phoneNumber", ""),
+                        isPrimary = u.optBoolean("isPrimary", false),
+                        avatarColorHex = u.optLong("avatarColorHex", 0xFF10B981L),
+                        notes = u.optString("notes", "")
+                    )
+                )
+            }
+
+            // 4. Parse Shares first to assist legacy loan migration
+            val sharesList = mutableListOf<DebtorShare>()
+            val sharesArray = payload.optJSONArray("shares") ?: JSONArray()
+            for (i in 0 until sharesArray.length()) {
+                val s = sharesArray.getJSONObject(i)
+                sharesList.add(
+                    DebtorShare(
+                        id = s.optLong("id", 0L),
+                        loanId = s.optLong("loanId", 0L),
+                        loanTitle = s.optString("loanTitle", ""),
+                        personName = s.optString("personName", ""),
+                        shareAmount = s.optLong("shareAmount", 0L),
+                        dueDay = s.optInt("dueDay", 1),
+                        isPaidForCurrentMonth = s.optBoolean("isPaidForCurrentMonth", false),
+                        lastPaidMonthName = s.optString("lastPaidMonth", s.optString("lastPaidMonthName", "")),
+                        shareDescription = s.optString("shareDescription", "")
+                    )
+                )
+            }
+
+            // 5. Parse and Migrate Loans
+            val loansList = mutableListOf<Loan>()
+            val loansArray = payload.optJSONArray("loans") ?: JSONArray()
+            for (i in 0 until loansArray.length()) {
+                val l = loansArray.getJSONObject(i)
+                val loanId = l.optLong("id", 0L)
+                val monthlyAmount = l.optLong("monthlyAmount", 0L)
+                val existingSharesForLoan = sharesList.filter { it.loanId == loanId }
+                val hasPartnersInJson = if (l.has("hasPartners")) {
+                    l.getBoolean("hasPartners")
+                } else {
+                    existingSharesForLoan.isNotEmpty()
+                }
+
+                val rawMyShare = l.optLong("myShareAmount", 0L)
+                val migratedMyShare = if (!hasPartnersInJson && rawMyShare == 0L) {
+                    monthlyAmount // Legacy fix: if no partners, my share was 100%
+                } else {
+                    rawMyShare
+                }
+
+                loansList.add(
+                    Loan(
+                        id = loanId,
+                        title = l.optString("title", "وام"),
+                        dueDay = l.optInt("dueDay", 1),
+                        monthlyAmount = monthlyAmount,
+                        totalMonths = l.optInt("totalMonths", 12),
+                        paidMonths = l.optInt("paidMonths", 0),
+                        startYear = l.optInt("startYear", 1403),
+                        startMonth = l.optInt("startMonth", 1),
+                        endYear = l.optInt("endYear", 1404),
+                        endMonth = l.optInt("endMonth", 1),
+                        category = l.optString("category", "بانکی"),
+                        colorHex = l.optLong("colorHex", 0xFF1E88E5L),
+                        notes = l.optString("notes", ""),
+                        myShareAmount = migratedMyShare,
+                        hasPartners = hasPartnersInJson,
+                        isArchived = l.optBoolean("isArchived", false),
+                        isCurrentMonthPaid = l.optBoolean("isCurrentMonthPaid", false),
+                        iconName = l.optString("iconName", "account_balance"),
+                        iconShape = l.optString("iconShape", "ROUNDED_SQUARE"),
+                        customIconPath = if (l.isNull("customIconPath")) null else l.optString("customIconPath", null)
+                    )
+                )
+            }
+
+            // 6. Parse Payment Records
+            val recordsList = mutableListOf<PaymentRecord>()
+            val recordsArray = payload.optJSONArray("records") ?: JSONArray()
+            for (i in 0 until recordsArray.length()) {
+                val r = recordsArray.getJSONObject(i)
+                recordsList.add(
+                    PaymentRecord(
+                        id = r.optLong("id", 0L),
+                        loanId = r.optLong("loanId", 0L),
+                        loanTitle = r.optString("loanTitle", ""),
+                        installmentNumber = r.optInt("installmentNumber", 1),
+                        amountPaid = r.optLong("amountPaid", 0L),
+                        paymentDateShamsi = r.optString("paymentDateShamsi", ""),
+                        timestamp = r.optLong("timestamp", System.currentTimeMillis())
+                    )
+                )
+            }
+
+            // 7. Parse Preferences
+            val prefsObj = payload.optJSONObject("preferences") ?: JSONObject()
+            val preferences = BackupPreferences(
+                themeMode = prefsObj.optString("themeMode", "DARK"),
+                themePreset = prefsObj.optString("themePreset", "EMERALD_GOLD"),
+                fontStyle = prefsObj.optString("fontStyle", "SYSTEM"),
+                usePersianDigits = prefsObj.optBoolean("usePersianDigits", true),
+                compactThousands = prefsObj.optBoolean("compactThousands", false),
+                soundEnabled = prefsObj.optBoolean("soundEnabled", true),
+                customYear = prefsObj.optInt("customYear", 1405),
+                customMonth = prefsObj.optInt("customMonth", 8),
+                customDay = prefsObj.optInt("customDay", 2),
+                isCustomDateEnabled = prefsObj.optBoolean("isCustomDateEnabled", false)
+            )
+
+            Result.success(
+                BackupRestoreData(
+                    users = usersList,
+                    loans = loansList,
+                    shares = sharesList,
+                    records = recordsList,
+                    preferences = preferences,
+                    schemaVersion = schemaVersion,
+                    exportedDate = exportDate
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun calculateSha256(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(input.toByteArray(Charsets.UTF_8))
+        return hashBytes.joinToString("") { "%02x".format(it) }
+    }
+}

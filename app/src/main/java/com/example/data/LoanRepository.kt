@@ -42,7 +42,25 @@ class LoanRepository(
     suspend fun clearAllDataAndReset() = withContext(Dispatchers.IO) {
         loanDao.clearAllLoans()
         debtorShareDao.clearAllShares()
+        paymentRecordDao.clearAllRecords()
         userProfileDao.clearAllUsers()
+    }
+
+    suspend fun restoreDatabaseSnapshot(
+        users: List<UserProfile>,
+        loans: List<Loan>,
+        shares: List<DebtorShare>,
+        records: List<PaymentRecord>
+    ) = withContext(Dispatchers.IO) {
+        loanDao.clearAllLoans()
+        debtorShareDao.clearAllShares()
+        paymentRecordDao.clearAllRecords()
+        userProfileDao.clearAllUsers()
+
+        users.forEach { userProfileDao.insertUser(it) }
+        loans.forEach { loanDao.insertLoan(it) }
+        shares.forEach { debtorShareDao.insertShare(it) }
+        records.forEach { paymentRecordDao.insertRecord(it) }
     }
 
     // User Management Methods

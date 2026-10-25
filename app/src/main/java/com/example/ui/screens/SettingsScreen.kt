@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.example.data.UserDeleteCheckResult
 import com.example.model.UserProfile
@@ -60,6 +65,8 @@ fun SettingsScreen(
     onSetCustomDate: (ShamsiDate) -> Unit,
     onClearAllLoans: () -> Unit,
     onTestNotification: () -> Unit,
+    onExportBackup: () -> String = { "" },
+    onImportBackup: suspend (String) -> Result<String> = { Result.success("") },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -75,6 +82,47 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
     var userConfirmDeleteDialog by remember { mutableStateOf<UserProfile?>(null) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val json = onExportBackup()
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                }
+                Toast.makeText(context, "فایل پشتیبان با موفقیت ذخیره شد", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطا در ذخیره فایل پشتیبان: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.bufferedReader(Charsets.UTF_8).readText()
+                } ?: ""
+
+                if (jsonString.isNotBlank()) {
+                    coroutineScope.launch {
+                        val result = onImportBackup(jsonString)
+                        if (result.isSuccess) {
+                            Toast.makeText(context, result.getOrNull() ?: "بازیابی با موفقیت انجام شد", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "خطا در بازیابی پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطا در خواندن فایل: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -568,13 +616,109 @@ fun SettingsScreen(
                     }
                 }
 
-                // CATEGORY 4: DATA MANAGEMENT & RESET
+                // CATEGORY 4: DATA MANAGEMENT, BACKUP & RESET
                 SettingsCategory.DATA_MANAGEMENT -> {
+                    // Backup & Restore Card
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Column {
+                                        Text("پشتیبان‌گیری و بازگردانی اطلاعات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            "خروجی استاندارد JSON با هش اعتبارسنجی SHA-256 جهت امنیت و سازگاری دائم",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "می‌توانید از کل اطلاعات برنامه (وام‌ها، کاربران، سهم‌های شراکت، سوابق اقساط و تنظیمات) فایل پشتیبان تهیه کنید و در هر زمان به راحتی آن را بازیابی نمایید.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 20.sp
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            val timestamp = System.currentTimeMillis()
+                                            createDocumentLauncher.launch("VaamYar_Backup_${timestamp}.json")
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("ذخیره پشتیبان", style = MaterialTheme.typography.labelSmall)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            try {
+                                                val json = onExportBackup()
+                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "application/json"
+                                                    putExtra(Intent.EXTRA_SUBJECT, "فایل پشتیبان وام‌یار")
+                                                    putExtra(Intent.EXTRA_TEXT, json)
+                                                }
+                                                context.startActivity(Intent.createChooser(shareIntent, "ارسال و اشتراک فایل پشتیبان"))
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("اشتراک‌گذاری", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+
+                                HorizontalDivider()
+
+                                OutlinedButton(
+                                    onClick = {
+                                        openDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("بازگردانی اطلاعات از فایل پشتیبان (ایمپورت)")
+                                }
+                            }
+                        }
+                    }
+
+                    // Reset & Notifications Card
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(
                                 modifier = Modifier

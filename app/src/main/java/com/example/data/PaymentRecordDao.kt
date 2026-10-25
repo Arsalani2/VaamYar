@@ -17,4 +17,7 @@ interface PaymentRecordDao {
 
     @Delete
     suspend fun deleteRecord(record: PaymentRecord)
+
+    @Query("DELETE FROM payment_records")
+    suspend fun clearAllRecords()
 }

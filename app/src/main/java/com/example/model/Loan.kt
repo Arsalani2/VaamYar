@@ -21,8 +21,12 @@ data class Loan(
     val colorHex: Long = 0xFF1E88E5,
     val notes: String = "",
     val myShareAmount: Long = 0L, // سهم کاربر اصلی (شخصی)
+    val hasPartners: Boolean = false, // آیا این وام دارای شریک است
     val isArchived: Boolean = false,
-    val isCurrentMonthPaid: Boolean = false // آیا قسط ماه جاری پرداخت شده است
+    val isCurrentMonthPaid: Boolean = false, // آیا قسط ماه جاری پرداخت شده است
+    val iconName: String = "account_balance", // نام آیکون پیش‌فرض
+    val iconShape: String = "ROUNDED_SQUARE", // ROUNDED_SQUARE یا CIRCLE
+    val customIconPath: String? = null // آدرس تصویر اختصاصی آپلود شده در حافظه برنامه
 ) {
     val remainingMonths: Int
         get() = (totalMonths - paidMonths).coerceAtLeast(0)
@@ -30,8 +34,11 @@ data class Loan(
     val remainingTotalDebt: Long
         get() = remainingMonths.toLong() * monthlyAmount
 
+    val effectiveMyShare: Long
+        get() = if (hasPartners || myShareAmount < monthlyAmount) myShareAmount else monthlyAmount
+
     val remainingMyDebt: Long
-        get() = remainingMonths.toLong() * (if (myShareAmount > 0) myShareAmount else monthlyAmount)
+        get() = remainingMonths.toLong() * effectiveMyShare
 
     val totalLoanAmount: Long
         get() = totalMonths.toLong() * monthlyAmount
@@ -45,9 +52,6 @@ data class Loan(
     val isCompleted: Boolean
         get() = paidMonths >= totalMonths
 
-    val effectiveMyShare: Long
-        get() = if (myShareAmount > 0) myShareAmount else monthlyAmount
-
     val othersShareAmount: Long
         get() = (monthlyAmount - effectiveMyShare).coerceAtLeast(0L)
 
@@ -58,5 +62,5 @@ data class Loan(
         get() = ShamsiDateHelper.getMonthName(endMonth)
 
     val payoffCountdownText: String
-        get() = if (isCompleted) "تسویه شده ✓" else "$remainingMonths ماه مانده تا تسویه ($endMonthName $endYear)"
+        get() = if (isCompleted) "تسویه شده" else "$remainingMonths ماه مانده تا تسویه ($endMonthName $endYear)"
 }

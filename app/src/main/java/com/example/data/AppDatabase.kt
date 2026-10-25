@@ -9,9 +9,12 @@ import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
 @Database(
     entities = [Loan::class, DebtorShare::class, PaymentRecord::class, UserProfile::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,13 +28,25 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE loans ADD COLUMN hasPartners INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE loans ADD COLUMN iconName TEXT NOT NULL DEFAULT 'account_balance'")
+                database.execSQL("ALTER TABLE loans ADD COLUMN iconShape TEXT NOT NULL DEFAULT 'ROUNDED_SQUARE'")
+                database.execSQL("ALTER TABLE loans ADD COLUMN customIconPath TEXT DEFAULT NULL")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "vamyar_database"
-                ).fallbackToDestructiveMigration(dropAllTables = true).build()
+                )
+                    .addMigrations(MIGRATION_2_3)
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
                 INSTANCE = instance
                 instance
             }

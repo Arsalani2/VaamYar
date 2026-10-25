@@ -126,10 +126,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val soundEnabled: StateFlow<Boolean> = _soundEnabled.asStateFlow()
 
     private fun getUserShareForLoan(loan: Loan, shares: List<DebtorShare>, activeUser: String, primaryUserName: String = activeUser): Long {
-        return if (activeUser == primaryUserName || activeUser == "من") {
-            loan.effectiveMyShare
+        val loanShares = shares.filter { it.loanId == loan.id }
+        val isPrimary = activeUser.trim().equals(primaryUserName.trim(), ignoreCase = true) || activeUser == "من" || activeUser == "شما"
+
+        return if (isPrimary) {
+            if (loanShares.isNotEmpty()) {
+                val othersTotal = loanShares.sumOf { it.shareAmount }
+                (loan.monthlyAmount - othersTotal).coerceAtLeast(0L)
+            } else if (loan.hasPartners) {
+                loan.myShareAmount
+            } else {
+                loan.monthlyAmount
+            }
         } else {
-            val userDebtorShare = shares.find { it.loanId == loan.id && it.personName == activeUser }
+            val userDebtorShare = loanShares.find { it.personName.trim().equals(activeUser.trim(), ignoreCase = true) }
             userDebtorShare?.shareAmount ?: 0L
         }
     }
@@ -462,6 +472,78 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.clearAllLoansAndReset()
             SoundHelper.playClick(getApplication(), _soundEnabled.value)
+        }
+    }
+
+    fun exportBackupJson(): String {
+        val currentLoans = allLoans.value
+        val currentShares = allShares.value
+        val currentRecords = allRecords.value
+        val currentUsers = allUsers.value
+
+        val prefs = com.example.util.BackupPreferences(
+            themeMode = _themeMode.value.name,
+            themePreset = _themePreset.value.name,
+            fontStyle = _appFontStyle.value.name,
+            usePersianDigits = _usePersianDigits.value,
+            compactThousands = _compactThousands.value,
+            soundEnabled = _soundEnabled.value,
+            customYear = _currentShamsiDate.value.year,
+            customMonth = _currentShamsiDate.value.month,
+            customDay = _currentShamsiDate.value.day,
+            isCustomDateEnabled = isCustomDateActive.value
+        )
+
+        return com.example.util.BackupHelper.createBackupJson(
+            users = currentUsers,
+            loans = currentLoans,
+            shares = currentShares,
+            records = currentRecords,
+            preferences = prefs,
+            appVersion = "1.0.1",
+            shamsiDateFormatted = _currentShamsiDate.value.toStandardFormat(usePersianDigits = false)
+        )
+    }
+
+    suspend fun importBackupJson(jsonString: String): Result<String> {
+        return try {
+            val parseResult = com.example.util.BackupHelper.parseAndValidateBackup(jsonString)
+            if (parseResult.isFailure) {
+                return Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
+            }
+
+            val data = parseResult.getOrThrow()
+
+            // Restore Database
+            repository.restoreDatabaseSnapshot(
+                users = data.users,
+                loans = data.loans,
+                shares = data.shares,
+                records = data.records
+            )
+
+            // Restore preferences
+            try {
+                _themeMode.value = AppThemeMode.valueOf(data.preferences.themeMode)
+                _themePreset.value = ThemePreset.valueOf(data.preferences.themePreset)
+                _appFontStyle.value = AppFontStyle.valueOf(data.preferences.fontStyle)
+                _usePersianDigits.value = data.preferences.usePersianDigits
+                _compactThousands.value = data.preferences.compactThousands
+                _soundEnabled.value = data.preferences.soundEnabled
+
+                if (data.preferences.isCustomDateEnabled) {
+                    setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
+                } else {
+                    syncDateWithSystem()
+                }
+            } catch (_: Exception) {}
+
+            SoundHelper.playPaymentSuccess(getApplication(), _soundEnabled.value)
+
+            val summary = "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
+            Result.success(summary)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

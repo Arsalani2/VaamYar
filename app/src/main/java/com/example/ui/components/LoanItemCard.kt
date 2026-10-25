@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.util.LoanIconDisplay
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDateHelper
 
@@ -61,9 +62,17 @@ fun LoanItemCard(
     }
 
     val loanAccentColor = Color(loan.colorHex)
-    val myShare = loan.effectiveMyShare
-    val hasPartners = loan.monthlyAmount > myShare || debtorShares.isNotEmpty()
-    val partnersTotalShare = (loan.monthlyAmount - myShare).coerceAtLeast(0L)
+    val partnersTotalShare = if (debtorShares.isNotEmpty()) {
+        debtorShares.sumOf { it.shareAmount }
+    } else {
+        loan.othersShareAmount
+    }
+    val myShare = if (debtorShares.isNotEmpty()) {
+        (loan.monthlyAmount - partnersTotalShare).coerceAtLeast(0L)
+    } else {
+        loan.effectiveMyShare
+    }
+    val hasPartners = partnersTotalShare > 0L || loan.hasPartners
 
     // Clear paid border / tint
     val cardBorder = if (loan.isCurrentMonthPaid) {
@@ -106,11 +115,13 @@ fun LoanItemCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(loanAccentColor)
+                            LoanIconDisplay(
+                                iconName = loan.iconName,
+                                iconShape = loan.iconShape,
+                                customIconPath = loan.customIconPath,
+                                tintColor = loanAccentColor,
+                                size = 42.dp,
+                                iconSize = 22.dp
                             )
                             Column {
                                 Text(
@@ -126,11 +137,11 @@ fun LoanItemCard(
                             }
                         }
 
-                        // Prominent Paid Status Badge
+                        // Minimalist, elegant Paid Status Badge
                         if (loan.isCurrentMonthPaid) {
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -138,13 +149,13 @@ fun LoanItemCard(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CheckCircle,
+                                        imageVector = Icons.Default.Check,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = "قسط این ماه پرداخت شد ✓",
+                                        text = "پرداخت شد",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
@@ -153,7 +164,7 @@ fun LoanItemCard(
                             }
                         } else {
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 color = when {
                                     loan.isCompleted -> MaterialTheme.colorScheme.surfaceVariant
                                     daysRemaining == 0 -> MaterialTheme.colorScheme.errorContainer
@@ -181,7 +192,7 @@ fun LoanItemCard(
                         }
                     }
 
-                    // PRIMARY AMOUNT: Arsalan's Share
+                    // PRIMARY AMOUNT: User's Share (بدون پرانتز من)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,7 +200,7 @@ fun LoanItemCard(
                     ) {
                         Column {
                             Text(
-                                text = "قسط سهم شما (من)",
+                                text = "قسط سهم شما:",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -266,7 +277,7 @@ fun LoanItemCard(
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        // Clear Payment Status Button
+                        // Clear Payment Status Button (بدون تیک تکراری)
                         Button(
                             onClick = onTogglePaidThisMonth,
                             shape = RoundedCornerShape(10.dp),
@@ -281,7 +292,7 @@ fun LoanItemCard(
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                             modifier = Modifier.height(36.dp)
                         ) {
                             Icon(
@@ -291,7 +302,7 @@ fun LoanItemCard(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (loan.isCurrentMonthPaid) "پرداخت شده ✓" else "پرداخت این ماه",
+                                text = if (loan.isCurrentMonthPaid) "پرداخت شده" else "پرداخت این ماه",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -371,7 +382,7 @@ fun LoanItemCard(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Text("• سهم شما (من):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            Text("• سهم شما:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                                             Text(
                                                 NumberFormatter.formatPrice(myShare, usePersian = usePersianDigits, compactThousands = compactThousands),
                                                 style = MaterialTheme.typography.bodySmall,
@@ -384,7 +395,8 @@ fun LoanItemCard(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                Text("• سهم ${share.personName} (${share.shareDescription}):", style = MaterialTheme.typography.bodySmall)
+                                                val labelText = if (share.shareDescription.isNotBlank()) "• سهم ${share.personName} - ${share.shareDescription}:" else "• سهم ${share.personName}:"
+                                                Text(labelText, style = MaterialTheme.typography.bodySmall)
                                                 Text(
                                                     NumberFormatter.formatPrice(share.shareAmount, usePersian = usePersianDigits, compactThousands = compactThousands),
                                                     style = MaterialTheme.typography.bodySmall,
@@ -450,18 +462,20 @@ fun LoanItemCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(CircleShape)
-                                .background(loanAccentColor)
+                        LoanIconDisplay(
+                            iconName = loan.iconName,
+                            iconShape = loan.iconShape,
+                            customIconPath = loan.customIconPath,
+                            tintColor = loanAccentColor,
+                            size = 32.dp,
+                            iconSize = 18.dp
                         )
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                text = if (loan.isCurrentMonthPaid) "پرداخت شد ✓" else "${NumberFormatter.formatNumber(loan.dueDay, usePersian = usePersianDigits)}ام",
+                                text = if (loan.isCurrentMonthPaid) "پرداخت شد" else "${NumberFormatter.formatNumber(loan.dueDay, usePersian = usePersianDigits)}ام",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -477,10 +491,10 @@ fun LoanItemCard(
                         maxLines = 1
                     )
 
-                    // Arsalan's Share as main amount
+                    // User's Share as main amount
                     Column {
                         Text(
-                            text = "سهم من",
+                            text = "سهم شما",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontSize = 10.sp
@@ -627,8 +641,16 @@ fun LoanItemCard(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                LoanIconDisplay(
+                                    iconName = loan.iconName,
+                                    iconShape = loan.iconShape,
+                                    customIconPath = loan.customIconPath,
+                                    tintColor = loanAccentColor,
+                                    size = 32.dp,
+                                    iconSize = 18.dp
+                                )
                                 Text(text = loan.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 if (loan.isCurrentMonthPaid) {
                                     Icon(
@@ -640,7 +662,7 @@ fun LoanItemCard(
                                 }
                             }
                             Text(
-                                text = "سهم من: ${NumberFormatter.formatPrice(myShare, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                                text = "سهم شما: ${NumberFormatter.formatPrice(myShare, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary

@@ -1,10 +1,17 @@
 package com.example.ui.dialogs
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -28,6 +36,9 @@ import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.model.UserProfile
 import com.example.ui.components.InstallmentNodesView
+import com.example.ui.components.PriceInputField
+import com.example.util.LoanIconDisplay
+import com.example.util.LoanIconHelper
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
@@ -45,11 +56,33 @@ fun AddEditLoanDialog(
     onAddNewUser: (UserProfile) -> Unit,
     onSave: (Loan, List<DebtorShare>) -> Unit
 ) {
+    val context = LocalContext.current
+
     var title by remember { mutableStateOf(loanToEdit?.title ?: "") }
     var totalMonthsText by remember { mutableStateOf(loanToEdit?.totalMonths?.toString() ?: "12") }
     var selectedColor by remember { mutableLongStateOf(loanToEdit?.colorHex ?: 0xFF1976D2L) }
 
-    // Start Date (Unified: Year, Month, Day)
+    // Icon & Shape & Custom Image State
+    var selectedIconName by remember { mutableStateOf(loanToEdit?.iconName ?: "account_balance") }
+    var selectedIconShape by remember { mutableStateOf(loanToEdit?.iconShape ?: "ROUNDED_SQUARE") }
+    var customIconPath by remember { mutableStateOf(loanToEdit?.customIconPath) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val saved = LoanIconHelper.saveCustomIconImage(context, uri)
+            if (saved != null) {
+                // If there was an older custom image, clean it up
+                if (customIconPath != null && customIconPath != saved) {
+                    LoanIconHelper.deleteCustomIconFile(customIconPath)
+                }
+                customIconPath = saved
+            }
+        }
+    }
+
+    // Start Date
     var startDate by remember {
         mutableStateOf(
             if (loanToEdit != null) ShamsiDate(loanToEdit.startYear, loanToEdit.startMonth, loanToEdit.dueDay)
@@ -59,11 +92,11 @@ fun AddEditLoanDialog(
 
     var showCalendarPicker by remember { mutableStateOf(false) }
 
-    // Total Installment Amount with live comma formatting
-    var monthlyAmountText by remember {
+    // Stable raw digits for installment amount
+    var monthlyAmountDigits by remember {
         mutableStateOf(
             if (loanToEdit != null && loanToEdit.monthlyAmount > 0)
-                NumberFormatter.formatWithCommas(loanToEdit.monthlyAmount, usePersian = false)
+                loanToEdit.monthlyAmount.toString()
             else ""
         )
     }
@@ -73,7 +106,7 @@ fun AddEditLoanDialog(
     }
 
     // Auto-detected paid months from start date to current date
-    val autoElapsed = remember(startDate, currentShamsiDate, totalMonths) {
+    val autoElapsed = remember(startDate.year, startDate.month, startDate.day, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day, totalMonths) {
         ShamsiDateHelper.calculateElapsedInstallments(
             startYear = startDate.year,
             startMonth = startDate.month,
@@ -90,10 +123,19 @@ fun AddEditLoanDialog(
         mutableIntStateOf(loanToEdit?.paidMonths ?: autoElapsed)
     }
 
-    // Whenever user changes start date on a new loan, update suggested paid months
-    LaunchedEffect(startDate, totalMonths) {
+    // Whenever user changes start date or total months on a new loan, sync paid months automatically
+    LaunchedEffect(startDate.year, startDate.month, startDate.day, totalMonths, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
         if (loanToEdit == null) {
-            paidMonths = autoElapsed
+            val freshElapsed = ShamsiDateHelper.calculateElapsedInstallments(
+                startYear = startDate.year,
+                startMonth = startDate.month,
+                startDay = startDate.day,
+                curYear = currentShamsiDate.year,
+                curMonth = currentShamsiDate.month,
+                curDay = currentShamsiDate.day,
+                totalMonths = totalMonths
+            )
+            paidMonths = freshElapsed
         }
     }
 
@@ -107,9 +149,14 @@ fun AddEditLoanDialog(
     var showAddPartnerDialog by remember { mutableStateOf(false) }
     var showCreateUserDialog by remember { mutableStateOf(false) }
 
-    val rawMonthlyAmount = NumberFormatter.parseAmount(monthlyAmountText)
+    val rawMonthlyAmount = monthlyAmountDigits.toLongOrNull() ?: 0L
+    val hasPartners = sharesList.isNotEmpty()
     val othersTotalShare = sharesList.sumOf { it.shareAmount }
-    val calculatedMyShare = (rawMonthlyAmount - othersTotalShare).coerceAtLeast(0L)
+    val calculatedMyShare = if (hasPartners) {
+        (rawMonthlyAmount - othersTotalShare).coerceAtLeast(0L)
+    } else {
+        rawMonthlyAmount
+    }
 
     val endDate = remember(startDate, totalMonths) {
         ShamsiDateHelper.calculateEndDate(startDate.year, startDate.month, totalMonths)
@@ -132,7 +179,7 @@ fun AddEditLoanDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.92f),
+                .fillMaxHeight(0.94f),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -147,17 +194,30 @@ fun AddEditLoanDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = if (loanToEdit == null) "ثبت وام جدید" else "ویرایش وام و سهم‌ها",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        LoanIconDisplay(
+                            iconName = selectedIconName,
+                            iconShape = selectedIconShape,
+                            customIconPath = customIconPath,
+                            tintColor = Color(selectedColor),
+                            size = 40.dp,
+                            iconSize = 22.dp
                         )
-                        Text(
-                            text = "مشخصات قسط، تاریخ شمسی و سهم شرکا",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column {
+                            Text(
+                                text = if (loanToEdit == null) "ثبت وام جدید" else "ویرایش وام و سهم‌ها",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "مشخصات قسط، تاریخ شمسی، آیکون و سهم شرکا",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "بستن")
@@ -170,7 +230,7 @@ fun AddEditLoanDialog(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     // 1. Title
                     OutlinedTextField(
@@ -182,7 +242,122 @@ fun AddEditLoanDialog(
                         singleLine = true
                     )
 
-                    // 2. Unified Start Date Field (with elegant minimal calendar picker)
+                    // 2. Icon, Shape & Gallery Image Section
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "نماد و ظاهر وام (آیکون و فرم نمایش):",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            // Shape selector
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                FilterChip(
+                                    selected = selectedIconShape == "ROUNDED_SQUARE",
+                                    onClick = { selectedIconShape = "ROUNDED_SQUARE" },
+                                    label = { Text("مربع دور گرد مینیمال") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.CropSquare, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                FilterChip(
+                                    selected = selectedIconShape == "CIRCLE",
+                                    onClick = { selectedIconShape = "CIRCLE" },
+                                    label = { Text("دایره مینیمال") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Circle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+
+                            // Preset Vector Icons
+                            Text("انتخاب از آیکون‌های پیش‌فرض:", style = MaterialTheme.typography.labelSmall)
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(LoanIconHelper.PRESET_ICONS) { item ->
+                                    val isSelected = selectedIconName == item.id && customIconPath == null
+                                    Surface(
+                                        shape = if (selectedIconShape == "CIRCLE") CircleShape else RoundedCornerShape(10.dp),
+                                        color = if (isSelected) Color(selectedColor).copy(alpha = 0.22f) else MaterialTheme.colorScheme.surface,
+                                        border = if (isSelected) BorderStroke(1.5.dp, Color(selectedColor)) else null,
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clickable {
+                                                selectedIconName = item.id
+                                                customIconPath = null // Clear custom image if preset selected
+                                            }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = item.icon,
+                                                contentDescription = item.titleFa,
+                                                tint = if (isSelected) Color(selectedColor) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Custom Gallery / Logo Picker
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (customIconPath != null) "تغییر تصویر از گالری" else "انتخاب لوگو/عکس از گالری",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+
+                                if (customIconPath != null) {
+                                    TextButton(
+                                        onClick = {
+                                            LoanIconHelper.deleteCustomIconFile(customIconPath)
+                                            customIconPath = null
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("حذف تصویر", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Unified Start Date Field (with elegant minimal calendar picker)
                     OutlinedTextField(
                         value = startDate.toStandardFormat(usePersianDigits = usePersianDigits),
                         onValueChange = {},
@@ -205,31 +380,18 @@ fun AddEditLoanDialog(
                             .clickable { showCalendarPicker = true }
                     )
 
-                    // 3. Amount with live comma separation
-                    OutlinedTextField(
-                        value = monthlyAmountText,
-                        onValueChange = { input ->
-                            val clean = input.filter { it.isDigit() }
-                            val num = clean.toLongOrNull() ?: 0L
-                            monthlyAmountText = if (clean.isEmpty()) "" else NumberFormatter.formatWithCommas(num, usePersian = false)
-                        },
-                        label = { Text("مبلغ کل قسط ماهانه (تومان)") },
-                        placeholder = { Text("مثلاً: ۲,۸۲۲,۰۰۰") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        supportingText = {
-                            if (rawMonthlyAmount > 0) {
-                                Text(
-                                    text = NumberFormatter.formatPrice(rawMonthlyAmount, usePersian = usePersianDigits, compactThousands = compactThousands),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
+                    // 4. Stable Price Input Field (بدون پرش کرسر و بدون خطا)
+                    PriceInputField(
+                        rawDigitsValue = monthlyAmountDigits,
+                        onRawDigitsChange = { monthlyAmountDigits = it },
+                        label = "مبلغ کل قسط ماهانه (تومان)",
+                        placeholder = "مثلاً: ۲,۸۲۲,۰۰۰",
+                        usePersianDigits = usePersianDigits,
+                        compactThousands = compactThousands,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
-                    // 4. Total Installment Count (Quick Chips + Input)
+                    // 5. Total Installment Count (Quick Chips + Input)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -263,7 +425,7 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    // 5. INTERACTIVE INSTALLMENT CIRCLES (دایره‌های هوشمند اقساط)
+                    // 6. Interactive Installment Circles & Auto-Detection
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -287,7 +449,7 @@ fun AddEditLoanDialog(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "تشخیص هوشمند: ${NumberFormatter.formatNumber(autoElapsed, usePersianDigits)} قسط تا امروز (${currentShamsiDate.monthName})",
+                                        text = "تشخیص هوشمند: ${NumberFormatter.formatNumber(autoElapsed, usePersianDigits)} قسط تا امروز (${currentShamsiDate.monthName} ${currentShamsiDate.year})",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -304,6 +466,23 @@ fun AddEditLoanDialog(
                                         color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
+                                }
+                            }
+
+                            // Quick sync chip button
+                            if (paidMonths != autoElapsed) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = { paidMonths = autoElapsed },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.AutoMode, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("تنظیم خودکار به $autoElapsed قسط گذشته", style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
                             }
 
@@ -333,7 +512,7 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    // 6. PARTNERS MANAGEMENT (سهم افراد و اتصال به کاربران سیستم)
+                    // 7. Partners Management (بدون پرانتزهای اضافه)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -377,7 +556,7 @@ fun AddEditLoanDialog(
 
                             if (sharesList.isEmpty()) {
                                 Text(
-                                    text = "این وام بدون شریک است (کل قسط سهم خود کاربر مبنا است).",
+                                    text = "این وام بدون شریک است و کل قسط متعلق به کاربر مبنا است.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -408,13 +587,13 @@ fun AddEditLoanDialog(
 
                             HorizontalDivider()
 
-                            // Baseline Share Indicator
+                            // Baseline Share Indicator (بدون پرانتزهای اضافی)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("سهم کاربر مبنا (من):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text("سهم کاربر مبنا:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 Text(
                                     text = NumberFormatter.formatPrice(calculatedMyShare, usePersianDigits, compactThousands),
                                     style = MaterialTheme.typography.titleSmall,
@@ -425,27 +604,33 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    // 7. Color Picker
+                    // 8. Color Picker
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("رنگ نشانگر وام:", style = MaterialTheme.typography.bodySmall)
+                        Text("رنگ مشخصه وام:", style = MaterialTheme.typography.bodySmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            colorOptions.forEach { colorHex ->
-                                val color = Color(colorHex)
-                                val isSelected = selectedColor == colorHex
+                            colorOptions.forEach { colorVal ->
+                                val isSelected = selectedColor == colorVal
                                 Box(
                                     modifier = Modifier
-                                        .size(26.dp)
+                                        .size(28.dp)
                                         .clip(CircleShape)
-                                        .background(color)
-                                        .clickable { selectedColor = colorHex }
-                                        .then(
-                                            if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier
+                                        .background(Color(colorVal))
+                                        .clickable { selectedColor = colorVal },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
                                         )
-                                )
+                                    }
+                                }
                             }
                         }
                     }
@@ -481,7 +666,11 @@ fun AddEditLoanDialog(
                                 endYear = endDate.year,
                                 endMonth = endDate.month,
                                 myShareAmount = calculatedMyShare,
-                                colorHex = selectedColor
+                                hasPartners = hasPartners,
+                                colorHex = selectedColor,
+                                iconName = selectedIconName,
+                                iconShape = selectedIconShape,
+                                customIconPath = customIconPath
                             )
 
                             onSave(loan, sharesList)
@@ -495,7 +684,7 @@ fun AddEditLoanDialog(
         }
     }
 
-    // Virtual Minimal Shamsi Calendar Picker Dialog
+    // Calendar Picker Dialog
     if (showCalendarPicker) {
         ShamsiDatePickerDialog(
             initialDate = startDate,
@@ -504,14 +693,26 @@ fun AddEditLoanDialog(
             onDateSelected = { pickedDate ->
                 startDate = pickedDate
                 showCalendarPicker = false
+                if (loanToEdit == null) {
+                    val calculated = ShamsiDateHelper.calculateElapsedInstallments(
+                        startYear = pickedDate.year,
+                        startMonth = pickedDate.month,
+                        startDay = pickedDate.day,
+                        curYear = currentShamsiDate.year,
+                        curMonth = currentShamsiDate.month,
+                        curDay = currentShamsiDate.day,
+                        totalMonths = totalMonths
+                    )
+                    paidMonths = calculated
+                }
             }
         )
     }
 
-    // Add Partner Modal Dialog (Connected to User Profiles)
+    // Add Partner Modal Dialog
     if (showAddPartnerDialog) {
         var selectedUserName by remember { mutableStateOf(allUsers.firstOrNull { !it.isPrimary }?.name ?: allUsers.firstOrNull()?.name ?: "") }
-        var partnerAmountText by remember { mutableStateOf("") }
+        var partnerAmountDigits by remember { mutableStateOf("") }
         var partnerDesc by remember { mutableStateOf("") }
 
         AlertDialog(
@@ -519,7 +720,6 @@ fun AddEditLoanDialog(
             title = { Text("تعریف سهم شریک") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Pick from existing users or create new
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -527,16 +727,13 @@ fun AddEditLoanDialog(
                     ) {
                         Text("انتخاب فرد:", style = MaterialTheme.typography.bodySmall)
                         TextButton(
-                            onClick = {
-                                showCreateUserDialog = true
-                            }
+                            onClick = { showCreateUserDialog = true }
                         ) {
                             Text("+ کاربر جدید", style = MaterialTheme.typography.labelSmall)
                         }
                     }
 
                     if (allUsers.isNotEmpty()) {
-                        // User chips
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -562,24 +759,21 @@ fun AddEditLoanDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OutlinedTextField(
-                        value = partnerAmountText,
-                        onValueChange = { input ->
-                            val clean = input.filter { it.isDigit() }
-                            val num = clean.toLongOrNull() ?: 0L
-                            partnerAmountText = if (clean.isEmpty()) "" else NumberFormatter.formatWithCommas(num, usePersian = false)
-                        },
-                        label = { Text("مبلغ سهم شریک (تومان)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
+                    PriceInputField(
+                        rawDigitsValue = partnerAmountDigits,
+                        onRawDigitsChange = { partnerAmountDigits = it },
+                        label = "مبلغ سهم شریک (تومان)",
+                        placeholder = "مثلاً: ۸۰۰,۰۰۰",
+                        usePersianDigits = usePersianDigits,
+                        compactThousands = compactThousands,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     OutlinedTextField(
                         value = partnerDesc,
                         onValueChange = { partnerDesc = it },
-                        label = { Text("توضیحات (اختیاری)") },
-                        placeholder = { Text("مثلاً: نصف قسط") },
+                        label = { Text("یادداشت / شماره تماس / کارت") },
+                        placeholder = { Text("توضیحات اختیاری...") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -588,34 +782,33 @@ fun AddEditLoanDialog(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = NumberFormatter.parseAmount(partnerAmountText)
-                        if (selectedUserName.isNotBlank() && amount > 0) {
+                        val amount = partnerAmountDigits.toLongOrNull() ?: 0L
+                        if (selectedUserName.isNotBlank() && amount > 0L) {
                             sharesList.add(
                                 DebtorShare(
                                     loanId = loanToEdit?.id ?: 0L,
-                                    loanTitle = title.ifBlank { "وام" },
+                                    loanTitle = title.ifBlank { "وام جدید" },
                                     personName = selectedUserName.trim(),
                                     shareAmount = amount,
-                                    shareDescription = partnerDesc.trim(),
-                                    dueDay = startDate.day
+                                    dueDay = startDate.day,
+                                    shareDescription = partnerDesc.trim()
                                 )
                             )
                             showAddPartnerDialog = false
                         }
                     }
                 ) {
-                    Text("تایید سهم")
+                    Text("ثبت سهم")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddPartnerDialog = false }) {
+                OutlinedButton(onClick = { showAddPartnerDialog = false }) {
                     Text("انصراف")
                 }
             }
         )
     }
 
-    // Quick Add New User Dialog
     if (showCreateUserDialog) {
         AddEditUserDialog(
             userToEdit = null,

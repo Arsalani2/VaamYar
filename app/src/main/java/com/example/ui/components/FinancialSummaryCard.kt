@@ -75,7 +75,7 @@ fun FinancialSummaryCard(
                 ) {
                     Column {
                         Text(
-                            text = "مانده پرداخت‌نشده این ماه (${overview.activeUserName})",
+                            text = "مانده پرداخت‌نشده این ماه: ${overview.activeUserName}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = if (isAllMonthPaid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant

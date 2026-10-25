@@ -339,7 +339,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onSyncDateWithSystem = { viewModel.syncDateWithSystem() },
                         onSetCustomDate = { viewModel.setCustomShamsiDate(it) },
                         onClearAllLoans = { viewModel.clearAllLoansAndStartFresh() },
-                        onTestNotification = { viewModel.sendTestNotification(context) }
+                        onTestNotification = { viewModel.sendTestNotification(context) },
+                        onExportBackup = { viewModel.exportBackupJson() },
+                        onImportBackup = { viewModel.importBackupJson(it) }
                     )
                 }
             }
