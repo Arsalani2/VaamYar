@@ -42,9 +42,29 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                 val currentShamsi = ShamsiDateHelper.getCurrentShamsiDate()
                 val today = currentShamsi.day
 
-                // Find loans due today or tomorrow
-                val dueToday = loans.filter { !it.isCompleted && it.dueDay == today }
-                val dueTomorrow = loans.filter { !it.isCompleted && it.dueDay == (today + 1) }
+                // فیکس bug.md/P2-2: «فردا» با تقویم شمسیِ واقعی محاسبه می‌شود، نه today+1 ساده.
+                // قبلاً در آخرین روز هر ماه (مثلاً ۳۰ آبان) یادآوریِ قسط اول ماه بعد (۱ آذر)
+                // هرگز پخش نمی‌شد. حالا در آخرین روز ماه، فردا = ۱ ماه بعد است (سال هم در
+                // اسفند درست می‌چرخد) و عنوان اعلان تاریخ دقیق فردا را نشان می‌دهد.
+                val daysInCurrentMonth = ShamsiDateHelper.getDaysInShamsiMonth(currentShamsi.year, currentShamsi.month)
+                val tomorrowIsNextMonth = today >= daysInCurrentMonth
+                val tomorrowDay = if (tomorrowIsNextMonth) 1 else today + 1
+                val tomorrowMonthName = if (tomorrowIsNextMonth) {
+                    ShamsiDateHelper.getMonthName(if (currentShamsi.month == 12) 1 else currentShamsi.month + 1)
+                } else {
+                    currentShamsi.monthName
+                }
+
+                // فیکس bug.md/P2-3: وامِ تسویه‌نشده‌ای که قسط همین ماه را پرداخت کرده
+                // (isCurrentMonthPaid) دیگر اعلانِ بی‌فایده‌ی «امروز موعد پرداخت» نمی‌گیرد.
+                // یادآوریِ «فردا» هم فقط وقتی حذف می‌شود که فردا در همین ماه باشد و قسط همین
+                // ماه پرداخت شده باشد؛ برای سررسیدِ اول ماه بعد (که پرچم هنوز وجود ندارد)
+                // یادآوری مثل همیشه پخش می‌شود.
+                val activeLoans = loans.filter { !it.isCompleted }
+                val dueToday = activeLoans.filter { !it.isCurrentMonthPaid && it.dueDay == today }
+                val dueTomorrow = activeLoans.filter {
+                    it.dueDay == tomorrowDay && (tomorrowIsNextMonth || !it.isCurrentMonthPaid)
+                }
 
                 if (dueToday.isNotEmpty()) {
                     val titles = dueToday.joinToString("، ") { it.title }
@@ -59,7 +79,7 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                     val titles = dueTomorrow.joinToString("، ") { it.title }
                     NotificationHelper.showNotification(
                         context = context,
-                        title = "یادآوری: سررسید فردا ⏰",
+                        title = "یادآوری: سررسید فردا (${NumberFormatter.toPersianDigits(tomorrowDay)} $tomorrowMonthName) ⏰",
                         message = "فردا موعد پرداخت $titles فرا می‌رسد.",
                         id = 1003
                     )
