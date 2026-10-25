@@ -106,8 +106,37 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
   - برای جلوگیری از ریلیز عمومی تأییدنشده، تغییرات روی شاخه‌ی جدا push شد نه main (هر push به main ریلیز می‌سازد).
 محدودیت‌ها: رکوردهای تکراری ازقبل‌موجود در دیتابیس کاربران پاک‌سازی نمی‌شوند (نیازمند Migration نسخه 4؛ موکول به F1).
 
+[2026-10-25 ~19:50–20:10 UTC] — Claude Sonnet 5.5 (claude-sonnet-5-5)
+اقدام: رفع شکست ورک‌فلو «Android Build & Release» روی main (اجراهای 40226910444 و 40227292528) و افزودن CI اعتبارسنجی.
+  (توجه: ورودی‌های بین 12:45 تا 19:50 UTC در این فایل ثبت نشده بودند؛ جزئیات آن‌ها فقط در bug.md/Update.md و git log است.
+   بخش «وضعیت فعلی» پایین این فایل قبلاً کهنه بود و در همین نشست اصلاح شد.)
+علت‌های واقعی (از Annotationهای check-run؛ لاگ کامل 403 است):
+  1) اجرای 40227292528: خطای کامپایل کاتلین در app/src/main/java/com/example/data/LoanRepository.kt خطوط 63 و 73:
+       e: No parameter with name 'phoneNumber' found.
+     ریشه: کامیت f5f19fa (P3-5) فیلد UserProfile.phoneNumber را حذف کرد ولی seed داده‌ی اولیه (checkAndSeedInitialData)
+     هنوز phoneNumber = "" پاس می‌داد → :app:compileReleaseKotlin شکست خورد.
+  2) اجرای 40226910444: SAXParseException در AndroidManifest.xml خط 13 (کامنت داخل تگ <application>) — قبلاً در 82ef55e رفع شده بود.
+  3) اجرای 40225404421: شکست مرحله «Commit and Push Version Bump» (race، non-fast-forward) — قبلاً با P4-7 (9de7f56) رفع شده بود.
+     خطای «ksp...ApplicationManager.getApplication() is null» که در Annotation همه اجراها (حتی موفق) دیده می‌شود، فقط نویز لاگ KSP است و علت شکست نیست.
+تغییرات (شاخه fix/ci-compile-phonenumber):
+  - LoanRepository.kt: حذف دو خط phoneNumber = "".
+  - فایل جدید .github/workflows/ci.yml: روی PR و push به شاخه‌های غیر main (بدون امضا/ریلیز/bump) اجرا می‌کند:
+      ./gradlew compileDebugKotlin compileReleaseKotlin testDebugUnitTest
+    تا خطاهای کامپایل/تست قبل از merge به main (که ریلیز عمومی می‌سازد) دیده شوند.
+  - ExampleRobolectricTest.kt: پاس‌دادن appPreferences به سازنده LoanRepository (خطای کامپایل تست از P3-10؛ تا الان هرگز کامپایل نشده بود چون CI تست نداشت).
+  - LoanRepositoryIntegrityTest.kt: تست p1_3_completedLoanTickDoesNotCreateGhostRecord با رفتار P1-9 هم‌خوان شد
+      (saveLoanWithShares برای وام تسویه‌شده isCurrentMonthPaid=true می‌گذارد؛ تست اکنون صریحاً پرچم false را می‌سازد).
+      تغییر فقط در تست است؛ رفتار برنامه عوض نشده.
+راستی‌آزمایی (واقعی، روی GitHub Actions):
+  - اجرای CI 40227865813: کامپایل main موفق، کامپایل تست‌ها شکست (خطای appPreferences) → رفع شد.
+  - اجرای CI 40228140275: کامپایل کامل موفق، یک تست شکست خورد (p1_3_completedLoan...) → رفع شد.
+  - اجرای CI 40228497757: موفق (compileDebugKotlin + compileReleaseKotlin + testDebugUnitTest، همه تست‌ها سبز).
+  - بیلد محلی ممکن نیست (شبکه به services.gradle.org / dl.google.com / maven بسته است).
+  - ورک‌فلو ریلیز (امضا + AAB/APK) روی این شاخه اجرا نشد؛ فقط پس از merge به main اجرا می‌شود.
+
 ۳. رویکردهای موفق / ناموفق
 --------------------------
+- موفق: CI جداگانه (ci.yml) برای کامپایل+تست روی شاخه‌ها؛ دو خطای پنهان تست در همان اجرای اول آشکار شد.
 - موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
 - موفق: بازطراحی فیلد عددی با LTR خالص و پیش‌نمایش به حروف فارسی جهت حذف کامل پرش کرسر.
 - نامشخص: خطای اولیه KSP (ApplicationManager.getApplication() is null) در run اول دیده شد و پس از پین شدن Gradle روی 9.3.1
@@ -119,11 +148,12 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
 
 ۴. وضعیت فعلی و گام‌های بعدی
 ----------------------------
-- آخرین عملیات موفق: ارتقای نسخه به 1.0.2، آماده‌سازی فایل‌های مستندات و تست‌های محلی.
-- آخرین وضعیت (2026-10-25 ~12:45 UTC): P1-1 و P1-2 روی main رفع شده‌اند؛ P1-3 و P1-4 روی شاخه‌ی fix/p1-3-p1-4
-  (کامیت 6ccaf77 + کامیت مستندات) هستند و منتظر بیلد/تست و merge. باقی‌مانده‌ی بحرانی‌ها: P1-5 تا P1-9 در bug.md.
-- گام بعدی پیشنهادی: ۱) اجرای `./gradlew testDebugUnitTest` روی شاخه‌ی fix/p1-3-p1-4 و رفع هر خطای کامپایل؛
-  ۲) merge به main (توجه: merge باعث ریلیز و bump نسخه می‌شود)؛ ۳) سپس P1-5 (جدا کردن dueMonths از paidMonths) و ادامه‌ی لیست.
+- آخرین عملیات موفق: اجرای CI 40228497757 روی شاخه fix/ci-compile-phonenumber (کامپایل + همه تست‌های واحد سبز).
+- وضعیت (2026-10-25 ~20:10 UTC): تمام موارد P1 و بیشتر P2/P3 در bug.md رفع شده‌اند (برای فهرست دقیق به bug.md مراجعه شود).
+  باقی‌مانده: P3-2, P3-3, P3-4, P3-6, P3-11, P3-12 و P4-1..P4-6 (P4-1 با ci.yml تا حدی پوشش داده شد؛ ریلیز هنوز بر هر push به main است).
+- گام بعدی پیشنهادی: ۱) merge شاخه fix/ci-compile-phonenumber به main (باعث ریلیز و bump نسخه می‌شود) و تأیید سبز بودن
+  ورک‌فلو «Android Build & Release»؛ ۲) در تنظیمات GitHub قاعده‌ی branch protection با شرط سبز بودن CI؛
+  ۳) ادامه‌ی P3/P4؛ ۴) ارتقای actions (checkout/setup-java/upload-artifact به v5 یا بالاتر) برای رفع هشدار Node 20.
 - فایل مرجع بکاپ: Structure Backup and import.md
 - فایل گزارش تغییرات: Update.md
 - مسائل شناخته‌شده/پیشنهادی (غیرمسدودکننده): هشدار deprecation برای checkout@v4 و setup-java@v4 (Node 20)؛

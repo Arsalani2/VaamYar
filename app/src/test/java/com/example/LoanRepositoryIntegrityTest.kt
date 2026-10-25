@@ -152,7 +152,13 @@ class LoanRepositoryIntegrityTest {
 
     @Test
     fun p1_3_completedLoanTickDoesNotCreateGhostRecord() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 12) // کاملاً تسویه‌شده (clamp)
+        val saved = insertSharedLoan(paidMonths = 12) // کاملاً تسویه‌شده (clamp)
+        // از P1-9 به بعد saveLoanWithShares برای وام تسویه‌شده isCurrentMonthPaid=true می‌گذارد.
+        // سناریوی «رکورد شبح» فقط وقتی رخ می‌دهد که وام تسویه‌شده با پرچم false باشد
+        // (داده‌ی قدیمی)؛ پس این حالت را صریحاً می‌سازیم.
+        db.loanDao().updateLoan(saved.copy(isCurrentMonthPaid = false))
+        val loan = currentLoan(saved.id)
+        assertFalse(loan.isCurrentMonthPaid)
         repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
         assertTrue(repository.allRecords.first().isEmpty())
         assertEquals(12, currentLoan(loan.id).paidMonths)
