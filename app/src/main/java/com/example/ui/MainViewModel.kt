@@ -455,6 +455,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun completeOnboarding(userName: String, phoneNumber: String = "") {
         viewModelScope.launch {
             val cleanName = userName.trim().ifEmpty { "من" }
+            // فیکس bug.md/P1-7: saveUser اکنون پرچم مبنای قبلی را در همان تراکنش پاک می‌کند؛
+            // دیگر ممکن نیست دو کاربر مبنا هم‌زمان وجود داشته باشند.
             repository.saveUser(
                 com.example.model.UserProfile(
                     id = 0L,

@@ -184,16 +184,39 @@ class LoanRepository(
         userProfileDao.setPrimaryUser(userId)
     }
 
+    /**
+     * فیکس bug.md/P1-7:
+     * درج/ویرایش کاربرِ دارای پرچمِ مبنا (مسیر completeOnboarding و ویرایش کاربر مبنا)
+     * قبلاً پرچم کاربر مبنای قبلی را پاک نمی‌کرد → دو کاربر مبنا + انتخابِ غیرقطعی
+     * getPrimaryUser. اکنون پاک‌سازی پرچم‌های قبلی و ثبت/به‌روزرسانی کاربر درون یک
+     * تراکنش اتمیک انجام می‌شود تا همیشه حداکثر یک کاربر مبنا وجود داشته باشد.
+     */
     suspend fun saveUser(user: UserProfile) = withContext(Dispatchers.IO) {
-        if (user.id == 0L) {
-            userProfileDao.insertUser(user)
-        } else {
-            val existing = userProfileDao.getUserById(user.id)
-            if (existing != null && existing.name != user.name) {
-                // Synchronize name change in all debtor shares!
-                debtorShareDao.renamePersonInShares(existing.name, user.name)
+        if (user.isPrimary) {
+            database.withTransaction {
+                userProfileDao.clearPrimaryFlags()
+                if (user.id == 0L) {
+                    userProfileDao.insertUser(user)
+                } else {
+                    val existing = userProfileDao.getUserById(user.id)
+                    if (existing != null && existing.name != user.name) {
+                        // Synchronize name change in all debtor shares!
+                        debtorShareDao.renamePersonInShares(existing.name, user.name)
+                    }
+                    userProfileDao.updateUser(user)
+                }
             }
-            userProfileDao.updateUser(user)
+        } else {
+            if (user.id == 0L) {
+                userProfileDao.insertUser(user)
+            } else {
+                val existing = userProfileDao.getUserById(user.id)
+                if (existing != null && existing.name != user.name) {
+                    // Synchronize name change in all debtor shares!
+                    debtorShareDao.renamePersonInShares(existing.name, user.name)
+                }
+                userProfileDao.updateUser(user)
+            }
         }
     }
 

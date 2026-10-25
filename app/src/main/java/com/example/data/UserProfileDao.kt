@@ -10,7 +10,9 @@ interface UserProfileDao {
     @Query("SELECT * FROM user_profiles ORDER BY isPrimary DESC, id ASC")
     fun getAllUsers(): Flow<List<UserProfile>>
 
-    @Query("SELECT * FROM user_profiles WHERE isPrimary = 1 LIMIT 1")
+    // فیکس bug.md/P1-7: LIMIT 1 بدون ORDER BY انتخابِ غیرقطعی می‌داد؛
+    // اکنون همیشه اولین (قدیمی‌ترین) کاربرِ دارای پرچم مبنا به‌صورت قطعی برگردانده می‌شود.
+    @Query("SELECT * FROM user_profiles WHERE isPrimary = 1 ORDER BY id ASC LIMIT 1")
     fun getPrimaryUser(): Flow<UserProfile?>
 
     @Query("SELECT * FROM user_profiles WHERE id = :id LIMIT 1")

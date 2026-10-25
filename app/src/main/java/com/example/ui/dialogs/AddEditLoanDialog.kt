@@ -145,6 +145,12 @@ fun AddEditLoanDialog(
         rawMonthlyAmount
     }
 
+    // فیکس bug.md/P1-8: مجموع سهم شرکا هرگز نباید از مبلغ کل قسط ماهانه بیشتر شود
+    // (قبلاً سهم کاربر مبنا بی‌صدا صفر می‌شد). این حالت هم موقع افزودن شریک چک می‌شود
+    // و هم اینجا — مثلاً اگر کاربر بعداً مبلغ قسط را کم کند — ذخیره‌ی وام را مسدود می‌کند.
+    val sharesExceedMonthly = hasPartners && othersTotalShare > rawMonthlyAmount
+    val primaryUserName = allUsers.firstOrNull { it.isPrimary }?.name?.trim()
+
     val endDate = remember(startDate, totalMonths) {
         ShamsiDateHelper.calculateEndDate(startDate.year, startDate.month, totalMonths)
     }
@@ -588,6 +594,17 @@ fun AddEditLoanDialog(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+
+                            // فیکس bug.md/P1-8(الف): سهم صفرِ بی‌صدا دیگر ممکن نیست —
+                            // اگر مجموع سهم شرکا از مبلغ قسط بیشتر شده (مثلاً با کم‌کردن مبلغ قسط)،
+                            // ذخیره‌ی وام مسدود و دلیلش نمایش داده می‌شود.
+                            if (sharesExceedMonthly) {
+                                Text(
+                                    text = "⚠️ مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر است؛ مبلغ قسط را افزایش دهید یا سهم شرکا را کم/حذف کنید.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
 
@@ -635,6 +652,8 @@ fun AddEditLoanDialog(
                     }
 
                     Button(
+                        // فیکس bug.md/P1-8: ذخیره‌ی وامی که سهم شرکایش از مبلغ قسط بیشتر است مسدود است
+                        enabled = !sharesExceedMonthly,
                         onClick = {
                             val loan = (loanToEdit ?: Loan(
                                 title = title.ifBlank { "وام جدید" },
@@ -688,9 +707,14 @@ fun AddEditLoanDialog(
 
     // Add Partner Modal Dialog
     if (showAddPartnerDialog) {
-        var selectedUserName by remember { mutableStateOf(allUsers.firstOrNull { !it.isPrimary }?.name ?: allUsers.firstOrNull()?.name ?: "") }
+        // فیکس bug.md/P1-8(ج): کاربر مبنا در فهرست انتخاب شرکا نیست؛ سهم او به‌صورت خودکار
+        // از باقی‌مانده‌ی قسط محاسبه می‌شود و شریکِ همان وام ثبت نمی‌شود (شمارش دوبرابر).
+        val partnerCandidates = allUsers.filter { !it.isPrimary }
+        var selectedUserName by remember { mutableStateOf(partnerCandidates.firstOrNull()?.name ?: "") }
         var partnerAmountDigits by remember { mutableStateOf("") }
         var partnerDesc by remember { mutableStateOf("") }
+        // فیکس bug.md/P1-8: پیام خطای اعتبارسنجی سهم شریک (به‌جای بی‌صدا بی‌اثر ماندن دکمه)
+        var partnerError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(
             onDismissRequest = { showAddPartnerDialog = false },
@@ -710,12 +734,12 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    if (allUsers.isNotEmpty()) {
+                    if (partnerCandidates.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            allUsers.forEach { user ->
+                            partnerCandidates.forEach { user ->
                                 val isSelected = selectedUserName == user.name
                                 FilterChip(
                                     selected = isSelected,
@@ -754,18 +778,46 @@ fun AddEditLoanDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // فیکس bug.md/P1-8: نمایش دلیل رد شدنِ ثبت سهم به‌جای سکوت
+                    partnerError?.let { err ->
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         val amount = partnerAmountDigits.toLongOrNull() ?: 0L
-                        if (selectedUserName.isNotBlank() && amount > 0L) {
+                        val partnerName = selectedUserName.trim()
+                        // فیکس bug.md/P1-8 — اعتبارسنجی سه‌لایه:
+                        // (ج) کاربر مبنا نمی‌تواند شریکِ وام خودش شود (شمارش دوبرابر)،
+                        // (ب) یک نفر نمی‌تواند دو بار شریکِ همان وام شود،
+                        // (الف) مجموع سهم شرکا نمی‌تواند از مبلغ کل قسط ماهانه بیشتر شود
+                        //      (قبلاً سهم کاربر مبنا بی‌صدا صفر می‌شد).
+                        partnerError = when {
+                            partnerName.isBlank() ->
+                                "نام شریک را وارد کنید."
+                            primaryUserName != null && partnerName.equals(primaryUserName, ignoreCase = true) ->
+                                "«$partnerName» کاربر مبناست؛ سهم او به‌صورت خودکار از باقی‌مانده‌ی قسط محاسبه می‌شود و نمی‌تواند شریکِ همین وام ثبت شود."
+                            sharesList.any { it.personName.trim().equals(partnerName, ignoreCase = true) } ->
+                                "«$partnerName» قبلاً شریکِ همین وام ثبت شده است؛ برای تغییر مبلغ، سهم قبلی را حذف و دوباره ثبت کنید."
+                            amount <= 0L ->
+                                "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
+                            amount + othersTotalShare > rawMonthlyAmount ->
+                                "مجموع سهم شرکا (${NumberFormatter.formatPrice(amount + othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
+                            else -> null
+                        }
+                        if (partnerError == null) {
                             sharesList.add(
                                 DebtorShare(
                                     loanId = loanToEdit?.id ?: 0L,
                                     loanTitle = title.ifBlank { "وام جدید" },
-                                    personName = selectedUserName.trim(),
+                                    personName = partnerName,
                                     shareAmount = amount,
                                     dueDay = startDate.day,
                                     shareDescription = partnerDesc.trim()
