@@ -1,5 +1,7 @@
 package com.example.data
 
+import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.model.PaymentRecord
@@ -18,7 +20,9 @@ class LoanRepository(
     private val loanDao: LoanDao,
     private val debtorShareDao: DebtorShareDao,
     private val paymentRecordDao: PaymentRecordDao,
-    private val userProfileDao: UserProfileDao
+    private val userProfileDao: UserProfileDao,
+    // فیکس bug.md/P1-4: برای اجرای عملیات چندمرحله‌ای (restore، ویرایش وام، ثبت پرداخت) به‌صورت اتمیک
+    private val database: RoomDatabase
 ) {
     val allLoans: Flow<List<Loan>> = loanDao.getAllLoans()
     val allActiveLoans: Flow<List<Loan>> = loanDao.getAllActiveLoans()
@@ -133,32 +137,46 @@ class LoanRepository(
     }
 
     suspend fun clearAllLoansAndReset() = withContext(Dispatchers.IO) {
-        loanDao.clearAllLoans()
-        debtorShareDao.clearAllShares()
+        database.withTransaction {
+            loanDao.clearAllLoans()
+            debtorShareDao.clearAllShares()
+        }
     }
 
     suspend fun clearAllDataAndReset() = withContext(Dispatchers.IO) {
-        loanDao.clearAllLoans()
-        debtorShareDao.clearAllShares()
-        paymentRecordDao.clearAllRecords()
-        userProfileDao.clearAllUsers()
+        database.withTransaction {
+            loanDao.clearAllLoans()
+            debtorShareDao.clearAllShares()
+            paymentRecordDao.clearAllRecords()
+            userProfileDao.clearAllUsers()
+        }
     }
 
+    /**
+     * فیکس bug.md/P1-4:
+     * پاک‌سازی چهار جدول و درج داده‌های پشتیبان قبلاً بدون تراکنش انجام می‌شد؛ کشته شدن اپ یا
+     * استثنا وسط کار = دیتابیس نصفه (مثلاً وام‌ها پاک و سهم‌ها درج‌نشده). اکنون کل عملیات یک
+     * تراکنش اتمیک است: یا کاملاً اعمال می‌شود یا (در صورت هر خطا) rollback شده و داده‌ی قبلی
+     * کاربر دست‌نخورده می‌ماند. استثنا عمداً به فراخواننده منتقل می‌شود تا importBackupJson
+     * آن را به‌صورت Result.failure به کاربر گزارش کند.
+     */
     suspend fun restoreDatabaseSnapshot(
         users: List<UserProfile>,
         loans: List<Loan>,
         shares: List<DebtorShare>,
         records: List<PaymentRecord>
     ) = withContext(Dispatchers.IO) {
-        loanDao.clearAllLoans()
-        debtorShareDao.clearAllShares()
-        paymentRecordDao.clearAllRecords()
-        userProfileDao.clearAllUsers()
+        database.withTransaction {
+            loanDao.clearAllLoans()
+            debtorShareDao.clearAllShares()
+            paymentRecordDao.clearAllRecords()
+            userProfileDao.clearAllUsers()
 
-        users.forEach { userProfileDao.insertUser(it) }
-        loans.forEach { loanDao.insertLoan(it) }
-        shares.forEach { debtorShareDao.insertShare(it) }
-        records.forEach { paymentRecordDao.insertRecord(it) }
+            users.forEach { userProfileDao.insertUser(it) }
+            loans.forEach { loanDao.insertLoan(it) }
+            shares.forEach { debtorShareDao.insertShare(it) }
+            records.forEach { paymentRecordDao.insertRecord(it) }
+        }
     }
 
     // User Management Methods
@@ -209,110 +227,163 @@ class LoanRepository(
         loan: Loan,
         shares: List<DebtorShare>
     ): Long = withContext(Dispatchers.IO) {
-        if (loan.id == 0L) {
-            // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند درج می‌شوند
-            val newLoanId = loanDao.insertLoan(loan)
-            shares.forEach { share ->
-                debtorShareDao.insertShare(
-                    share.copy(
-                        loanId = newLoanId,
-                        loanTitle = loan.title,
-                        dueDay = loan.dueDay
+        // ذخیره‌ی وام + شرکا یک تراکنش اتمیک است (حذف و درج دوباره‌ی سهم‌ها نباید وسط کار قطع شود)
+        database.withTransaction {
+            if (loan.id == 0L) {
+                // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند درج می‌شوند
+                val newLoanId = loanDao.insertLoan(loan)
+                shares.forEach { share ->
+                    debtorShareDao.insertShare(
+                        share.copy(
+                            loanId = newLoanId,
+                            loanTitle = loan.title,
+                            dueDay = loan.dueDay
+                        )
                     )
-                )
-            }
-            newLoanId
-        } else {
-            loanDao.updateLoan(loan)
-            val existingByName = debtorShareDao
-                .getSharesForLoanOnce(loan.id)
-                .associateBy { it.personName.trim() }
-            debtorShareDao.deleteSharesForLoan(loan.id)
-
-            shares.forEach { newShare ->
-                val matched = existingByName[newShare.personName.trim()]
-                val toInsert = if (matched != null) {
-                    newShare.copy(
-                        isPaidForCurrentMonth = matched.isPaidForCurrentMonth,
-                        lastPaidMonthName = matched.lastPaidMonthName
-                    )
-                } else {
-                    newShare
                 }
-                debtorShareDao.insertShare(
-                    toInsert.copy(
-                        loanId = loan.id,
-                        loanTitle = loan.title,
-                        dueDay = loan.dueDay
+                newLoanId
+            } else {
+                loanDao.updateLoan(loan)
+                val existingByName = debtorShareDao
+                    .getSharesForLoanOnce(loan.id)
+                    .associateBy { it.personName.trim() }
+                debtorShareDao.deleteSharesForLoan(loan.id)
+
+                shares.forEach { newShare ->
+                    val matched = existingByName[newShare.personName.trim()]
+                    val toInsert = if (matched != null) {
+                        newShare.copy(
+                            isPaidForCurrentMonth = matched.isPaidForCurrentMonth,
+                            lastPaidMonthName = matched.lastPaidMonthName
+                        )
+                    } else {
+                        newShare
+                    }
+                    debtorShareDao.insertShare(
+                        toInsert.copy(
+                            loanId = loan.id,
+                            loanTitle = loan.title,
+                            dueDay = loan.dueDay
+                        )
                     )
-                )
+                }
+                loan.id
             }
-            loan.id
         }
     }
 
     suspend fun deleteLoan(loanId: Long) = withContext(Dispatchers.IO) {
-        debtorShareDao.deleteSharesForLoan(loanId)
-        loanDao.deleteLoanById(loanId)
+        database.withTransaction {
+            debtorShareDao.deleteSharesForLoan(loanId)
+            loanDao.deleteLoanById(loanId)
+        }
     }
 
     /**
+     * رکورد تاریخچه‌ی یک قسط. منبع واحد برای مبلغ ثبت‌شده در تاریخچه (فیکس bug.md/P1-3).
+     *
+     * تصمیم: مبلغ رکورد همیشه «کل قسط ماهانه‌ی وام» (monthlyAmount) است، چون هر دو مسیر
+     * ثبت پرداخت (تیک ماه جاری و دکمه‌ی +/−) خودِ قسط وام را به وام‌دهنده پرداخت‌شده علامت
+     * می‌زنند و Loan.totalPaidAmount هم بر پایه‌ی monthlyAmount محاسبه می‌شود. سهم هر شریک جدا
+     * در debtor_shares نگه‌داری می‌شود. اگر روزی تاریخچه‌ی «سهم من» لازم شد، فقط همین تابع عوض شود.
+     */
+    private fun buildPaymentRecord(
+        loan: Loan,
+        installmentNumber: Int,
+        curShamsiFormatted: String
+    ) = PaymentRecord(
+        loanId = loan.id,
+        loanTitle = loan.title,
+        installmentNumber = installmentNumber,
+        amountPaid = loan.monthlyAmount,
+        paymentDateShamsi = curShamsiFormatted
+    )
+
+    /**
+     * ثبت رکورد قسط شماره‌ی [installmentNumber]؛ idempotent است: اگر رکوردی با همین شماره
+     * از قبل وجود داشته باشد (مثلاً تکراریِ باقی‌مانده از باگ قدیمی) اول پاک می‌شود تا هرگز
+     * دو رکورد برای یک قسط نماند.
+     */
+    private suspend fun upsertInstallmentRecord(
+        loan: Loan,
+        installmentNumber: Int,
+        curShamsiFormatted: String
+    ) {
+        paymentRecordDao.deleteRecordsForInstallment(loan.id, installmentNumber)
+        paymentRecordDao.insertRecord(buildPaymentRecord(loan, installmentNumber, curShamsiFormatted))
+    }
+
+    /**
+     * فیکس bug.md/P1-3:
+     * 1) برداشتن تیک، رکورد تاریخچه‌ی همان قسط را حذف می‌کند (قبلاً می‌ماند و تیک دوباره
+     *    رکورد تکراری می‌ساخت).
+     * 2) مبلغ رکورد در هر دو مسیر پرداخت یکسان است (buildPaymentRecord).
+     * 3) وضعیت وام داخل تراکنش از دیتابیس خوانده می‌شود، نه از نسخه‌ی احتمالاً کهنه‌ی UI؛
+     *    پس دوبار ضربه‌ی سریع هم رکورد تکراری یا شمارنده‌ی غلط نمی‌سازد.
+     *
      * Toggles whether the installment for the current month is paid or unpaid.
      */
     suspend fun toggleCurrentMonthPaid(loan: Loan, curShamsiFormatted: String) = withContext(Dispatchers.IO) {
-        val newPaidStatus = !loan.isCurrentMonthPaid
-        val newPaidMonths = if (newPaidStatus) {
-            (loan.paidMonths + 1).coerceAtMost(loan.totalMonths)
-        } else {
-            (loan.paidMonths - 1).coerceAtLeast(0)
-        }
+        database.withTransaction<Unit> {
+            val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            val newPaidStatus = !current.isCurrentMonthPaid
+            val newPaidMonths = if (newPaidStatus) {
+                (current.paidMonths + 1).coerceAtMost(current.totalMonths)
+            } else {
+                (current.paidMonths - 1).coerceAtLeast(0)
+            }
 
-        val updated = loan.copy(
-            isCurrentMonthPaid = newPaidStatus,
-            paidMonths = newPaidMonths
-        )
-        loanDao.updateLoan(updated)
-
-        if (newPaidStatus) {
-            paymentRecordDao.insertRecord(
-                PaymentRecord(
-                    loanId = loan.id,
-                    loanTitle = loan.title,
-                    installmentNumber = newPaidMonths,
-                    amountPaid = loan.effectiveMyShare,
-                    paymentDateShamsi = curShamsiFormatted
+            loanDao.updateLoan(
+                current.copy(
+                    isCurrentMonthPaid = newPaidStatus,
+                    paidMonths = newPaidMonths
                 )
             )
+
+            if (newPaidStatus) {
+                // فقط وقتی واقعاً یک قسط جدید اضافه شده رکورد ثبت می‌شود (وام تسویه‌شده clamp می‌شود)
+                if (newPaidMonths > current.paidMonths) {
+                    upsertInstallmentRecord(current, newPaidMonths, curShamsiFormatted)
+                }
+            } else {
+                // قسطی که تا اینجا آخرین پرداخت‌شده بوده برگردانده شد؛ رکوردش باید پاک شود
+                paymentRecordDao.deleteRecordsForInstallment(current.id, current.paidMonths)
+            }
         }
     }
 
+    /**
+     * افزایش/کاهش دستی تعداد اقساط پرداخت‌شده (دکمه‌های +/−).
+     * فیکس bug.md/P1-3: کاهش قسط هم اکنون رکورد همان قسط را از تاریخچه حذف می‌کند و
+     * افزایش، رکورد تکراری نمی‌سازد.
+     */
     suspend fun recordInstallmentPayment(
         loan: Loan,
         isIncrement: Boolean,
         curShamsiFormatted: String
     ) = withContext(Dispatchers.IO) {
-        val newPaidMonths = if (isIncrement) {
-            (loan.paidMonths + 1).coerceAtMost(loan.totalMonths)
-        } else {
-            (loan.paidMonths - 1).coerceAtLeast(0)
-        }
-        val isPaidNow = if (isIncrement) true else (newPaidMonths > 0)
-        val updated = loan.copy(
-            paidMonths = newPaidMonths,
-            isCurrentMonthPaid = isPaidNow
-        )
-        loanDao.updateLoan(updated)
-
-        if (isIncrement) {
-            paymentRecordDao.insertRecord(
-                PaymentRecord(
-                    loanId = loan.id,
-                    loanTitle = loan.title,
-                    installmentNumber = newPaidMonths,
-                    amountPaid = loan.monthlyAmount,
-                    paymentDateShamsi = curShamsiFormatted
+        database.withTransaction<Unit> {
+            val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            val newPaidMonths = if (isIncrement) {
+                (current.paidMonths + 1).coerceAtMost(current.totalMonths)
+            } else {
+                (current.paidMonths - 1).coerceAtLeast(0)
+            }
+            val isPaidNow = if (isIncrement) true else (newPaidMonths > 0)
+            loanDao.updateLoan(
+                current.copy(
+                    paidMonths = newPaidMonths,
+                    isCurrentMonthPaid = isPaidNow
                 )
             )
+
+            if (isIncrement) {
+                if (newPaidMonths > current.paidMonths) {
+                    upsertInstallmentRecord(current, newPaidMonths, curShamsiFormatted)
+                }
+            } else if (newPaidMonths < current.paidMonths) {
+                paymentRecordDao.deleteRecordsForInstallment(current.id, current.paidMonths)
+            }
         }
     }
 

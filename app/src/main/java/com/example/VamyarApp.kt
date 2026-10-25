@@ -21,7 +21,8 @@ class VamyarApp : Application() {
             loanDao = database.loanDao(),
             debtorShareDao = database.debtorShareDao(),
             paymentRecordDao = database.paymentRecordDao(),
-            userProfileDao = database.userProfileDao()
+            userProfileDao = database.userProfileDao(),
+            database = database
         )
 
         NotificationHelper.createNotificationChannel(this)

@@ -45,7 +45,8 @@ class ExampleRobolectricTest {
             loanDao = db.loanDao(),
             debtorShareDao = db.debtorShareDao(),
             paymentRecordDao = db.paymentRecordDao(),
-            userProfileDao = db.userProfileDao()
+            userProfileDao = db.userProfileDao(),
+            database = db
         )
     }
 

@@ -18,6 +18,11 @@ interface PaymentRecordDao {
     @Delete
     suspend fun deleteRecord(record: PaymentRecord)
 
+    // فیکس bug.md/P1-3: حذف رکورد(های) یک قسط مشخص هنگام برداشتن تیک پرداخت یا کاهش قسط.
+    // همه‌ی رکوردهای هم‌شماره پاک می‌شوند تا تکراری‌های قدیمیِ ناشی از باگ هم تمیز شوند.
+    @Query("DELETE FROM payment_records WHERE loanId = :loanId AND installmentNumber = :installmentNumber")
+    suspend fun deleteRecordsForInstallment(loanId: Long, installmentNumber: Int)
+
     @Query("DELETE FROM payment_records")
     suspend fun clearAllRecords()
 }
