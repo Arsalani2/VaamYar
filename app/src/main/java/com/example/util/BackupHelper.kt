@@ -1,3 +1,4 @@
+
 package com.example.util
 
 import android.content.Context
@@ -14,10 +15,8 @@ import java.security.MessageDigest
 data class BackupPreferences(
     val themeMode: String = "DARK",
     val themePreset: String = "EMERALD_GOLD",
-    val fontStyle: String = "SYSTEM",
     val usePersianDigits: Boolean = true,
     val compactThousands: Boolean = false,
-    val soundEnabled: Boolean = true,
     val customYear: Int = 1405,
     val customMonth: Int = 8,
     val customDay: Int = 2,
@@ -141,10 +140,8 @@ object BackupHelper {
         val prefsObj = JSONObject()
         prefsObj.put("themeMode", preferences.themeMode)
         prefsObj.put("themePreset", preferences.themePreset)
-        prefsObj.put("fontStyle", preferences.fontStyle)
         prefsObj.put("usePersianDigits", preferences.usePersianDigits)
         prefsObj.put("compactThousands", preferences.compactThousands)
-        prefsObj.put("soundEnabled", preferences.soundEnabled)
         prefsObj.put("customYear", preferences.customYear)
         prefsObj.put("customMonth", preferences.customMonth)
         prefsObj.put("customDay", preferences.customDay)
@@ -298,10 +295,8 @@ object BackupHelper {
             val preferences = BackupPreferences(
                 themeMode = prefsObj.optString("themeMode", "DARK"),
                 themePreset = prefsObj.optString("themePreset", "EMERALD_GOLD"),
-                fontStyle = prefsObj.optString("fontStyle", "SYSTEM"),
                 usePersianDigits = prefsObj.optBoolean("usePersianDigits", true),
                 compactThousands = prefsObj.optBoolean("compactThousands", false),
-                soundEnabled = prefsObj.optBoolean("soundEnabled", true),
                 customYear = prefsObj.optInt("customYear", 1405),
                 customMonth = prefsObj.optInt("customMonth", 8),
                 customDay = prefsObj.optInt("customDay", 2),

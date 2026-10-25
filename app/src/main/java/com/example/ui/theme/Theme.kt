@@ -1,3 +1,4 @@
+
 package com.example.ui.theme
 
 import android.os.Build
@@ -170,7 +171,6 @@ private fun getLightColorScheme(preset: ThemePreset): ColorScheme {
 fun MyApplicationTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     preset: ThemePreset = ThemePreset.EMERALD_GOLD,
-    fontStyle: AppFontStyle = AppFontStyle.SYSTEM,
     content: @Composable () -> Unit
 ) {
     val isDark = when (themeMode) {
@@ -187,7 +187,7 @@ fun MyApplicationTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = getAppTypography(fontStyle),
+        typography = Typography,
         content = content
     )
 }

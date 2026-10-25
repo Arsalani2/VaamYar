@@ -1,3 +1,4 @@
+
 package com.example.ui.screens
 
 import android.content.Intent
@@ -29,7 +30,6 @@ import com.example.data.UserDeleteCheckResult
 import com.example.model.UserProfile
 import com.example.ui.dialogs.AddEditUserDialog
 import com.example.ui.dialogs.ShamsiDatePickerDialog
-import com.example.ui.theme.AppFontStyle
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.ThemePreset
 import com.example.util.ShamsiDate
@@ -45,18 +45,14 @@ enum class SettingsCategory(val titleFa: String, val icon: androidx.compose.ui.g
 fun SettingsScreen(
     currentThemeMode: AppThemeMode,
     currentThemePreset: ThemePreset,
-    currentFontStyle: AppFontStyle,
     usePersianDigits: Boolean,
     compactThousands: Boolean,
-    soundEnabled: Boolean,
     currentShamsiDate: ShamsiDate,
     users: List<UserProfile>,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onThemePresetChange: (ThemePreset) -> Unit,
-    onFontStyleChange: (AppFontStyle) -> Unit,
     onDigitsChange: (Boolean) -> Unit,
     onCompactThousandsChange: (Boolean) -> Unit,
-    onSoundEnabledChange: (Boolean) -> Unit,
     onSetPrimaryUser: (Long) -> Unit,
     onSaveUser: (UserProfile) -> Unit,
     onCheckDeleteUser: suspend (Long) -> UserDeleteCheckResult,

@@ -1,3 +1,4 @@
+
 package com.example
 
 import android.Manifest
@@ -59,12 +60,10 @@ class MainActivity : ComponentActivity() {
             val viewModel: MainViewModel = viewModel()
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val themePreset by viewModel.themePreset.collectAsStateWithLifecycle()
-            val appFontStyle by viewModel.appFontStyle.collectAsStateWithLifecycle()
 
             MyApplicationTheme(
                 themeMode = themeMode,
-                preset = themePreset,
-                fontStyle = appFontStyle
+                preset = themePreset
             ) {
                 // Persian Right-To-Left layout
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -112,10 +111,8 @@ fun VamyarMainApp(viewModel: MainViewModel) {
     val personSummaries by viewModel.personSummaries.collectAsStateWithLifecycle()
     val currentThemeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val currentThemePreset by viewModel.themePreset.collectAsStateWithLifecycle()
-    val currentFontStyle by viewModel.appFontStyle.collectAsStateWithLifecycle()
     val usePersianDigits by viewModel.usePersianDigits.collectAsStateWithLifecycle()
     val compactThousands by viewModel.compactThousands.collectAsStateWithLifecycle()
-    val soundEnabled by viewModel.soundEnabled.collectAsStateWithLifecycle()
     val loanViewMode by viewModel.loanViewMode.collectAsStateWithLifecycle()
     val smartTips by viewModel.smartFinancialTips.collectAsStateWithLifecycle()
     val currentShamsiDate by viewModel.currentShamsiDate.collectAsStateWithLifecycle()
@@ -319,18 +316,14 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                     AppTab.SETTINGS -> SettingsScreen(
                         currentThemeMode = currentThemeMode,
                         currentThemePreset = currentThemePreset,
-                        currentFontStyle = currentFontStyle,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
-                        soundEnabled = soundEnabled,
                         currentShamsiDate = currentShamsiDate,
                         users = allUsers,
                         onThemeModeChange = { viewModel.setThemeMode(it) },
                         onThemePresetChange = { viewModel.setThemePreset(it) },
-                        onFontStyleChange = { viewModel.setAppFontStyle(it) },
                         onDigitsChange = { viewModel.setUsePersianDigits(it) },
                         onCompactThousandsChange = { viewModel.setCompactThousands(it) },
-                        onSoundEnabledChange = { viewModel.setSoundEnabled(it) },
                         onSetPrimaryUser = { viewModel.setPrimaryUser(it) },
                         onSaveUser = { viewModel.saveUser(it) },
                         onCheckDeleteUser = { id -> viewModel.checkCanDeleteUser(id) },

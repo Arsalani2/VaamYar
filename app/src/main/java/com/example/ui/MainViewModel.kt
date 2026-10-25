@@ -1,3 +1,4 @@
+
 package com.example.ui
 
 import android.app.Application
@@ -13,14 +14,12 @@ import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.notification.InstallmentAlarmReceiver
 import com.example.ui.components.LoanViewMode
-import com.example.ui.theme.AppFontStyle
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.ThemePreset
 import com.example.util.AppPreferences
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
-import com.example.util.SoundHelper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -134,18 +133,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _themePreset = MutableStateFlow(appPreferences.themePreset)
     val themePreset: StateFlow<ThemePreset> = _themePreset.asStateFlow()
 
-    private val _appFontStyle = MutableStateFlow(AppFontStyle.SYSTEM)
-    val appFontStyle: StateFlow<AppFontStyle> = _appFontStyle.asStateFlow()
-
     // Persistent Digit Display Setting (Persian vs English)
     private val _usePersianDigits = MutableStateFlow(appPreferences.usePersianDigits)
     val usePersianDigits: StateFlow<Boolean> = _usePersianDigits.asStateFlow()
 
     private val _compactThousands = MutableStateFlow(appPreferences.compactThousands)
     val compactThousands: StateFlow<Boolean> = _compactThousands.asStateFlow()
-
-    private val _soundEnabled = MutableStateFlow(false)
-    val soundEnabled: StateFlow<Boolean> = _soundEnabled.asStateFlow()
 
     private fun getUserShareForLoan(loan: Loan, shares: List<DebtorShare>, activeUser: String, primaryUserName: String = activeUser): Long {
         val loanShares = shares.filter { it.loanId == loan.id }
@@ -349,13 +342,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncDateWithSystem() {
         appPreferences.clearCustomDate()
         _currentShamsiDate.value = ShamsiDateHelper.getSystemShamsiDate()
-        SoundHelper.playClick(getApplication(), _soundEnabled.value)
     }
 
     fun setCustomShamsiDate(date: ShamsiDate) {
         appPreferences.setCustomDate(date.year, date.month, date.day)
         _currentShamsiDate.value = date
-        SoundHelper.playClick(getApplication(), _soundEnabled.value)
     }
 
     // Persistent View Mode
@@ -368,14 +359,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setPrimaryUser(userId: Long) {
         viewModelScope.launch {
             repository.setPrimaryUser(userId)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun saveUser(user: UserProfile) {
         viewModelScope.launch {
             repository.saveUser(user)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -386,7 +375,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteUser(userId: Long) {
         viewModelScope.launch {
             repository.deleteUser(userId)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -398,10 +386,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setThemePreset(preset: ThemePreset) {
         _themePreset.value = preset
         appPreferences.themePreset = preset
-    }
-
-    fun setAppFontStyle(fontStyle: AppFontStyle) {
-        _appFontStyle.value = fontStyle
     }
 
     fun setUsePersianDigits(usePersian: Boolean) {
@@ -419,19 +403,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appPreferences.hasSeenAppGuide = true
     }
 
-    fun setSoundEnabled(enabled: Boolean) {
-        _soundEnabled.value = false
-    }
-
     fun toggleLoanCurrentMonthPaid(loan: Loan) {
         viewModelScope.launch {
             val curDateStr = _currentShamsiDate.value.formatted()
             repository.toggleCurrentMonthPaid(loan, curDateStr)
-            if (!loan.isCurrentMonthPaid) {
-                SoundHelper.playPaymentSuccess(getApplication(), _soundEnabled.value)
-            } else {
-                SoundHelper.playClick(getApplication(), _soundEnabled.value)
-            }
         }
     }
 
@@ -439,7 +414,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val curDateStr = _currentShamsiDate.value.formatted()
             repository.recordInstallmentPayment(loan, isIncrement = true, curShamsiFormatted = curDateStr)
-            SoundHelper.playPaymentSuccess(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -447,21 +421,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val curDateStr = _currentShamsiDate.value.formatted()
             repository.recordInstallmentPayment(loan, isIncrement = false, curShamsiFormatted = curDateStr)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun saveLoan(loan: Loan, shares: List<DebtorShare>) {
         viewModelScope.launch {
             repository.saveLoanWithShares(loan, shares)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun deleteLoan(loanId: Long) {
         viewModelScope.launch {
             repository.deleteLoan(loanId)
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -469,18 +440,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val monthName = if (isPaid) _currentShamsiDate.value.monthName else ""
             repository.updateDebtorPaidStatus(shareId, isPaid, monthName)
-            if (isPaid) {
-                SoundHelper.playPaymentSuccess(getApplication(), _soundEnabled.value)
-            } else {
-                SoundHelper.playClick(getApplication(), _soundEnabled.value)
-            }
         }
     }
 
     fun resetMonthlyDebtorStatus() {
         viewModelScope.launch {
             repository.resetMonthlyDebtorStatus()
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -499,28 +464,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     notes = "کاربر مبنا"
                 )
             )
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun clearAllDataAndStartFresh() {
         viewModelScope.launch {
             repository.clearAllDataAndReset()
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun clearAllLoansAndStartFresh() {
         viewModelScope.launch {
             repository.clearAllLoansAndReset()
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
     fun resetToDefaults() {
         viewModelScope.launch {
             repository.clearAllLoansAndReset()
-            SoundHelper.playClick(getApplication(), _soundEnabled.value)
         }
     }
 
@@ -533,10 +494,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = com.example.util.BackupPreferences(
             themeMode = _themeMode.value.name,
             themePreset = _themePreset.value.name,
-            fontStyle = _appFontStyle.value.name,
             usePersianDigits = _usePersianDigits.value,
             compactThousands = _compactThousands.value,
-            soundEnabled = _soundEnabled.value,
             customYear = _currentShamsiDate.value.year,
             customMonth = _currentShamsiDate.value.month,
             customDay = _currentShamsiDate.value.day,
@@ -575,10 +534,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 _themeMode.value = AppThemeMode.valueOf(data.preferences.themeMode)
                 _themePreset.value = ThemePreset.valueOf(data.preferences.themePreset)
-                _appFontStyle.value = AppFontStyle.valueOf(data.preferences.fontStyle)
                 _usePersianDigits.value = data.preferences.usePersianDigits
                 _compactThousands.value = data.preferences.compactThousands
-                _soundEnabled.value = data.preferences.soundEnabled
 
                 if (data.preferences.isCustomDateEnabled) {
                     setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
@@ -587,7 +544,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (_: Exception) {}
 
-            SoundHelper.playPaymentSuccess(getApplication(), _soundEnabled.value)
 
             val summary = "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
             Result.success(summary)
