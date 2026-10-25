@@ -46,7 +46,8 @@ class ExampleRobolectricTest {
             debtorShareDao = db.debtorShareDao(),
             paymentRecordDao = db.paymentRecordDao(),
             userProfileDao = db.userProfileDao(),
-            database = db
+            database = db,
+            appPreferences = preferences
         )
     }
 
