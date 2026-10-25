@@ -92,3 +92,18 @@
   - همین اتمیک‌سازی برای `saveLoanWithShares` (حذف و درج دوباره‌ی سهم‌ها هنگام ویرایش)، `deleteLoan`، `clearAllLoansAndReset` و `clearAllDataAndReset` هم اعمال شد.
   - `LoanRepository` پارامتر سازنده‌ی `database` گرفت؛ `VamyarApp` و `ExampleRobolectricTest` به‌روز شدند.
 - **تست:** فایل `LoanRepositoryIntegrityTest.kt` با ۸ تست رگرسیون (شامل rollback با شبیه‌سازی خطا وسط restore) اضافه شد. (کامیت `6ccaf77`)
+
+### رفع P1-5 — تفکیک «اقساط رسیده» از «اقساط پرداخت‌شده»
+- **شرح باگ:** `AddEditLoanDialog` برای وام جدید `paidMonths = autoElapsed` می‌گذاشت و با تغییر تاریخ شروع/مدت (افکت همگام‌ساز و `onDateSelected`) این عدد بازنویسی می‌شد؛ وامی که ۶ ماه پیش شروع شده، از همان لحظه ۶ قسط «پرداخت‌شده» ثبت می‌شد.
+- **اقدام اصلاحی:**
+  - مقدار پیش‌فرض `paidMonths` وام جدید صفر شد؛ افکت همگام‌ساز و انتساب خودکار در `onDateSelected` حذف شد. `paidMonths` فقط با تأیید صریح کاربر (چیپ یا لمس دایره‌های اقساط) تغییر می‌کند.
+  - `autoElapsed` فقط نقش نمایشی «اقساط رسیده تا امروز» را دارد؛ برچسب بخش به «اقساط پرداخت‌شده (ثبت‌شده توسط شما)» و چیپ به «ثبت X قسط رسیده به‌عنوان پرداخت‌شده» تغییر کرد تا ماهیت عمل شفاف باشد.
+  - بدون تغییر اسکیمای Room (کامیت `0db3f48`)
+
+### رفع P1-6 — ر‌س‌ت خودکار ماهانه‌ی پرچم‌های «پرداخت ماه جاری»
+- **شرح باگ:** `isCurrentMonthPaid` وام‌ها و `isPaidForCurrentMonth` سهم‌ها با عوض شدن ماه شمسی هیچ‌جا خودکار صفر نمی‌شدند (ماه جدید تیک‌خورده به‌نظر می‌رسید)؛ `resetMonthlyPaidStatus` هم پرچم را صفر می‌کرد ولی `lastPaidMonthName` را پاک نمی‌کرد (وضعیت متناقض).
+- **اقدام اصلاحی:**
+  - `MonthlyRolloverHelper` جدید: «کلید ماه» (مثل `1405-08`) از تاریخ مؤثر اپ (سفارشی یا سیستم — `ShamsiDateHelper.getEffectiveShamsiDate`/`monthKey`) در SharedPreferences نگه داشته می‌شود؛ در اولین فرصتِ تغییر ماه، هر دو جدول درون یک تراکنش اتمیک ر‌س‌ت می‌شوند و کلید فقط پس از موفقیت ذخیره می‌شود. اولین اجرا وضعیت فعلی کاربر را دست‌نخورده می‌گذارد.
+  - فراخوانی: شروع اپ (`VamyarApp.onCreate`) + چک روزانه‌ی اعلان‌ها (`InstallmentAlarmReceiver`) — حتی اگر اپ مدتی باز نشده باشد.
+  - `LoanDao.resetCurrentMonthPaidFlags` اضافه شد؛ `DebtorShareDao.resetMonthlyPaidStatus` اکنون `lastPaidMonthName` را هم پاک می‌کند؛ ر‌س‌ت دستی «شروع ماه جدید» (`resetMonthlyDebtorStatus`) هر دو پرچم را درون یک تراکنش صفر می‌کند.
+  - بدون تغییر اسکیمای Room (کلید در prefs، نه ستون دیتابیس — بنا به حساسیت P1-1) (کامیت `0db3f48`)
