@@ -20,11 +20,10 @@ interface DebtorShareDao {
     // فیکس bug.md/P3-1: خواندن یک‌باره (غیر-Flow) از همهٔ سهم‌ها برای تطبیق نامِ
     // استانداردشده در LoanRepository (هم‌گام‌سازی rename و چک حذف کاربر)؛ نام‌ها
     // را نمی‌توان با تطبیق بایت‌به‌بایتِ SQL جست‌وجو کرد (ي/ك عربی، فاصله/نیم‌فاصله)
+    // — به همین دلیل کوئری‌های خام getSharesForPerson و renamePersonInShares حذف
+    // شدند؛ تطبیق نام از این پس فقط از طریق PersianNameNormalizer در LoanRepository است
     @Query("SELECT * FROM debtor_shares")
     suspend fun getAllSharesOnce(): List<DebtorShare>
-
-    @Query("SELECT * FROM debtor_shares WHERE personName = :personName")
-    suspend fun getSharesForPerson(personName: String): List<DebtorShare>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShare(share: DebtorShare): Long
@@ -48,9 +47,6 @@ interface DebtorShareDao {
     // حذف وضعیت متناقض (پرچم صفر ولی نام ماه پرداخت باقی‌مانده)
     @Query("UPDATE debtor_shares SET isPaidForCurrentMonth = 0, lastPaidMonthName = ''")
     suspend fun resetMonthlyPaidStatus()
-
-    @Query("UPDATE debtor_shares SET personName = :newName WHERE personName = :oldName")
-    suspend fun renamePersonInShares(oldName: String, newName: String)
 
     @Query("DELETE FROM debtor_shares")
     suspend fun clearAllShares()
