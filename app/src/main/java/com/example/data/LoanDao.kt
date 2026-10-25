@@ -15,6 +15,11 @@ interface LoanDao {
     @Query("SELECT * FROM loans WHERE id = :id")
     fun getLoanById(id: Long): Flow<Loan?>
 
+    // فیکس bug.md/P1-3: خواندن یک‌باره‌ی وضعیت واقعی وام داخل تراکنش، تا تیک/کاهش با
+    // نسخه‌ی کهنه‌ی UI (مثلاً دوبار ضربه‌ی سریع) رکورد تکراری نسازد.
+    @Query("SELECT * FROM loans WHERE id = :id")
+    suspend fun getLoanByIdOnce(id: Long): Loan?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoan(loan: Loan): Long
 
