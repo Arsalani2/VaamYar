@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.data.AppDatabase
 import com.example.data.LoanRepository
 import com.example.notification.NotificationHelper
+import com.example.util.AppPreferences
 import com.example.util.MonthlyRolloverHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,10 @@ class VamyarApp : Application() {
             debtorShareDao = database.debtorShareDao(),
             paymentRecordDao = database.paymentRecordDao(),
             userProfileDao = database.userProfileDao(),
-            database = database
+            database = database,
+            // فیکس bug.md/P3-10: مخزن مالکِ قاعدهٔ «seed فقط یک‌بار در هر نصب» است؛
+            // پرچم persisted در AppPreferences نگه داشته می‌شود.
+            appPreferences = AppPreferences(this)
         )
 
         NotificationHelper.createNotificationChannel(this)

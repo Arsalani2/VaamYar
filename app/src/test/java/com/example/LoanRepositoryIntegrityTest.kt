@@ -9,6 +9,7 @@ import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
+import com.example.util.AppPreferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -26,6 +27,7 @@ import org.robolectric.annotation.Config
  * تست‌های رگرسیون bug.md:
  *  - P1-3: تاریخچه‌ی پرداخت (حذف رکورد هنگام برداشتن تیک، بدون تکراری، مبلغ یکسان)
  *  - P1-4: اتمیک بودن restore (rollback کامل در صورت خطا)
+ *  - P3-10: seed داده‌ی راهنما فقط یک‌بار در هر نصب و هرگز بعد از حذف توسط کاربر
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -45,7 +47,8 @@ class LoanRepositoryIntegrityTest {
             debtorShareDao = db.debtorShareDao(),
             paymentRecordDao = db.paymentRecordDao(),
             userProfileDao = db.userProfileDao(),
-            database = db
+            database = db,
+            appPreferences = AppPreferences(context)
         )
     }
 
@@ -224,5 +227,40 @@ class LoanRepositoryIntegrityTest {
         assertEquals(sharesBefore, repository.allShares.first())
         assertEquals(recordsBefore, repository.allRecords.first())
         assertTrue(repository.allLoans.first().none { it.id == 100L })
+    }
+
+    // ---------------------------------------------------------------- P3-10
+
+    @Test
+    fun p3_10_demoDataIsSeededOnlyOnceAndNeverRecreatedAfterDeletion() = runBlocking {
+        // اولین اجرا (نصب تمیز): داده‌ی راهنما ساخته می‌شود
+        repository.checkAndSeedInitialData()
+        val seededLoans = repository.allLoans.first()
+        assertEquals(3, seededLoans.size)
+        assertEquals(2, repository.allUsers.first().size)
+
+        // کاربر وام‌های دمو را پاک می‌کند (تکی یا «پاکسازی کامل وام‌ها»)
+        seededLoans.forEach { repository.deleteLoan(it.id) }
+        assertTrue(repository.allLoans.first().isEmpty())
+
+        // اجرای بعدی اپ: seed دوباره نباید اتفاق بیفتد (باگ گزارش‌شده)
+        repository.checkAndSeedInitialData()
+        assertTrue(
+            "پس از حذف توسط کاربر، داده‌ی دمو نباید دوباره ساخته شود",
+            repository.allLoans.first().isEmpty()
+        )
+    }
+
+    @Test
+    fun p3_10_upgraderWithExistingDataGetsNoDemoDataAndFlagIsClosed() = runBlocking {
+        // کاربر قدیمی که از قبل داده دارد (پرچم هنوز set نشده): وام دمو نباید اضافه شود
+        insertSharedLoan()
+        repository.checkAndSeedInitialData()
+        assertEquals(1, repository.allLoans.first().size)
+
+        // و پس از حذف داده‌هایش هم seed دوباره نباید بیاید
+        repository.allLoans.first().forEach { repository.deleteLoan(it.id) }
+        repository.checkAndSeedInitialData()
+        assertTrue(repository.allLoans.first().isEmpty())
     }
 }

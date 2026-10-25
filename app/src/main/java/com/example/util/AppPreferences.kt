@@ -24,6 +24,7 @@ class AppPreferences(context: Context) {
         private const val KEY_LAST_ROLLOVER_MONTH = "key_last_rollover_month" // فیکس bug.md/P1-6
         private const val KEY_REMINDER_HOUR = "key_reminder_hour" // فیکس bug.md/P2-7
         private const val KEY_REMINDER_MINUTE = "key_reminder_minute" // فیکس bug.md/P2-7
+        private const val KEY_INITIAL_DATA_SEEDED = "key_initial_data_seeded" // فیکس bug.md/P3-10
     }
 
     var loanViewMode: LoanViewMode
@@ -115,6 +116,17 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt(KEY_REMINDER_MINUTE, 0)
         set(value) {
             prefs.edit().putInt(KEY_REMINDER_MINUTE, value.coerceIn(0, 59)).apply()
+        }
+
+    // فیکس bug.md/P3-10 (تصمیم A1): پرچم «داده‌ی راهنما seed شده یا نه» —
+    // seed دقیقاً یک‌بار در هر نصب انجام می‌شود و این پرچم پس از اولین اجرا
+    // برای همیشه true می‌ماند تا حذف وام‌های دمو توسط کاربر هرگز به seedِ
+    // دوباره منجر نشود (باگ گزارش‌شده: وام‌های دمو بعد از هر پاک‌سازی در
+    // اجرای بعدی دوباره ساخته می‌شدند).
+    var initialDataSeeded: Boolean
+        get() = prefs.getBoolean(KEY_INITIAL_DATA_SEEDED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_INITIAL_DATA_SEEDED, value).apply()
         }
 
     fun setCustomDate(year: Int, month: Int, day: Int) {
