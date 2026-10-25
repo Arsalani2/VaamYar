@@ -47,7 +47,10 @@ object BackupHelper {
         shares: List<DebtorShare>,
         records: List<PaymentRecord>,
         preferences: BackupPreferences,
-        appVersion: String = "1.0.1",
+        // فیکس bug.md/P2-13: پارامتر نسخه دیگر پیش‌فرض هاردکد ندارد تا هیچ فراخوانی
+        // ناخواسته نسخهٔ کهره در فایل بکاپ درج نکند؛ تنها فراخوانیِ فعلی مقدار را از
+        // BuildConfig.VERSION_NAME (تزریق‌شده از version.properties در زمان بیلد) می‌گذراند.
+        appVersion: String,
         shamsiDateFormatted: String = ""
     ): String {
         val root = JSONObject()
