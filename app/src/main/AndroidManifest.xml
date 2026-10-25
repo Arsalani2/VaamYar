@@ -10,9 +10,11 @@
 
     <application
         android:name=".VamyarApp"
-        android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        <!-- فیکس bug.md/P3-8: Auto Backup گوگل برای دیتابیس مالی (اسامی، مبالغ) غیرفعال شد
+             تا با ادعای «کاملاً آفلاین» README هم‌خوان باشد؛ تنها مسیر پشتیبان، export/import
+             خودِ اپ (BackupHelper) است. فایل‌های backup_rules.xml و data_extraction_rules.xml
+             هم حذف شدند. -->
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

@@ -27,7 +27,6 @@ fun AddEditUserDialog(
 ) {
     var name by remember { mutableStateOf(userToEdit?.name ?: "") }
     var notes by remember { mutableStateOf(userToEdit?.notes ?: "") }
-    var phoneNumber by remember { mutableStateOf(userToEdit?.phoneNumber ?: "") }
     var selectedColor by remember { mutableLongStateOf(userToEdit?.avatarColorHex ?: 0xFF1976D2L) }
 
     val colorOptions = listOf(
@@ -90,16 +89,6 @@ fun AddEditUserDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Phone number (optional)
-                OutlinedTextField(
-                    value = phoneNumber,
-                    onValueChange = { phoneNumber = it },
-                    label = { Text("شماره تماس (جهت پیامک یادآوری)") },
-                    placeholder = { Text("0912...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 // Color picker
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("رنگ نشانگر پروفایل:", style = MaterialTheme.typography.bodySmall)
@@ -143,7 +132,6 @@ fun AddEditUserDialog(
                                     (userToEdit ?: UserProfile(name = name.trim())).copy(
                                         name = name.trim(),
                                         notes = notes.trim(),
-                                        phoneNumber = phoneNumber.trim(),
                                         avatarColorHex = selectedColor
                                     )
                                 )

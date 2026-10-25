@@ -175,7 +175,7 @@ class LoanRepositoryIntegrityTest {
         insertSharedLoan()
 
         repository.restoreDatabaseSnapshot(
-            users = listOf(UserProfile(id = 1L, name = "من", phoneNumber = "", isPrimary = true)),
+            users = listOf(UserProfile(id = 1L, name = "من", isPrimary = true)),
             loans = listOf(sampleSnapshotLoan()),
             shares = emptyList(),
             records = listOf(
@@ -212,7 +212,7 @@ class LoanRepositoryIntegrityTest {
 
         try {
             repository.restoreDatabaseSnapshot(
-                users = listOf(UserProfile(id = 1L, name = "من", phoneNumber = "", isPrimary = true)),
+                users = listOf(UserProfile(id = 1L, name = "من", isPrimary = true)),
                 loans = listOf(sampleSnapshotLoan()),
                 shares = explodingShares,
                 records = emptyList()

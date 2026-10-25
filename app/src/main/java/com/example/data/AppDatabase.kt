@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Loan::class, DebtorShare::class, PaymentRecord::class, UserProfile::class],
-    version = 3,
+    version = 4, // فیکس bug.md/P3-5: حذف ستون phoneNumber از user_profiles
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +37,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // فیکس bug.md/P3-5: ستون phoneNumber با حذف قابلیت «شماره تماس شریک» از
+        // user_profiles حذف می‌شود. چون SQLite نسخه‌های قدیمی اندروید (۸–۱۱) از
+        // DROP COLUMN پشتیبانی نمی‌کند، جدول با اسکیمای جدید بازسازی و داده‌های
+        // موجود عیناً منتقل می‌شوند (الگوی استاندارد Migration در Room).
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `user_profiles_new` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`isPrimary` INTEGER NOT NULL, " +
+                        "`avatarColorHex` INTEGER NOT NULL, " +
+                        "`notes` TEXT NOT NULL)"
+                )
+                database.execSQL(
+                    "INSERT INTO `user_profiles_new` (`id`, `name`, `isPrimary`, `avatarColorHex`, `notes`) " +
+                        "SELECT `id`, `name`, `isPrimary`, `avatarColorHex`, `notes` FROM `user_profiles`"
+                )
+                database.execSQL("DROP TABLE `user_profiles`")
+                database.execSQL("ALTER TABLE `user_profiles_new` RENAME TO `user_profiles`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -44,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vamyar_database"
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     // فیکس bug.md/P1-1: fallbackToDestructiveMigration(dropAllTables = true) حذف شد.
                     // هر تغییر اسکیمای آینده بدون Migration واقعی، دیگر داده‌های مالی کاربر را
                     // بی‌سروصدا پاک نمی‌کند؛ بلکه Room خطای IllegalStateException می‌دهد تا در زمان

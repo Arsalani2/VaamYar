@@ -89,8 +89,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val primaryUser: StateFlow<UserProfile?> = repository.primaryUser
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // Onboarding dialog removed per user request (primary user defaults to "من")
-    val showOnboarding: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
+    // فیکس bug.md/P3-9: فلگ مردهٔ showOnboarding (همیشه false، بدون هیچ فراخوانی)
+    // حذف شد؛ راهنمای کاربر جدید همان AppGuideDialog و دادهٔ راهنمای seed است.
 
     // Persistent View Mode
     private val _loanViewMode = MutableStateFlow(appPreferences.loanViewMode)
@@ -462,24 +462,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun resetMonthlyDebtorStatus() {
         viewModelScope.launch {
             repository.resetMonthlyDebtorStatus()
-        }
-    }
-
-    fun completeOnboarding(userName: String, phoneNumber: String = "") {
-        viewModelScope.launch {
-            val cleanName = userName.trim().ifEmpty { "من" }
-            // فیکس bug.md/P1-7: saveUser اکنون پرچم مبنای قبلی را در همان تراکنش پاک می‌کند؛
-            // دیگر ممکن نیست دو کاربر مبنا هم‌زمان وجود داشته باشند.
-            repository.saveUser(
-                com.example.model.UserProfile(
-                    id = 0L,
-                    name = cleanName,
-                    phoneNumber = phoneNumber.trim(),
-                    isPrimary = true,
-                    avatarColorHex = 0xFF10B981L,
-                    notes = "کاربر مبنا"
-                )
-            )
         }
     }
 

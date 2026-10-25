@@ -70,7 +70,6 @@ object BackupHelper {
             val uObj = JSONObject()
             uObj.put("id", u.id)
             uObj.put("name", u.name)
-            uObj.put("phoneNumber", u.phoneNumber)
             uObj.put("isPrimary", u.isPrimary)
             uObj.put("avatarColorHex", u.avatarColorHex)
             uObj.put("notes", u.notes)
@@ -199,7 +198,6 @@ object BackupHelper {
                     UserProfile(
                         id = u.optLong("id", 0L),
                         name = u.optString("name", "کاربر"),
-                        phoneNumber = u.optString("phoneNumber", ""),
                         isPrimary = u.optBoolean("isPrimary", false),
                         avatarColorHex = u.optLong("avatarColorHex", 0xFF10B981L),
                         notes = u.optString("notes", "")
