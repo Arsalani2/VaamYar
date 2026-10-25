@@ -104,7 +104,7 @@ class AppPreferences(context: Context) {
     // فیکس bug.md/P2-7: ساعتِ چکِ روزانهٔ اعلان‌ها دیگر هاردکد نیست و اینجا persist
     // می‌شود (پیش‌فرض ۱۰:۰۰، مثل رفتار قبلی). برای تغییر کافی است این دو کلید نوشته
     // و NotificationHelper.scheduleDailyCheck(context) دوباره فراخوانی شود —
-    // Receiver و BootCompletedRouter هر دو از همین منبع می‌خوانند.
+    // Receiver و BootCompletedReceiver هر دو از همین منبع می‌خوانند.
     var reminderHour: Int
         get() = prefs.getInt(KEY_REMINDER_HOUR, 10)
         set(value) {
