@@ -6,6 +6,7 @@ import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
+import com.example.util.PersianNameNormalizer
 import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -172,9 +173,17 @@ class LoanRepository(
             paymentRecordDao.clearAllRecords()
             userProfileDao.clearAllUsers()
 
-            users.forEach { userProfileDao.insertUser(it) }
+            // فیکس bug.md/P3-1: نام‌های ورودی از بکاپ/داده‌های قدیمی هم هنگام بازیابی در
+            // شکل استاندارد ذخیره می‌شوند تا داده‌های قدیمی با قاعدهٔ واحد تطبیق همگرا شوند.
+            users.forEach {
+                userProfileDao.insertUser(it.copy(name = PersianNameNormalizer.canonicalName(it.name)))
+            }
             loans.forEach { loanDao.insertLoan(it) }
-            shares.forEach { debtorShareDao.insertShare(it) }
+            shares.forEach {
+                debtorShareDao.insertShare(
+                    it.copy(personName = PersianNameNormalizer.canonicalName(it.personName))
+                )
+            }
             records.forEach { paymentRecordDao.insertRecord(it) }
         }
     }
@@ -192,30 +201,50 @@ class LoanRepository(
      * تراکنش اتمیک انجام می‌شود تا همیشه حداکثر یک کاربر مبنا وجود داشته باشد.
      */
     suspend fun saveUser(user: UserProfile) = withContext(Dispatchers.IO) {
-        if (user.isPrimary) {
+        // فیکس bug.md/P3-1: نام کاربر همیشه در شکل استاندارد ذخیره می‌شود (ي/ك عربی،
+        // فاصله‌های اضافه) و هم‌گام‌سازی تغییر نام در سهم‌ها با کلیدِ تطبیقِ استاندارد
+        // انجام می‌شود تا سهم‌های شرکا هرگز از صاحبشان جدا نمانند.
+        val canonicalUser = user.copy(name = PersianNameNormalizer.canonicalName(user.name))
+        if (canonicalUser.isPrimary) {
             database.withTransaction {
                 userProfileDao.clearPrimaryFlags()
-                if (user.id == 0L) {
-                    userProfileDao.insertUser(user)
+                if (canonicalUser.id == 0L) {
+                    userProfileDao.insertUser(canonicalUser)
                 } else {
-                    val existing = userProfileDao.getUserById(user.id)
-                    if (existing != null && existing.name != user.name) {
+                    val existing = userProfileDao.getUserById(canonicalUser.id)
+                    if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
                         // Synchronize name change in all debtor shares!
-                        debtorShareDao.renamePersonInShares(existing.name, user.name)
+                        syncPersonNameInShares(existing.name, canonicalUser.name)
                     }
-                    userProfileDao.updateUser(user)
+                    userProfileDao.updateUser(canonicalUser)
                 }
             }
         } else {
-            if (user.id == 0L) {
-                userProfileDao.insertUser(user)
+            if (canonicalUser.id == 0L) {
+                userProfileDao.insertUser(canonicalUser)
             } else {
-                val existing = userProfileDao.getUserById(user.id)
-                if (existing != null && existing.name != user.name) {
+                val existing = userProfileDao.getUserById(canonicalUser.id)
+                if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
                     // Synchronize name change in all debtor shares!
-                    debtorShareDao.renamePersonInShares(existing.name, user.name)
+                    syncPersonNameInShares(existing.name, canonicalUser.name)
                 }
-                userProfileDao.updateUser(user)
+                userProfileDao.updateUser(canonicalUser)
+            }
+        }
+    }
+
+    /**
+     * فیکس bug.md/P3-1: هم‌گام‌سازی تغییر نامِ شخص در سهم‌های شرکا قبلاً یک UPDATE با
+     * تطبیق خامِ رشته‌ای در SQL بود (renamePersonInShares)؛ نام قدیمی با ي/ك عربی،
+     * فاصله‌های اضافه یا نیم‌فاصله هرگز مچ نمی‌شد و سهم‌های آن شخص بی‌صدا از صاحبشان
+     * جدا می‌ماندند. اکنون تطبیق با کلید استاندارد نام (PersianNameNormalizer) انجام
+     * می‌شود و نام جدید هم در همان شکل استاندارد نوشته می‌شود. باید درون تراکنشِ
+     * فراخواننده صدا زده شود.
+     */
+    private suspend fun syncPersonNameInShares(oldName: String, canonicalNewName: String) {
+        debtorShareDao.getAllSharesOnce().forEach { share ->
+            if (PersianNameNormalizer.namesMatch(share.personName, oldName)) {
+                debtorShareDao.updateShare(share.copy(personName = canonicalNewName))
             }
         }
     }
@@ -223,10 +252,15 @@ class LoanRepository(
     /**
      * Checks if a user is safely deletable.
      * If user is partner in any loans, deletion is blocked and loan titles are returned.
+     *
+     * فیکس bug.md/P3-1: تطبیقِ «این کاربر شریکِ کدام وام‌هاست» قبلاً تطبیق خامِ رشته‌ای
+     * بود؛ نام با ي/ك عربی یا فاصلهٔ اضافه مچ نمی‌شد و حذفِ کاربری که هنوز سهم دارد
+     * مجاز می‌شد (سهم یتیم می‌ماند). اکنون تطبیق با کلید استاندارد نام انجام می‌شود.
      */
     suspend fun checkCanDeleteUser(userId: Long): UserDeleteCheckResult = withContext(Dispatchers.IO) {
         val user = userProfileDao.getUserById(userId) ?: return@withContext UserDeleteCheckResult(canDelete = true)
-        val shares = debtorShareDao.getSharesForPerson(user.name)
+        val shares = debtorShareDao.getAllSharesOnce()
+            .filter { PersianNameNormalizer.namesMatch(it.personName, user.name) }
         if (shares.isNotEmpty()) {
             val loanTitles = shares.map { it.loanTitle }.distinct()
             UserDeleteCheckResult(canDelete = false, blockingLoanTitles = loanTitles)
@@ -270,6 +304,8 @@ class LoanRepository(
                 shares.forEach { share ->
                     debtorShareDao.insertShare(
                         share.copy(
+                            // فیکس bug.md/P3-1: نام شریک در شکل استاندارد ذخیره می‌شود
+                            personName = PersianNameNormalizer.canonicalName(share.personName),
                             loanId = newLoanId,
                             loanTitle = safeLoan.title,
                             dueDay = safeLoan.dueDay
@@ -282,13 +318,16 @@ class LoanRepository(
                 // رکوردهای تاریخچه با شماره‌ی بالاتر از کل اقساط (باقی‌مانده از داده‌ی قدیمی
                 // یا کاهشِ مدت وام) معنایی ندارند و حذف می‌شوند تا تاریخچه با وام سازگار بماند.
                 paymentRecordDao.deleteRecordsAboveInstallment(safeLoan.id, safeTotalMonths)
+                // فیکس bug.md/P3-1: بازگرداندن وضعیت پرداخت شرکای پابرجا حالا با کلید
+                // استاندارد نام مچ می‌شود (ي/ك عربی، فاصله/نیم‌فاصله) و نامِ شخص هم در
+                // شکل استاندارد ذخیره می‌شود.
                 val existingByName = debtorShareDao
                     .getSharesForLoanOnce(safeLoan.id)
-                    .associateBy { it.personName.trim() }
+                    .associateBy { PersianNameNormalizer.matchKey(it.personName) }
                 debtorShareDao.deleteSharesForLoan(safeLoan.id)
 
                 shares.forEach { newShare ->
-                    val matched = existingByName[newShare.personName.trim()]
+                    val matched = existingByName[PersianNameNormalizer.matchKey(newShare.personName)]
                     val toInsert = if (matched != null) {
                         newShare.copy(
                             isPaidForCurrentMonth = matched.isPaidForCurrentMonth,
@@ -299,6 +338,7 @@ class LoanRepository(
                     }
                     debtorShareDao.insertShare(
                         toInsert.copy(
+                            personName = PersianNameNormalizer.canonicalName(toInsert.personName),
                             loanId = safeLoan.id,
                             loanTitle = safeLoan.title,
                             dueDay = safeLoan.dueDay
