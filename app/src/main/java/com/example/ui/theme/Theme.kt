@@ -92,61 +92,76 @@ private fun getLightColorScheme(preset: ThemePreset): ColorScheme {
             primary = EmeraldPrimaryLight,
             onPrimary = EmeraldOnPrimaryLight,
             primaryContainer = EmeraldPrimaryContainerLight,
+            onPrimaryContainer = Color(0xFF003822),
             secondary = EmeraldSecondaryLight,
             background = EmeraldBackgroundLight,
             surface = EmeraldSurfaceLight,
             surfaceVariant = EmeraldSurfaceVariantLight,
             onBackground = Color(0xFF0F172A),
             onSurface = Color(0xFF1E293B),
-            outline = Color(0xFFCBD5E1)
+            onSurfaceVariant = Color(0xFF475569),
+            outline = Color(0xFFCBD5E1),
+            outlineVariant = Color(0xFFE2E8F0)
         )
         ThemePreset.COBALT_BLUE -> lightColorScheme(
             primary = CobaltPrimaryLight,
             onPrimary = Color.White,
             primaryContainer = Color(0xFFDBEAFE),
+            onPrimaryContainer = Color(0xFF1E3A8A),
             secondary = CobaltSecondaryLight,
             background = CobaltBackgroundLight,
             surface = CobaltSurfaceLight,
             surfaceVariant = CobaltSurfaceVariantLight,
             onBackground = Color(0xFF0F172A),
             onSurface = Color(0xFF1E293B),
-            outline = Color(0xFFBFDBFE)
+            onSurfaceVariant = Color(0xFF475569),
+            outline = Color(0xFFBFDBFE),
+            outlineVariant = Color(0xFFE2E8F0)
         )
         ThemePreset.ROYAL_PURPLE -> lightColorScheme(
             primary = PurplePrimaryLight,
             onPrimary = Color.White,
             primaryContainer = Color(0xFFF3E8FF),
+            onPrimaryContainer = Color(0xFF581C87),
             secondary = PurpleSecondaryLight,
             background = PurpleBackgroundLight,
             surface = PurpleSurfaceLight,
             surfaceVariant = PurpleSurfaceVariantLight,
             onBackground = Color(0xFF1F1033),
             onSurface = Color(0xFF2D164B),
-            outline = Color(0xFFE9D5FF)
+            onSurfaceVariant = Color(0xFF584C66),
+            outline = Color(0xFFE9D5FF),
+            outlineVariant = Color(0xFFF1E4FA)
         )
         ThemePreset.RUBY_ROSE -> lightColorScheme(
             primary = RubyPrimaryLight,
             onPrimary = Color.White,
             primaryContainer = Color(0xFFFFE4E6),
+            onPrimaryContainer = Color(0xFF881337),
             secondary = RubySecondaryLight,
             background = RubyBackgroundLight,
             surface = RubySurfaceLight,
             surfaceVariant = RubySurfaceVariantLight,
             onBackground = Color(0xFF2A0A12),
             onSurface = Color(0xFF3B101A),
-            outline = Color(0xFFFECDD3)
+            onSurfaceVariant = Color(0xFF5E494E),
+            outline = Color(0xFFFECDD3),
+            outlineVariant = Color(0xFFFCE3E8)
         )
         ThemePreset.OBSIDIAN_SLATE -> lightColorScheme(
             primary = ObsidianPrimaryLight,
             onPrimary = Color.White,
             primaryContainer = Color(0xFFE2E8F0),
+            onPrimaryContainer = Color(0xFF1E293B),
             secondary = ObsidianSecondaryLight,
             background = ObsidianBackgroundLight,
             surface = ObsidianSurfaceLight,
             surfaceVariant = ObsidianSurfaceVariantLight,
             onBackground = Color(0xFF0F172A),
             onSurface = Color(0xFF1E293B),
-            outline = Color(0xFFCBD5E1)
+            onSurfaceVariant = Color(0xFF475569),
+            outline = Color(0xFFCBD5E1),
+            outlineVariant = Color(0xFFE2E8F0)
         )
     }
 }

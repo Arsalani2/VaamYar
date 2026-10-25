@@ -36,10 +36,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.MainViewModel
-import com.example.ui.dialogs.FirstLaunchOnboardingDialog
+import com.example.ui.dialogs.AppGuideDialog
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
-import com.example.util.SoundHelper
 
 // 3 Main Tabs as explicitly requested by user (Timeline & Analytics removed)
 enum class AppTab(
@@ -120,15 +119,15 @@ fun VamyarMainApp(viewModel: MainViewModel) {
     val loanViewMode by viewModel.loanViewMode.collectAsStateWithLifecycle()
     val smartTips by viewModel.smartFinancialTips.collectAsStateWithLifecycle()
     val currentShamsiDate by viewModel.currentShamsiDate.collectAsStateWithLifecycle()
-    val showOnboarding by viewModel.showOnboarding.collectAsStateWithLifecycle()
+    val hasSeenAppGuide by viewModel.hasSeenAppGuide.collectAsStateWithLifecycle()
 
-    val activeUserName = primaryUser?.name ?: "کاربر اصلی"
+    val activeUserName = primaryUser?.name ?: "من"
     val activeUserColor = primaryUser?.avatarColorHex ?: 0xFF10B981L
 
-    if (showOnboarding) {
-        FirstLaunchOnboardingDialog(
-            onComplete = { name, phone ->
-                viewModel.completeOnboarding(name, phone)
+    if (!hasSeenAppGuide) {
+        AppGuideDialog(
+            onDismiss = {
+                viewModel.dismissAppGuide()
             }
         )
     }
@@ -253,7 +252,6 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         selected = isSelected,
                         onClick = {
                             if (selectedTab != tab) {
-                                SoundHelper.playClick(context, soundEnabled)
                                 selectedTab = tab
                             }
                         },

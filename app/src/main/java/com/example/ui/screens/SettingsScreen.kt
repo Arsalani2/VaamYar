@@ -37,7 +37,7 @@ import com.example.util.ShamsiDate
 enum class SettingsCategory(val titleFa: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     USERS("کاربران", Icons.Default.People),
     DATE_SYNC("تاریخ شمسی", Icons.Default.CalendarMonth),
-    APPEARANCE("قلم و تم", Icons.Default.Palette),
+    APPEARANCE("ظاهر و تم", Icons.Default.Palette),
     DATA_MANAGEMENT("داده‌ها", Icons.Default.Storage)
 }
 
@@ -440,21 +440,21 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("رسم‌الخط اعداد:", style = MaterialTheme.typography.bodyMedium)
+                                    Text("نوع نمایش اعداد:", style = MaterialTheme.typography.bodyMedium)
                                     SingleChoiceSegmentedButtonRow {
                                         SegmentedButton(
                                             selected = usePersianDigits,
                                             onClick = { onDigitsChange(true) },
                                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                                         ) {
-                                            Text("فارسی (۱۲۳)", style = MaterialTheme.typography.labelSmall)
+                                            Text("فارسی", style = MaterialTheme.typography.labelSmall)
                                         }
                                         SegmentedButton(
                                             selected = !usePersianDigits,
                                             onClick = { onDigitsChange(false) },
                                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                                         ) {
-                                            Text("English (123)", style = MaterialTheme.typography.labelSmall)
+                                            Text("EN", style = MaterialTheme.typography.labelSmall)
                                         }
                                     }
                                 }
@@ -476,49 +476,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Font Selection
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text("فونت و قلم برنامه", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                AppFontStyle.values().forEach { fontStyle ->
-                                    val isSelected = currentFontStyle == fontStyle
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { onFontStyleChange(fontStyle) },
-                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent,
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(fontStyle.titleFa, style = MaterialTheme.typography.bodyMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                            if (isSelected) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Theme Mode & Color Presets
+                    // Theme Mode & Color Presets (Default follows system)
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -585,32 +543,6 @@ fun SettingsScreen(
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    // Sound switch
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(imageVector = Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Text("صداگذاری و بازخورد لمسی", style = MaterialTheme.typography.bodyMedium)
-                                }
-                                Switch(checked = soundEnabled, onCheckedChange = onSoundEnabledChange)
                             }
                         }
                     }

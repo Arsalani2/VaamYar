@@ -3,6 +3,8 @@ package com.example.util
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.ui.components.LoanViewMode
+import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.ThemePreset
 
 class AppPreferences(context: Context) {
 
@@ -10,6 +12,11 @@ class AppPreferences(context: Context) {
 
     companion object {
         private const val KEY_VIEW_MODE = "key_loan_view_mode"
+        private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_THEME_PRESET = "key_theme_preset"
+        private const val KEY_PERSIAN_DIGITS = "key_persian_digits"
+        private const val KEY_COMPACT_THOUSANDS = "key_compact_thousands"
+        private const val KEY_HAS_SEEN_GUIDE = "key_has_seen_guide"
         private const val KEY_CUSTOM_DATE_ENABLED = "key_custom_date_enabled"
         private const val KEY_CUSTOM_YEAR = "key_custom_year"
         private const val KEY_CUSTOM_MONTH = "key_custom_month"
@@ -28,6 +35,44 @@ class AppPreferences(context: Context) {
         set(value) {
             prefs.edit().putString(KEY_VIEW_MODE, value.name).apply()
         }
+
+    var themeMode: AppThemeMode
+        get() {
+            val name = prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name)
+            return try {
+                AppThemeMode.valueOf(name ?: AppThemeMode.SYSTEM.name)
+            } catch (e: Exception) {
+                AppThemeMode.SYSTEM
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_THEME_MODE, value.name).apply()
+        }
+
+    var themePreset: ThemePreset
+        get() {
+            val name = prefs.getString(KEY_THEME_PRESET, ThemePreset.EMERALD_GOLD.name)
+            return try {
+                ThemePreset.valueOf(name ?: ThemePreset.EMERALD_GOLD.name)
+            } catch (e: Exception) {
+                ThemePreset.EMERALD_GOLD
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_THEME_PRESET, value.name).apply()
+        }
+
+    var usePersianDigits: Boolean
+        get() = prefs.getBoolean(KEY_PERSIAN_DIGITS, true)
+        set(value) = prefs.edit().putBoolean(KEY_PERSIAN_DIGITS, value).apply()
+
+    var compactThousands: Boolean
+        get() = prefs.getBoolean(KEY_COMPACT_THOUSANDS, false)
+        set(value) = prefs.edit().putBoolean(KEY_COMPACT_THOUSANDS, value).apply()
+
+    var hasSeenAppGuide: Boolean
+        get() = prefs.getBoolean(KEY_HAS_SEEN_GUIDE, false)
+        set(value) = prefs.edit().putBoolean(KEY_HAS_SEEN_GUIDE, value).apply()
 
     var isCustomDateEnabled: Boolean
         get() = prefs.getBoolean(KEY_CUSTOM_DATE_ENABLED, false)

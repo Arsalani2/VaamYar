@@ -62,21 +62,49 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testZeroStateCleanStartup() = runBlocking {
+    fun testSeedingAndDataPersistence() = runBlocking {
+        // Initial run seeds 3 guide loans and sets up primary user "من"
         repository.checkAndSeedInitialData()
         val loans = repository.allLoans.first()
-        // Fresh zero-state: all demo loans are cleared for new user
-        assertEquals(0, loans.size)
+        assertEquals(3, loans.size)
 
-        // When fresh, no pre-seeded users exist; onboarding creates the user
-        val users = repository.allUsers.first()
-        assertEquals(0, users.size)
-
-        // Onboarding completes
-        repository.saveUser(UserProfile(name = "کاربر اصلی", isPrimary = true))
         val primary = repository.primaryUser.first()
         assertNotNull(primary)
-        assertEquals("کاربر اصلی", primary!!.name)
+        assertEquals("من", primary!!.name)
+        assertTrue(primary.isPrimary)
+
+        // Add a user created custom loan
+        val customLoan = Loan(
+            title = "وام جدید شخصی",
+            dueDay = 15,
+            monthlyAmount = 3500000L,
+            totalMonths = 10,
+            paidMonths = 1
+        )
+        repository.saveLoanWithShares(customLoan, emptyList())
+        assertEquals(4, repository.allLoans.first().size)
+
+        // CRITICAL BUG VERIFICATION: Restarting app/re-calling checkAndSeedInitialData must NEVER wipe data!
+        repository.checkAndSeedInitialData()
+        val loansAfterRestart = repository.allLoans.first()
+        assertEquals(4, loansAfterRestart.size)
+    }
+
+    @Test
+    fun testAppPreferencesPersistence() {
+        // Default theme mode should follow SYSTEM
+        assertEquals(com.example.ui.theme.AppThemeMode.SYSTEM, preferences.themeMode)
+
+        // Digit format toggles
+        preferences.usePersianDigits = false
+        assertFalse(preferences.usePersianDigits)
+        preferences.usePersianDigits = true
+        assertTrue(preferences.usePersianDigits)
+
+        // Tour guide persistence
+        assertFalse(preferences.hasSeenAppGuide)
+        preferences.hasSeenAppGuide = true
+        assertTrue(preferences.hasSeenAppGuide)
     }
 
     @Test

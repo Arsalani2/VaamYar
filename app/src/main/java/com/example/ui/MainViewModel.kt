@@ -87,13 +87,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val primaryUser: StateFlow<UserProfile?> = repository.primaryUser
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val showOnboarding: StateFlow<Boolean> = allUsers
-        .map { it.isEmpty() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    // Onboarding dialog removed per user request (primary user defaults to "من")
+    val showOnboarding: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
 
     // Persistent View Mode
     private val _loanViewMode = MutableStateFlow(appPreferences.loanViewMode)
     val loanViewMode: StateFlow<LoanViewMode> = _loanViewMode.asStateFlow()
+
+    // First Launch Unobtrusive Guide Tour
+    private val _hasSeenAppGuide = MutableStateFlow(appPreferences.hasSeenAppGuide)
+    val hasSeenAppGuide: StateFlow<Boolean> = _hasSeenAppGuide.asStateFlow()
 
     // Current Shamsi Date (System date or custom override)
     private val _currentShamsiDate = MutableStateFlow(
@@ -107,22 +110,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isCustomDateActive: StateFlow<Boolean> = MutableStateFlow(appPreferences.isCustomDateEnabled)
 
-    private val _themeMode = MutableStateFlow(AppThemeMode.DARK)
+    // Persistent Theme Mode (default SYSTEM)
+    private val _themeMode = MutableStateFlow(appPreferences.themeMode)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
-    private val _themePreset = MutableStateFlow(ThemePreset.EMERALD_GOLD)
+    // Persistent Theme Preset
+    private val _themePreset = MutableStateFlow(appPreferences.themePreset)
     val themePreset: StateFlow<ThemePreset> = _themePreset.asStateFlow()
 
     private val _appFontStyle = MutableStateFlow(AppFontStyle.SYSTEM)
     val appFontStyle: StateFlow<AppFontStyle> = _appFontStyle.asStateFlow()
 
-    private val _usePersianDigits = MutableStateFlow(true)
+    // Persistent Digit Display Setting (Persian vs English)
+    private val _usePersianDigits = MutableStateFlow(appPreferences.usePersianDigits)
     val usePersianDigits: StateFlow<Boolean> = _usePersianDigits.asStateFlow()
 
-    private val _compactThousands = MutableStateFlow(false)
+    private val _compactThousands = MutableStateFlow(appPreferences.compactThousands)
     val compactThousands: StateFlow<Boolean> = _compactThousands.asStateFlow()
 
-    private val _soundEnabled = MutableStateFlow(true)
+    private val _soundEnabled = MutableStateFlow(false)
     val soundEnabled: StateFlow<Boolean> = _soundEnabled.asStateFlow()
 
     private fun getUserShareForLoan(loan: Loan, shares: List<DebtorShare>, activeUser: String, primaryUserName: String = activeUser): Long {
@@ -354,10 +360,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setThemeMode(mode: AppThemeMode) {
         _themeMode.value = mode
+        appPreferences.themeMode = mode
     }
 
     fun setThemePreset(preset: ThemePreset) {
         _themePreset.value = preset
+        appPreferences.themePreset = preset
     }
 
     fun setAppFontStyle(fontStyle: AppFontStyle) {
@@ -366,14 +374,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setUsePersianDigits(usePersian: Boolean) {
         _usePersianDigits.value = usePersian
+        appPreferences.usePersianDigits = usePersian
     }
 
     fun setCompactThousands(compact: Boolean) {
         _compactThousands.value = compact
+        appPreferences.compactThousands = compact
+    }
+
+    fun dismissAppGuide() {
+        _hasSeenAppGuide.value = true
+        appPreferences.hasSeenAppGuide = true
     }
 
     fun setSoundEnabled(enabled: Boolean) {
-        _soundEnabled.value = enabled
+        _soundEnabled.value = false
     }
 
     fun toggleLoanCurrentMonthPaid(loan: Loan) {
@@ -439,7 +454,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun completeOnboarding(userName: String, phoneNumber: String = "") {
         viewModelScope.launch {
-            val cleanName = userName.trim().ifEmpty { "کاربر اصلی" }
+            val cleanName = userName.trim().ifEmpty { "من" }
             repository.saveUser(
                 com.example.model.UserProfile(
                     id = 0L,
@@ -447,7 +462,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     phoneNumber = phoneNumber.trim(),
                     isPrimary = true,
                     avatarColorHex = 0xFF10B981L,
-                    notes = "کاربر اصلی برنامه"
+                    notes = "کاربر مبنا"
                 )
             )
             SoundHelper.playClick(getApplication(), _soundEnabled.value)

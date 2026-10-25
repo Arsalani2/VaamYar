@@ -28,10 +28,108 @@ class LoanRepository(
     val primaryUser: Flow<UserProfile?> = userProfileDao.getPrimaryUser()
 
     suspend fun checkAndSeedInitialData() = withContext(Dispatchers.IO) {
-        // App starts fresh in zero-state: no hardcoded personal names, no demo loans
-        // If users table is empty, first-launch onboarding will prompt the user
-        loanDao.clearAllLoans()
-        debtorShareDao.clearAllShares()
+        // 1. Ensure baseline primary user exists with default name "من" without prompting
+        if (userProfileDao.getCount() == 0) {
+            userProfileDao.insertUser(
+                UserProfile(
+                    id = 0L,
+                    name = "من",
+                    phoneNumber = "",
+                    isPrimary = true,
+                    avatarColorHex = 0xFF10B981L,
+                    notes = "کاربر مبنا"
+                )
+            )
+            userProfileDao.insertUser(
+                UserProfile(
+                    id = 0L,
+                    name = "علی",
+                    phoneNumber = "",
+                    isPrimary = false,
+                    avatarColorHex = 0xFF3B82F6L,
+                    notes = "شریک وام"
+                )
+            )
+        }
+
+        // 2. Only seed 3 attractive guide loans if the loan database is completely empty
+        if (loanDao.getCount() == 0) {
+            // Loan 1: Personal loan - وام قرض‌الحسنه مهر ایران
+            val loan1 = Loan(
+                id = 0L,
+                title = "وام قرض‌الحسنه مهر ایران",
+                dueDay = 10,
+                monthlyAmount = 2_100_000L,
+                totalMonths = 24,
+                paidMonths = 8,
+                startYear = 1403,
+                startMonth = 4,
+                endYear = 1405,
+                endMonth = 4,
+                category = "قرض‌الحسنه",
+                colorHex = 0xFF10B981L,
+                notes = "وام انفرادی جهت پس‌انداز و گردش حساب",
+                myShareAmount = 2_100_000L,
+                hasPartners = false,
+                isCurrentMonthPaid = false,
+                iconName = "bank"
+            )
+            loanDao.insertLoan(loan1)
+
+            // Loan 2: Shared loan - تسهیلات خودرو (شراکتی)
+            val loan2 = Loan(
+                id = 0L,
+                title = "تسهیلات خودرو (شراکتی)",
+                dueDay = 20,
+                monthlyAmount = 4_000_000L,
+                totalMonths = 36,
+                paidMonths = 12,
+                startYear = 1402,
+                startMonth = 11,
+                endYear = 1405,
+                endMonth = 11,
+                category = "خودرو",
+                colorHex = 0xFF2563EBL,
+                notes = "خرید خودرو مشترک با علی (سهم ۵۰-۵۰)",
+                myShareAmount = 2_000_000L,
+                hasPartners = true,
+                isCurrentMonthPaid = false,
+                iconName = "car"
+            )
+            val loan2Id = loanDao.insertLoan(loan2)
+            debtorShareDao.insertShare(
+                DebtorShare(
+                    id = 0L,
+                    loanId = loan2Id,
+                    loanTitle = "تسهیلات خودرو (شراکتی)",
+                    personName = "علی",
+                    shareAmount = 2_000_000L,
+                    isPaidForCurrentMonth = false
+                )
+            )
+
+            // Loan 3: Consumer goods loan - خرید کالا (کالا کارت)
+            val loan3 = Loan(
+                id = 0L,
+                title = "خرید کالا (کالا کارت)",
+                dueDay = 5,
+                monthlyAmount = 2_300_000L,
+                totalMonths = 12,
+                paidMonths = 4,
+                startYear = 1403,
+                startMonth = 8,
+                endYear = 1404,
+                endMonth = 8,
+                category = "کالا",
+                colorHex = 0xFFF59E0BL,
+                notes = "اقساط خرید لوازم خانگی",
+                myShareAmount = 2_300_000L,
+                hasPartners = false,
+                isCurrentMonthPaid = true,
+                iconName = "shopping_cart"
+            )
+            loanDao.insertLoan(loan3)
+        }
     }
 
     suspend fun clearAllLoansAndReset() = withContext(Dispatchers.IO) {
