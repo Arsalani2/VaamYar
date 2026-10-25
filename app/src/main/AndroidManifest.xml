@@ -8,12 +8,12 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- فیکس bug.md/P3-8: Auto Backup گوگل برای دیتابیس مالی (اسامی، مبالغ) غیرفعال شد
+         تا با ادعای «کاملاً آفلاین» README هم‌خوان باشد؛ تنها مسیر پشتیبان، export/import
+         خودِ اپ (BackupHelper) است. فایل‌های backup_rules.xml و data_extraction_rules.xml
+         هم حذف شدند. -->
     <application
         android:name=".VamyarApp"
-        <!-- فیکس bug.md/P3-8: Auto Backup گوگل برای دیتابیس مالی (اسامی، مبالغ) غیرفعال شد
-             تا با ادعای «کاملاً آفلاین» README هم‌خوان باشد؛ تنها مسیر پشتیبان، export/import
-             خودِ اپ (BackupHelper) است. فایل‌های backup_rules.xml و data_extraction_rules.xml
-             هم حذف شدند. -->
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
