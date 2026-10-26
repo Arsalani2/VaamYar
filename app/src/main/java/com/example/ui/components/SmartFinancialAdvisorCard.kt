@@ -119,6 +119,8 @@ private fun SingleTipItem(
         TipType.COLLECTION_REMINDER -> Icons.Default.Groups
         TipType.SNOWBALL_PAYOFF -> Icons.Default.TrendingUp
         TipType.LIQUIDITY_PLAN -> Icons.Default.AccountBalanceWallet
+        // فیکس bug.md/F7: نکتهٔ پیش‌بینی نقدینگی ۳/۶ ماه آینده
+        TipType.LIQUIDITY_FORECAST -> Icons.Default.Insights
         TipType.BUDGET_ADVICE -> Icons.Default.Lightbulb
     }
 
@@ -127,6 +129,7 @@ private fun SingleTipItem(
         TipType.COLLECTION_REMINDER -> MaterialTheme.colorScheme.secondary
         TipType.SNOWBALL_PAYOFF -> MaterialTheme.colorScheme.primary
         TipType.LIQUIDITY_PLAN -> MaterialTheme.colorScheme.tertiary
+        TipType.LIQUIDITY_FORECAST -> MaterialTheme.colorScheme.primary
         TipType.BUDGET_ADVICE -> MaterialTheme.colorScheme.secondary
     }
 

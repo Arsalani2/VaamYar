@@ -31,11 +31,13 @@ import com.example.model.UserProfile
 import com.example.ui.ArrearsPrompt
 import com.example.ui.FinancialOverview
 import com.example.ui.SmartFinancialTip
+import com.example.ui.TipType
 import com.example.ui.components.FinancialSummaryCard
 import com.example.ui.components.LoanItemCard
 import com.example.ui.components.LoanViewMode
 import com.example.ui.components.SmartFinancialAdvisorCard
 import com.example.ui.dialogs.AddEditLoanDialog
+import com.example.util.LiquidityForecast
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
 
@@ -64,6 +66,8 @@ fun HomeScreen(
     onDeleteLoan: (Long) -> Unit,
     onAddNewUser: (UserProfile) -> Unit,
     onTipAction: ((SmartFinancialTip) -> Unit)? = null,
+    // فیکس bug.md/F7: پیش‌بینی نقدینگی ۳/۶ ماه آینده (تفکیک ماه‌ها در دیالوگ)
+    liquidityForecast: LiquidityForecast? = null,
     modifier: Modifier = Modifier
 ) {
     var loanToEdit by remember { mutableStateOf<Loan?>(null) }
@@ -71,6 +75,10 @@ fun HomeScreen(
     // فیکس bug.md/NB-22: حذف وام فقط پس از تأیید صریح کاربر انجام می‌شود؛
     // ضربهٔ اول فقط این دیالوگ را باز می‌کند و انصراف هیچ تغییری نمی‌کند.
     var loanToDelete by remember { mutableStateOf<Loan?>(null) }
+
+    // فیکس bug.md/F7: دیالوگ تفکیک ماه‌های پیش‌بینی نقدینگی — با اکشنِ نکتهٔ
+    // «پیش‌بینی نقدینگی» در دستیار هوشمند باز می‌شود.
+    var showLiquidityDialog by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         if (viewMode == LoanViewMode.SQUARE && loans.isNotEmpty()) {
@@ -93,7 +101,14 @@ fun HomeScreen(
                     item(span = { GridItemSpan(2) }) {
                         SmartFinancialAdvisorCard(
                             tips = smartTips,
-                            onActionClick = onTipAction
+                            onActionClick = { tip ->
+                                // فیکس bug.md/F7: اکشن نکتهٔ نقدینگی، دیالوگ تفکیک ماه‌ها را باز می‌کند
+                                if (tip.type == TipType.LIQUIDITY_FORECAST) {
+                                    showLiquidityDialog = true
+                                } else {
+                                    onTipAction?.invoke(tip)
+                                }
+                            }
                         )
                     }
                 }
@@ -148,7 +163,14 @@ fun HomeScreen(
                     item {
                         SmartFinancialAdvisorCard(
                             tips = smartTips,
-                            onActionClick = onTipAction
+                            onActionClick = { tip ->
+                                // فیکس bug.md/F7: اکشن نکتهٔ نقدینگی، دیالوگ تفکیک ماه‌ها را باز می‌کند
+                                if (tip.type == TipType.LIQUIDITY_FORECAST) {
+                                    showLiquidityDialog = true
+                                } else {
+                                    onTipAction?.invoke(tip)
+                                }
+                            }
                         )
                     }
                 }
@@ -352,6 +374,76 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { loanToDelete = null }) {
                     Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // فیکس bug.md/F7 (تأیید کاربر — بازبینی ۴.۵): دیالوگ تفکیک ماه‌های پیش‌بینی نقدینگی —
+    // سهم خودِ کاربر در هر ماه (ماه‌های پرداخت‌شده ۰ هستند)، مجموع ۳ و ۶ ماهه + مقایسه
+    // با میانگین پرداخت‌های واقعی خودِ او. بدون فیلد درآمد.
+    if (showLiquidityDialog && liquidityForecast != null) {
+        AlertDialog(
+            onDismissRequest = { showLiquidityDialog = false },
+            title = { Text("پیش‌بینی نقدینگی ۶ ماه آینده") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "سهم ماهانهٔ خود شما در اقساطِ پیشِ رو (از ماه جاری؛ قسطِ پرداخت‌شده حساب نمی‌شود):",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    liquidityForecast.months.forEachIndexed { index, row ->
+                        val monthName = ShamsiDate(row.year, row.month, 1).monthName
+                        val yearStr = NumberFormatter.formatNumber(row.year, usePersianDigits)
+                        val amountStr = NumberFormatter.formatPrice(row.amount, usePersian = usePersianDigits, compactThousands = compactThousands)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (row.loansCount > 0) {
+                                    "$monthName $yearStr (${NumberFormatter.formatNumber(row.loansCount, usePersianDigits)} وام)"
+                                } else {
+                                    "$monthName $yearStr"
+                                },
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = amountStr,
+                                fontSize = 13.sp,
+                                fontWeight = if (index < 3) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                    Text(
+                        "مجموع ۳ ماه آینده (شامل این ماه): ${NumberFormatter.formatPrice(liquidityForecast.next3MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "مجموع ۶ ماه آینده (شامل این ماه): ${NumberFormatter.formatPrice(liquidityForecast.next6MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                        fontWeight = FontWeight.Bold
+                    )
+                    val avg = liquidityForecast.historyMonthlyAverage
+                    if (avg != null && liquidityForecast.historyMonthsCount > 0) {
+                        Text(
+                            "میانگین پرداخت ماهانهٔ شما از ${NumberFormatter.formatNumber(liquidityForecast.historyMonthsCount, usePersianDigits)} ماه تاریخچهٔ واقعی: ${NumberFormatter.formatPrice(avg, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            "هنوز تاریخچهٔ پرداختی واقعی ثبت نشده است تا میانگین با آن مقایسه شود.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLiquidityDialog = false }) {
+                    Text("بستن")
                 }
             }
         )

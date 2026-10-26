@@ -10,10 +10,13 @@ import com.example.util.BackupIcon
 import com.example.util.BackupPreferences
 import com.example.util.InputLimits
 import com.example.util.LoanIconHelper
+import com.example.util.LiquidityLoanInput
+import com.example.util.LiquidityPaidRecord
 import com.example.util.NumberFormatter
 import com.example.util.PublicId
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
+import com.example.util.computeLiquidityForecast
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -508,5 +511,92 @@ class PureLogicUnitTest {
             4,
             ShamsiDateHelper.calculateElapsedInstallments(1405, 4, 10, 1405, 8, 3, 12)
         )
+    }
+
+    // ---------------------------------------------------------------- F7 (پیش‌بینی نقدینگی ۳/۶ ماه آینده)
+
+    /**
+     * فیکس bug.md/F7: پنجره از ماه جاری شروع می‌شود؛ قسطِ پرداخت‌شدهٔ ماه جاری حساب
+     * نمی‌شود، شروعِ آیندهٔ وام و تسویهٔ وسط پنجره درست حساب می‌شود و عبور از مرز
+     * اسفند/فروردین سال را درست رد می‌کند.
+     */
+    @Test
+    fun f7_liquidityForecastSumsOnlyUnpaidInstallmentsWithinWindow() {
+        // امروز: آبان ۱۴۰۵ — پنجره: آبان..اسفند ۱۴۰۵ + فروردین ۱۴۰۶
+        val loanA = LiquidityLoanInput(loanId = 21L, startYear = 1405, startMonth = 4, totalMonths = 12, myMonthlyShare = 4_000_000L)
+        val loanB = LiquidityLoanInput(loanId = 22L, startYear = 1405, startMonth = 9, totalMonths = 6, myMonthlyShare = 2_000_000L) // شروع آذر
+        val loanD = LiquidityLoanInput(loanId = 24L, startYear = 1405, startMonth = 8, totalMonths = 1, myMonthlyShare = 1_000_000L) // فقط آبان، بعدش تسویه
+        val forecast = computeLiquidityForecast(
+            currentYear = 1405,
+            currentMonth = 8,
+            loans = listOf(loanA, loanB, loanD),
+            // آبانِ وام A پرداخت‌شده → در نقدینگیِ آینده حساب نمی‌شود
+            paidMonthsByLoan = mapOf(21L to setOf(1405 to 4, 1405 to 8)),
+            myShareByLoan = mapOf(21L to 4_000_000L, 22L to 2_000_000L, 24L to 1_000_000L),
+            paidRecords = listOf(
+                LiquidityPaidRecord(21L, 1405, 4),
+                LiquidityPaidRecord(21L, 1405, 8)
+            )
+        )
+
+        // ۶ ردیف به ترتیب زمانی: آبان..اسفند ۱۴۰۵ + فروردین ۱۴۰۶
+        assertEquals(6, forecast.months.size)
+        assertEquals(1405, forecast.months[0].year)
+        assertEquals(8, forecast.months[0].month)
+        assertEquals(1406, forecast.months[5].year) // مرز اسفند/فروردین رد شده
+        assertEquals(1, forecast.months[5].month)
+
+        // آبان: وام A پرداخت‌شده، وام B هنوز شروع نشده → فقط وام D
+        assertEquals(1_000_000L, forecast.months[0].amount)
+        assertEquals(1, forecast.months[0].loansCount)
+        // آذر تا فروردین: هر ماه A (۴م) + B (۲م)؛ دیگری صفر
+        for (i in 1..5) {
+            assertEquals(6_000_000L, forecast.months[i].amount)
+            assertEquals(2, forecast.months[i].loansCount)
+        }
+
+        // مجموع ۳ ماه (آبان+آذر+دی) و ۶ ماه
+        assertEquals(13_000_000L, forecast.next3MonthsTotal)
+        assertEquals(31_000_000L, forecast.next6MonthsTotal)
+
+        // میانگین تاریخچه از ۲ ماه دارای رکورد (تیر و آبان وام A): هر دو ۴م → میانگین ۴م
+        assertEquals(4_000_000L, forecast.historyMonthlyAverage)
+        assertEquals(2, forecast.historyMonthsCount)
+    }
+
+    /** فیکس bug.md/F7: میانگین تاریخچه مجموعِ چند وام در یک ماه را یک نمونه می‌شمارد و بدون تاریخچه null است. */
+    @Test
+    fun f7_liquidityForecastHistoryAverageFromRealRecords() {
+        // تاریخچه: تیر (A=۴م)، مرداد (A=۴م + C=۲م)، شهریور (A=۴م) → ۳ ماه متمایز
+        val forecast = computeLiquidityForecast(
+            currentYear = 1405,
+            currentMonth = 8,
+            loans = listOf(
+                LiquidityLoanInput(loanId = 21L, startYear = 1405, startMonth = 4, totalMonths = 12, myMonthlyShare = 4_000_000L)
+            ),
+            paidMonthsByLoan = emptyMap(),
+            myShareByLoan = mapOf(21L to 4_000_000L, 23L to 2_000_000L),
+            paidRecords = listOf(
+                LiquidityPaidRecord(21L, 1405, 4),
+                LiquidityPaidRecord(21L, 1405, 5),
+                LiquidityPaidRecord(23L, 1405, 5), // وامِ تسویه‌شده هم در تاریخچه می‌ماند
+                LiquidityPaidRecord(21L, 1405, 6)
+            )
+        )
+        // (۴ + ۶ + ۴) ÷ ۳ = ۴٬۶۶۶٬۶۶۶ (تقسیم صحیح)
+        assertEquals(4_666_666L, forecast.historyMonthlyAverage)
+        assertEquals(3, forecast.historyMonthsCount)
+
+        // بدون هیچ رکوردی: میانگین null و پنجره‌ها صفر
+        val empty = computeLiquidityForecast(
+            currentYear = 1405, currentMonth = 8,
+            loans = emptyList(), paidMonthsByLoan = emptyMap(),
+            myShareByLoan = emptyMap(), paidRecords = emptyList()
+        )
+        assertNull(empty.historyMonthlyAverage)
+        assertEquals(0, empty.historyMonthsCount)
+        assertEquals(0L, empty.next3MonthsTotal)
+        assertEquals(0L, empty.next6MonthsTotal)
+        assertEquals(6, empty.months.size)
     }
 }

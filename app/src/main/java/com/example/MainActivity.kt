@@ -117,6 +117,8 @@ fun VamyarMainApp(viewModel: MainViewModel) {
     val compactThousands by viewModel.compactThousands.collectAsStateWithLifecycle()
     val loanViewMode by viewModel.loanViewMode.collectAsStateWithLifecycle()
     val smartTips by viewModel.smartFinancialTips.collectAsStateWithLifecycle()
+    // فیکس bug.md/F7: پیش‌بینی نقدینگی ۳/۶ ماه آینده برای دیالوگ دستیار هوشمند
+    val liquidityForecast by viewModel.liquidityForecast.collectAsStateWithLifecycle()
     val currentShamsiDate by viewModel.currentShamsiDate.collectAsStateWithLifecycle()
     val hasSeenAppGuide by viewModel.hasSeenAppGuide.collectAsStateWithLifecycle()
 
@@ -289,6 +291,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         currentShamsiDate = currentShamsiDate,
                         overview = overview,
                         smartTips = smartTips,
+                        liquidityForecast = liquidityForecast,
                         viewMode = loanViewMode,
                         onViewModeChange = { viewModel.setLoanViewMode(it) },
                         usePersianDigits = usePersianDigits,

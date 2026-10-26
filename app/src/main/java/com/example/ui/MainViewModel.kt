@@ -23,10 +23,14 @@ import com.example.ui.components.LoanViewMode
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.ThemePreset
 import com.example.util.AppPreferences
+import com.example.util.LiquidityForecast
+import com.example.util.LiquidityLoanInput
+import com.example.util.LiquidityPaidRecord
 import com.example.util.NumberFormatter
 import com.example.util.PersianNameNormalizer
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
+import com.example.util.computeLiquidityForecast
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -72,6 +76,8 @@ enum class TipType {
     COLLECTION_REMINDER,
     SNOWBALL_PAYOFF,
     LIQUIDITY_PLAN,
+    // فیکس bug.md/F7: نکتهٔ پیش‌بینی نقدینگی ۳/۶ ماه آینده
+    LIQUIDITY_FORECAST,
     BUDGET_ADVICE
 }
 
@@ -293,11 +299,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Advanced, professional smart financial suggestions with proper formatted numbers
     // فیکس bug.md/NB-8: استفاده از فلوهای usePersianDigits و compactThousands به جای .value
+    /**
+     * فیکس bug.md/F7 (تأیید کاربر — بازبینی ۴.۵): پیش‌بینی نقدینگی ۳ و ۶ ماه آینده —
+     * مجموع اقساطِ سهم خودِ کاربر در ماه‌های پیشِ رو (به تفکیک ماه + مجموع کل ۳/۶
+     * ماهه، از ماه جاری؛ قسطِ پرداخت‌شدهٔ ماه جاری حساب نمی‌شود) + میانگین پرداخت‌های
+     * خودِ او از تاریخچهٔ واقعی (رکوردهای اقساط) — بدون فیلد درآمد (تصمیم کاربر: فعلاً نه).
+     * محاسبهٔ خالص در util/LiquidityForecast.kt است؛ اینجا فقط داده وصل می‌شود.
+     */
+    val liquidityForecast: StateFlow<LiquidityForecast?> = combine(
+        allLoans,
+        allShares,
+        allInstallments,
+        primaryUser,
+        currentShamsiDate
+    ) { loans, shares, installments, primary, curDate ->
+        val userName = primary?.name ?: "کاربر من"
+        // سهم ماهانهٔ فعلیِ خود کاربر برای همهٔ وام‌ها — هم برای پنجرهٔ آینده، هم برای
+        // میانگین تاریخچه (سهمِ تاریخی شرکا ثبت نمی‌شود؛ تقریبِ استاندارد = سهم فعلی)
+        val myShareByLoan = loans.associate { loan ->
+            loan.id to getUserShareForLoan(loan, shares, userName, userName)
+        }
+        val activeInputs = loans
+            .filter { !it.isCompleted && !it.isArchived }
+            .map { loan ->
+                LiquidityLoanInput(
+                    loanId = loan.id,
+                    startYear = loan.startYear,
+                    startMonth = loan.startMonth,
+                    totalMonths = loan.totalMonths,
+                    myMonthlyShare = myShareByLoan[loan.id] ?: 0L
+                )
+            }
+        val paidMonthsByLoan = installments
+            .groupBy({ it.loanId }, { it.year to it.month })
+            .mapValues { entry -> entry.value.toSet() }
+        computeLiquidityForecast(
+            currentYear = curDate.year,
+            currentMonth = curDate.month,
+            loans = activeInputs,
+            paidMonthsByLoan = paidMonthsByLoan,
+            myShareByLoan = myShareByLoan,
+            paidRecords = installments.map {
+                LiquidityPaidRecord(loanId = it.loanId, year = it.year, month = it.month)
+            }
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val smartFinancialTips: StateFlow<List<SmartFinancialTip>> = combine(
         combine(allLoans, allShares, ::Pair),
         combine(primaryUser, currentShamsiDate, ::Pair),
-        combine(usePersianDigits, compactThousands, ::Pair)
-    ) { (loans, shares), (primary, curDate), (usePersian, compact) ->
+        combine(usePersianDigits, compactThousands, ::Pair),
+        liquidityForecast
+    ) { (loans, shares), (primary, curDate), (usePersian, compact), forecast ->
         val tips = mutableListOf<SmartFinancialTip>()
         val activeUserName = primary?.name ?: "کاربر من"
         val activeLoans = loans.filter { !it.isCompleted }
@@ -381,6 +434,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     title = "توزیع بار مالی نقدینگی در ماه",
                     description = "نیمه اول ماه (روز ۱ تا ۱۵): ${formattedFirstHalf} • نیمه دوم ماه (روز ۱۶ تا ۳۱): ${formattedSecondHalf}.",
                     type = TipType.LIQUIDITY_PLAN
+                )
+            )
+        }
+
+        // فیکس bug.md/F7 (تأیید کاربر — بازبینی ۴.۵): پیش‌بینی نقدینگی ۳ و ۶ ماه آینده —
+        // مجموع اقساطِ سهم کاربر (از ماه جاری؛ قسطِ پرداخت‌شده حساب نمی‌شود) + مقایسه با
+        // میانگین پرداخت‌های خودِ او از تاریخچهٔ واقعی. بدون فیلد درآمد (تصمیم کاربر).
+        if (forecast != null && activeLoans.isNotEmpty()) {
+            val f3 = NumberFormatter.formatPrice(forecast.next3MonthsTotal, usePersian = usePersian, compactThousands = compact)
+            val f6 = NumberFormatter.formatPrice(forecast.next6MonthsTotal, usePersian = usePersian, compactThousands = compact)
+            val avg = forecast.historyMonthlyAverage
+            val historyText = if (avg != null && forecast.historyMonthsCount > 0) {
+                val avgFormatted = NumberFormatter.formatPrice(avg, usePersian = usePersian, compactThousands = compact)
+                val monthsCountFormatted = NumberFormatter.formatNumber(forecast.historyMonthsCount, usePersian)
+                val diff3 = forecast.next3MonthsTotal - avg * 3
+                val comparison = when {
+                    diff3 > 0 -> "بار ۳ماههٔ آینده ${NumberFormatter.formatPrice(diff3, usePersian = usePersian, compactThousands = compact)} بیشتر از میانگین پرداخت‌های شماست."
+                    diff3 < 0 -> "بار ۳ماههٔ آینده ${NumberFormatter.formatPrice(-diff3, usePersian = usePersian, compactThousands = compact)} کمتر از میانگین پرداخت‌های شماست."
+                    else -> "بار ۳ماههٔ آینده هم‌تراز میانگین پرداخت‌های شماست."
+                }
+                "میانگین پرداخت ماهانهٔ شما (از $monthsCountFormatted ماه تاریخچهٔ واقعی): $avgFormatted • $comparison"
+            } else {
+                "هنوز تاریخچهٔ پرداختی واقعی ثبت نشده است تا میانگین با آن مقایسه شود."
+            }
+
+            tips.add(
+                SmartFinancialTip(
+                    title = "پیش‌بینی نقدینگی ۳ و ۶ ماه آینده",
+                    description = "مجموع اقساط سهم شما در ۳ ماه آینده (شامل این ماه): $f3 • در ۶ ماه آینده: $f6 • $historyText",
+                    type = TipType.LIQUIDITY_FORECAST,
+                    actionText = "جزئیات ماه‌ها"
                 )
             )
         }
