@@ -229,15 +229,52 @@ fun AddEditLoanDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // 1. Title
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("نام بانک یا وام") },
-                        placeholder = { Text("مثلاً: بانک رسالت یا وام خودرو") },
+                    // 1. Title + Color Picker — فیکس bug.md/NB-32:
+                    // فیلد نام (وزن‌دار به‌جای تمام‌عرض) و انتخاب رنگ وام (بخش ۸ قدیمی)
+                    // در یک ردیف فشرده ادغام شدند تا ارتفاع دیالوگ کوتاه‌تر شود.
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            label = { Text("نام بانک یا وام") },
+                            placeholder = { Text("مثلاً: بانک رسالت") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "رنگ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                colorOptions.forEach { colorVal ->
+                                    val isSelected = selectedColor == colorVal
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(colorVal))
+                                            .clickable { selectedColor = colorVal },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     // 2. Icon, Shape & Gallery Image Section
                     Card(
@@ -354,39 +391,45 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    // 3. Unified Start Date Field (with elegant minimal calendar picker)
-                    OutlinedTextField(
-                        value = startDate.toStandardFormat(usePersianDigits = usePersianDigits),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("تاریخ شروع وام و روز سررسید (سال/ماه/روز)") },
-                        supportingText = {
-                            Text("روز سررسید هر ماه: ${NumberFormatter.formatNumber(startDate.day, usePersianDigits)}ام")
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { showCalendarPicker = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = "انتخاب تاریخ",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showCalendarPicker = true }
-                    )
+                    // 3+4. تاریخ شروع + مبلغ قسط — فیکس bug.md/NB-32:
+                    // هر دو فیلد به‌جای دو ردیف تمام‌عرض، در یک ردیف با وزن مساوی قرار گرفتند.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = startDate.toStandardFormat(usePersianDigits = usePersianDigits),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("تاریخ شروع وام") },
+                            supportingText = {
+                                Text("سررسید هر ماه: ${NumberFormatter.formatNumber(startDate.day, usePersianDigits)}ام")
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { showCalendarPicker = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = "انتخاب تاریخ",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { showCalendarPicker = true }
+                        )
 
-                    // 4. Stable Price Input Field (بدون پرش کرسر و بدون خطا)
-                    PriceInputField(
-                        rawDigitsValue = monthlyAmountDigits,
-                        onRawDigitsChange = { monthlyAmountDigits = it },
-                        label = "مبلغ کل قسط ماهانه (تومان)",
-                        placeholder = "مثلاً: ۲,۸۲۲,۰۰۰",
-                        usePersianDigits = usePersianDigits,
-                        compactThousands = compactThousands,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        // Stable Price Input Field (بدون پرش کرسر و بدون خطا)
+                        PriceInputField(
+                            rawDigitsValue = monthlyAmountDigits,
+                            onRawDigitsChange = { monthlyAmountDigits = it },
+                            label = "مبلغ قسط ماهانه (تومان)",
+                            placeholder = "مثلاً: ۲,۸۲۲,۰۰۰",
+                            usePersianDigits = usePersianDigits,
+                            compactThousands = compactThousands,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
                     // 5. Total Installment Count (Quick Chips + Input)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -630,36 +673,7 @@ fun AddEditLoanDialog(
                         }
                     }
 
-                    // 8. Color Picker
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("رنگ مشخصه وام:", style = MaterialTheme.typography.bodySmall)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            colorOptions.forEach { colorVal ->
-                                val isSelected = selectedColor == colorVal
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(colorVal))
-                                        .clickable { selectedColor = colorVal },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // 8. Color Picker — فیکس bug.md/NB-32: به داخل ردیف فیلد نام منتقل شد (بخش ۱)
                 }
 
                 // فیکس bug.md/P3-12: خطاهای درون‌خطی برای مقادیر نامعتبر
@@ -902,3 +916,4 @@ fun AddEditLoanDialog(
         )
     }
 }
+
