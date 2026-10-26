@@ -164,6 +164,10 @@ class LoanRepository(
 
     suspend fun clearAllLoansAndReset() = withContext(Dispatchers.IO) {
         database.withTransaction {
+            // فیکس bug.md/NB-14: رکوردهای تاریخچهٔ پرداخت وابستهٔ وام‌ها هستند؛ پیش از حذفِ
+            // خودِ وام‌ها پاک می‌شوند تا هیچ رکورد یتیمی در دیتابیس — و در نتیجه در هر
+            // بکاپِ بعدی — باقی نماند («پاکسازی تمام وام‌ها» اکنون واقعاً کامل است).
+            paymentRecordDao.clearAllRecords()
             loanDao.clearAllLoans()
             debtorShareDao.clearAllShares()
         }

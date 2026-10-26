@@ -263,4 +263,23 @@ class LoanRepositoryIntegrityTest {
         repository.checkAndSeedInitialData()
         assertTrue(repository.allLoans.first().isEmpty())
     }
+
+    // ---------------------------------------------------------------- NB-14
+
+    @Test
+    fun nb_14_clearAllLoansLeavesNoOrphanPaymentRecords() = runBlocking {
+        // وام با تاریخچهٔ پرداخت واقعی
+        val loan = insertSharedLoan(paidMonths = 3)
+        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
+        assertTrue(repository.allRecords.first().isNotEmpty())
+
+        repository.clearAllLoansAndReset()
+
+        assertTrue(repository.allLoans.first().isEmpty())
+        assertTrue(repository.allShares.first().isEmpty())
+        assertTrue(
+            "«پاکسازی تمام وام‌ها» نباید رکورد تاریخچهٔ یتیم به جا بگذارد",
+            repository.allRecords.first().isEmpty()
+        )
+    }
 }
