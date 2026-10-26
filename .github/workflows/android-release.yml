@@ -106,6 +106,19 @@ jobs:
           chmod +x gradlew
           ./gradlew --version
 
+      - name: Warn on Oversized Kotlin Files (P4-6)
+        run: |
+          # فیکس bug.md/P4-6: هشدار غیرمسدودکننده (warning) برای فایل‌های Kotlin بلند؛
+          # تفکیکِ تدریجی هنگام لمسِ هر فایل انجام می‌شود، نه refactor یکجا.
+          THRESHOLD=700
+          LONG_FILES=$(find app/src -name "*.kt" -exec awk -v t="$THRESHOLD" "END { if (NR > t) print FILENAME }" {} \;)
+          if [ -n "$LONG_FILES" ]; then
+            echo "::warning::فایل‌های Kotlin بلندتر از ${THRESHOLD} خط — کاندید تفکیک تدریجی (P4-6):"
+            echo "$LONG_FILES" | while IFS= read -r f; do echo "  - $f ($(wc -l < "$f") خط)"; done
+          else
+            echo "هیچ فایل Kotlin بلندتر از ${THRESHOLD} خط نیست ✓"
+          fi
+
       - name: Run Unit Tests
         run: |
           ./gradlew testDebugUnitTest --stacktrace
