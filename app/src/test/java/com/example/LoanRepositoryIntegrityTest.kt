@@ -342,4 +342,44 @@ class LoanRepositoryIntegrityTest {
         assertEquals("هویت وام نباید با edit عوض شود", savedLoan.publicId, editedLoan.publicId)
         assertEquals("هویت سهم نباید با edit عوض شود", savedShare.publicId, editedShare.publicId)
     }
+
+    @Test
+    fun f6_restoreKeepsValidPublicIdsAndBackfillsLegacyOnes() = runBlocking {
+        // دستهٔ ۱: رکوردهای بکاپ جدید با شناسهٔ معتبر — باید دست‌نخورده حفظ شوند
+        val userWithId = UserProfile(id = 1L, name = "علی", publicId = "U-aaa111")
+        val loanWithId = Loan(id = 101L, title = "وام رستور", dueDay = 10, monthlyAmount = 2_000_000L, totalMonths = 12, publicId = "L-aaa1111")
+        val shareWithId = DebtorShare(loanId = 101L, loanTitle = "وام رستور", personName = "علی", shareAmount = 1_000_000L, publicId = "S-aaa111", ownerPublicId = "U-aaa111")
+        // دستهٔ ۲: رکوردهای بکاپ قدیمی بدون شناسه — باید شناسهٔ تازهٔ یکتا بگیرند
+        val legacyUser = UserProfile(id = 2L, name = "مهدی")
+        val legacyLoan = Loan(id = 102L, title = "وام قدیمی", dueDay = 15, monthlyAmount = 1_000_000L, totalMonths = 10)
+        val legacyShare = DebtorShare(loanId = 102L, loanTitle = "وام قدیمی", personName = "مهدی", shareAmount = 500_000L)
+
+        repository.restoreDatabaseSnapshot(
+            users = listOf(userWithId, legacyUser),
+            loans = listOf(loanWithId, legacyLoan),
+            shares = listOf(shareWithId, legacyShare),
+            records = emptyList()
+        )
+
+        val users = db.userProfileDao().getAllUsersOnce()
+        val loans = repository.allLoans.first()
+        val shares = repository.allShares.first()
+
+        // شناسه‌های معتبر بکاپ عیناً حفظ شده‌اند (بازیابی idempotent)
+        assertEquals("U-aaa111", users.first { it.name == "علی" }.publicId)
+        assertEquals("L-aaa1111", loans.first { it.title == "وام رستور" }.publicId)
+        assertEquals("S-aaa111", shares.first { it.personName == "علی" }.publicId)
+        assertEquals("U-aaa111", shares.first { it.personName == "علی" }.ownerPublicId)
+
+        // رکوردهای قدیمی شناسهٔ معتبر و یکتا گرفته‌اند
+        val mehdiUser = users.first { it.name == "مهدی" }
+        val legacyLoanRow = loans.first { it.title == "وام قدیمی" }
+        val legacyShareRow = shares.first { it.personName == "مهدی" }
+        assertTrue(PublicId.isValidUserId(mehdiUser.publicId))
+        assertTrue(PublicId.isValidLoanId(legacyLoanRow.publicId))
+        assertTrue(PublicId.isValidShareId(legacyShareRow.publicId))
+
+        // سهم قدیمی بدون ownerPublicId به کاربر هم‌نامِ همین مجموعه پیوند خورده است
+        assertEquals("سهم قدیمی باید به کاربر هم‌نام پیوند بخورد", mehdiUser.publicId, legacyShareRow.ownerPublicId)
+    }
 }

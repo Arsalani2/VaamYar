@@ -236,7 +236,7 @@ class PureLogicUnitTest {
     fun backupValidation_clampsValuesAndFiltersOrphans() {
         val json = BackupHelper.createBackupJson(
             users = listOf(
-                UserProfile(id = 1L, name = "علی", isPrimary = false) // بدون کاربر مبنا
+                UserProfile(id = 1L, name = "علی", isPrimary = false, publicId = "U-aaa111") // بدون کاربر مبنا
             ),
             loans = listOf(
                 Loan(
@@ -246,11 +246,12 @@ class PureLogicUnitTest {
                     monthlyAmount = 1_000_000L,
                     totalMonths = 200, // باید به ۱۲۰ clamp شود
                     paidMonths = 250,  // باید به ۱۲۰ clamp شود
-                    myShareAmount = 1_000_000L
+                    myShareAmount = 1_000_000L,
+                    publicId = "L-aaa1111"
                 )
             ),
             shares = listOf(
-                DebtorShare(id = 1L, loanId = 10L, loanTitle = "وام تستی", personName = "علی", shareAmount = 500_000L),
+                DebtorShare(id = 1L, loanId = 10L, loanTitle = "وام تستی", personName = "علی", shareAmount = 500_000L, publicId = "S-aaa111", ownerPublicId = "U-aaa111"),
                 DebtorShare(id = 2L, loanId = 999L, loanTitle = "وام ناموجود", personName = "سهم یتیم", shareAmount = 500_000L) // وام ۹۹۹ وجود ندارد
             ),
             records = emptyList(),
@@ -274,5 +275,11 @@ class PureLogicUnitTest {
         // ۳) بررسی حذف سهم یتیم
         assertEquals(1, data.shares.size)
         assertEquals(10L, data.shares.first().loanId)
+
+        // ۴) فیکس bug.md/F6: شناسه‌های عمومی معتبر باید بدون تغییر حفظ شوند
+        assertEquals("U-aaa111", data.users.first().publicId)
+        assertEquals("L-aaa1111", data.loans.first().publicId)
+        assertEquals("S-aaa111", data.shares.first().publicId)
+        assertEquals("U-aaa111", data.shares.first().ownerPublicId)
     }
 }

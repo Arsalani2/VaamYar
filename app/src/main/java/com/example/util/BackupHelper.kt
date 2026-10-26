@@ -73,6 +73,7 @@ object BackupHelper {
             uObj.put("isPrimary", u.isPrimary)
             uObj.put("avatarColorHex", u.avatarColorHex)
             uObj.put("notes", u.notes)
+            uObj.put("publicId", u.publicId)
             usersArray.put(uObj)
         }
         payload.put("users", usersArray)
@@ -101,6 +102,7 @@ object BackupHelper {
             lObj.put("iconName", l.iconName)
             lObj.put("iconShape", l.iconShape)
             lObj.put("customIconPath", l.customIconPath ?: JSONObject.NULL)
+            lObj.put("publicId", l.publicId)
             loansArray.put(lObj)
         }
         payload.put("loans", loansArray)
@@ -118,6 +120,8 @@ object BackupHelper {
             sObj.put("isPaidForCurrentMonth", s.isPaidForCurrentMonth)
             sObj.put("lastPaidMonth", s.lastPaidMonthName)
             sObj.put("shareDescription", s.shareDescription)
+            sObj.put("publicId", s.publicId)
+            sObj.put("ownerPublicId", s.ownerPublicId)
             sharesArray.put(sObj)
         }
         payload.put("shares", sharesArray)
@@ -200,7 +204,9 @@ object BackupHelper {
                         name = u.optString("name", "کاربر"),
                         isPrimary = u.optBoolean("isPrimary", false),
                         avatarColorHex = u.optLong("avatarColorHex", 0xFF10B981L),
-                        notes = u.optString("notes", "")
+                        notes = u.optString("notes", ""),
+                        // فیکس bug.md/F6: حفظ شناسهٔ عمومی در بکاپ/بازیابی (بکاپ قدیمی → خالی، بعداً در restore پر می‌شود)
+                        publicId = u.optString("publicId", "")
                     )
                 )
             }
@@ -225,7 +231,10 @@ object BackupHelper {
                         dueDay = s.optInt("dueDay", 1),
                         isPaidForCurrentMonth = s.optBoolean("isPaidForCurrentMonth", false),
                         lastPaidMonthName = s.optString("lastPaidMonth", s.optString("lastPaidMonthName", "")),
-                        shareDescription = s.optString("shareDescription", "")
+                        shareDescription = s.optString("shareDescription", ""),
+                        // فیکس bug.md/F6: حفظ شناسهٔ سهم و شناسهٔ مالک آن
+                        publicId = s.optString("publicId", ""),
+                        ownerPublicId = s.optString("ownerPublicId", "")
                     )
                 )
             }
@@ -279,7 +288,9 @@ object BackupHelper {
                         isCurrentMonthPaid = l.optBoolean("isCurrentMonthPaid", false),
                         iconName = l.optString("iconName", "account_balance"),
                         iconShape = l.optString("iconShape", "ROUNDED_SQUARE"),
-                        customIconPath = if (l.isNull("customIconPath")) null else l.optString("customIconPath", null)
+                        customIconPath = if (l.isNull("customIconPath")) null else l.optString("customIconPath", null),
+                        // فیکس bug.md/F6: حفظ شناسهٔ عمومی وام
+                        publicId = l.optString("publicId", "")
                     )
                 )
             }

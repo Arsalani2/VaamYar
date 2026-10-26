@@ -217,13 +217,34 @@ class LoanRepository(
 
             // فیکس bug.md/P3-1: نام‌های ورودی از بکاپ/داده‌های قدیمی هم هنگام بازیابی در
             // شکل استاندارد ذخیره می‌شوند تا داده‌های قدیمی با قاعدهٔ واحد تطبیق همگرا شوند.
-            users.forEach {
-                userProfileDao.insertUser(it.copy(name = PersianNameNormalizer.canonicalName(it.name)))
+            // فیکس bug.md/F6: شناسهٔ عمومیِ معتبرِ بکاپ دست‌نخورده حفظ می‌شود (بازیابیِ
+            // پایدار/idempotent)؛ رکوردهای قدیمیِ بدون شناسه یا با شناسهٔ خاموشکل، شناسهٔ
+            // تازهٔ یکتا می‌گیرند. سهم‌هایی که ownerPublicId ندارند (بکاپ قدیمی) با
+            // resolveOwnerPublicId به کاربرِ هم‌نامِ همین مجموعه پیوند می‌خورند.
+            val preparedUsers = users.map {
+                it.copy(
+                    name = PersianNameNormalizer.canonicalName(it.name),
+                    publicId = if (PublicId.isValidUserId(it.publicId)) it.publicId else uniqueUserPublicId()
+                )
             }
-            loans.forEach { loanDao.insertLoan(it) }
+            preparedUsers.forEach { userProfileDao.insertUser(it) }
+
+            loans.forEach {
+                loanDao.insertLoan(
+                    it.copy(
+                        publicId = if (PublicId.isValidLoanId(it.publicId)) it.publicId else uniqueLoanPublicId()
+                    )
+                )
+            }
             shares.forEach {
+                val canonicalName = PersianNameNormalizer.canonicalName(it.personName)
                 debtorShareDao.insertShare(
-                    it.copy(personName = PersianNameNormalizer.canonicalName(it.personName))
+                    it.copy(
+                        personName = canonicalName,
+                        publicId = if (PublicId.isValidShareId(it.publicId)) it.publicId else uniqueSharePublicId(),
+                        ownerPublicId = it.ownerPublicId.takeIf(String::isNotBlank)
+                            ?: resolveOwnerPublicId(canonicalName, preparedUsers)
+                    )
                 )
             }
             records.forEach { paymentRecordDao.insertRecord(it) }
