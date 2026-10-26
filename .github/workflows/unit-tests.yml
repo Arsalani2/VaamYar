@@ -1,0 +1,85 @@
+name: Unit Tests (no release)
+
+# فقط تست اجرا می‌کند؛ هیچ نسخه‌ای bump یا منتشر نمی‌شود و به main چیزی push نمی‌کند.
+# قبل از merge به main حتماً این ورک‌فلو سبز باشد (هر push به main ریلیز می‌سازد).
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - 'fix/**'
+      - 'ci/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Verify Gradle Wrapper
+        run: |
+          test -f gradlew && test -f gradle/wrapper/gradle-wrapper.jar || { echo "::error::gradlew / gradle-wrapper.jar missing"; exit 1; }
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Run Unit Tests
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace --continue 2>&1 | tee gradle-test.log
+
+      - name: Summarize Test Failures
+        if: failure()
+        run: |
+          # خطاهای کامپایل Kotlin (e: file:///...) و خلاصه‌ی Gradle را به Annotation تبدیل می‌کند
+          if [ -f gradle-test.log ]; then
+            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed" gradle-test.log | head -40 \
+              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+          fi
+          # تست‌های شکست‌خورده از گزارش‌های JUnit XML
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          n = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              try:
+                  root = ET.parse(f).getroot()
+              except Exception:
+                  continue
+              for tc in root.iter('testcase'):
+                  for kind in ('failure', 'error'):
+                      el = tc.find(kind)
+                      if el is not None and n < 30:
+                          n += 1
+                          msg = (el.get('message') or '').replace('\n', ' ')[:600]
+                          print(f"::error title=Test failed::{tc.get('classname')}.{tc.get('name')} -> {msg}")
+          PY
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: |
+            gradle-test.log
+            app/build/reports/tests/**
+            app/build/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
