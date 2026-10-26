@@ -779,6 +779,7 @@ fun SettingsScreen(
     if (showAddUserDialog) {
         AddEditUserDialog(
             userToEdit = null,
+            existingUsers = users,
             onDismiss = { showAddUserDialog = false },
             onSave = { newUser ->
                 onSaveUser(newUser)
@@ -791,6 +792,7 @@ fun SettingsScreen(
     userToEdit?.let { user ->
         AddEditUserDialog(
             userToEdit = user,
+            existingUsers = users,
             onDismiss = { userToEdit = null },
             onSave = { updatedUser ->
                 onSaveUser(updatedUser)

@@ -18,16 +18,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.model.UserProfile
+import com.example.util.PersianNameNormalizer
 
 @Composable
 fun AddEditUserDialog(
     userToEdit: UserProfile? = null,
+    existingUsers: List<UserProfile> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (UserProfile) -> Unit
 ) {
     var name by remember { mutableStateOf(userToEdit?.name ?: "") }
     var notes by remember { mutableStateOf(userToEdit?.notes ?: "") }
     var selectedColor by remember { mutableLongStateOf(userToEdit?.avatarColorHex ?: 0xFF1976D2L) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+
+    // فیکس bug.md/NB-20 — نام تکراری رد می‌شود؛ مقایسه با namesMatch انجام می‌شود تا
+    // «علی» و «علي» (ي/ك عربی) و فاصله‌های زائد هم تکراری شمرده شوند. هنگام ویرایش،
+    // خودِ کاربر از بررسی کنار گذاشته می‌شود.
+    val editing = userToEdit
+    fun duplicateNameError(candidate: String): String? {
+        val trimmed = candidate.trim()
+        if (trimmed.isEmpty()) return null
+        val selfKey = editing?.let { if (it.publicId.isNotBlank()) it.publicId else "id-${it.id}" }
+        val duplicate = existingUsers.any { existing ->
+            val existingKey = if (existing.publicId.isNotBlank()) existing.publicId else "id-${existing.id}"
+            existingKey != selfKey && PersianNameNormalizer.namesMatch(existing.name, trimmed)
+        }
+        return if (duplicate) "کاربری با همین نام از قبل وجود دارد؛ لطفاً نام دیگری انتخاب کنید." else null
+    }
 
     // فیکس bug.md/NB-27: برچسب‌های عمومی رنگ‌ها جایگزین نام‌های شخصی شد
     val colorOptions = listOf(
@@ -73,10 +91,15 @@ fun AddEditUserDialog(
                 // Name
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = {
+                        name = it
+                        nameError = duplicateNameError(it)
+                    },
                     label = { Text("نام کاربر") },
                     placeholder = { Text("مثلاً: علی یا مریم") },
                     singleLine = true,
+                    isError = nameError != null,
+                    supportingText = { nameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -128,7 +151,10 @@ fun AddEditUserDialog(
 
                     Button(
                         onClick = {
-                            if (name.isNotBlank()) {
+                            // فیکس bug.md/NB-20: ذخیره فقط با نام غیرخالی و غیرتکراری
+                            val duplicateError = duplicateNameError(name)
+                            nameError = duplicateError
+                            if (name.isNotBlank() && duplicateError == null) {
                                 onSave(
                                     (userToEdit ?: UserProfile(name = name.trim())).copy(
                                         name = name.trim(),

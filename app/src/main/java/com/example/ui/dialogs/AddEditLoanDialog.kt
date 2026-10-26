@@ -41,6 +41,7 @@ import com.example.util.InputLimits
 import com.example.util.LoanIconDisplay
 import com.example.util.LoanIconHelper
 import com.example.util.NumberFormatter
+import com.example.util.PersianNameNormalizer
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
 
@@ -877,9 +878,11 @@ fun AddEditLoanDialog(
                         partnerError = when {
                             partnerName.isBlank() ->
                                 "نام شریک را وارد کنید."
-                            primaryUserName != null && partnerName.equals(primaryUserName, ignoreCase = true) ->
+                            // فیکس bug.md/NB-21 — مقایسهٔ نام با namesMatch (نه equals):
+                            // «علی» و «علي» (ي/ك عربی) و فاصله‌های زائد یکسان شمرده می‌شوند
+                            primaryUserName != null && PersianNameNormalizer.namesMatch(partnerName, primaryUserName) ->
                                 "«$partnerName» کاربر مبناست؛ سهم او به‌صورت خودکار از باقی‌مانده‌ی قسط محاسبه می‌شود و نمی‌تواند شریکِ همین وام ثبت شود."
-                            sharesList.any { it.personName.trim().equals(partnerName, ignoreCase = true) } ->
+                            sharesList.any { PersianNameNormalizer.namesMatch(it.personName.trim(), partnerName) } ->
                                 "«$partnerName» قبلاً شریکِ همین وام ثبت شده است؛ برای تغییر مبلغ، سهم قبلی را حذف و دوباره ثبت کنید."
                             amount <= 0L ->
                                 "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
