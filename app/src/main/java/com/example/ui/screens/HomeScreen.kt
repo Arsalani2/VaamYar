@@ -68,6 +68,9 @@ fun HomeScreen(
 ) {
     var loanToEdit by remember { mutableStateOf<Loan?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
+    // فیکس bug.md/NB-22: حذف وام فقط پس از تأیید صریح کاربر انجام می‌شود؛
+    // ضربهٔ اول فقط این دیالوگ را باز می‌کند و انصراف هیچ تغییری نمی‌کند.
+    var loanToDelete by remember { mutableStateOf<Loan?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
         if (viewMode == LoanViewMode.SQUARE && loans.isNotEmpty()) {
@@ -122,7 +125,7 @@ fun HomeScreen(
                         onIncrementPaid = { onIncrementPaid(loan) },
                         onDecrementPaid = { onDecrementPaid(loan) },
                         onEdit = { loanToEdit = loan },
-                        onDelete = { onDeleteLoan(loan.id) }
+                        onDelete = { loanToDelete = loan }
                     )
                 }
             }
@@ -237,7 +240,7 @@ fun HomeScreen(
                             onIncrementPaid = { onIncrementPaid(loan) },
                             onDecrementPaid = { onDecrementPaid(loan) },
                             onEdit = { loanToEdit = loan },
-                            onDelete = { onDeleteLoan(loan.id) }
+                            onDelete = { loanToDelete = loan }
                         )
                     }
                 }
@@ -324,6 +327,32 @@ fun HomeScreen(
             onSave = { updatedLoan, shares ->
                 onSaveLoan(updatedLoan, shares)
                 loanToEdit = null
+            }
+        )
+    }
+
+    // فیکس bug.md/NB-22: دیالوگ تأیید حذف وام — حذف دائمی است و سابقهٔ پرداخت‌ها،
+    // اقساط و آیکون اختصاصی وام هم پاک می‌شود؛ فقط پس از تأیید صریح انجام می‌شود.
+    loanToDelete?.let { loan ->
+        AlertDialog(
+            onDismissRequest = { loanToDelete = null },
+            title = { Text("حذف وام") },
+            text = { Text("وام «${loan.title}» برای همیشه حذف شود؟ سابقهٔ پرداخت‌ها، اقساط و آیکون اختصاصی این وام هم پاک می‌شود و این عمل قابل بازگشت نیست (فقط با فایل پشتیبان قابل بازیابی است).") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteLoan(loan.id)
+                        loanToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("بله، حذف شود")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { loanToDelete = null }) {
+                    Text("انصراف")
+                }
             }
         )
     }
