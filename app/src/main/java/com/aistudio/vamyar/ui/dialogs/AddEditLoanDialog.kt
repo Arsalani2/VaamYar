@@ -44,6 +44,9 @@ import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.PersianNameNormalizer
 import com.aistudio.vamyar.util.ShamsiDate
 import com.aistudio.vamyar.util.ShamsiDateHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,17 +72,26 @@ fun AddEditLoanDialog(
     var selectedIconShape by remember { mutableStateOf(loanToEdit?.iconShape ?: "ROUNDED_SQUARE") }
     var customIconPath by remember { mutableStateOf(loanToEdit?.customIconPath) }
 
+    // فیکس bug.md/NB-30: کپی/دکود/کمپرس تصویر انتخابی قبلاً مستقیم در callbackِ
+    // فتوپیکر روی نخ اصلی اجرا می‌شد و برای عکس‌های بزرگ UI را قفل می‌کرد —
+    // کارِ دیسک/دکود به Dispatchers.IO منتقل شد.
+    val iconScope = rememberCoroutineScope()
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val saved = LoanIconHelper.saveCustomIconImage(context, uri)
-            if (saved != null) {
-                // If there was an older custom image, clean it up
-                if (customIconPath != null && customIconPath != saved) {
-                    LoanIconHelper.deleteCustomIconFile(customIconPath)
+            iconScope.launch {
+                val saved = withContext(Dispatchers.IO) {
+                    LoanIconHelper.saveCustomIconImage(context, uri)
                 }
-                customIconPath = saved
+                if (saved != null) {
+                    // If there was an older custom image, clean it up
+                    val older = customIconPath
+                    if (older != null && older != saved) {
+                        withContext(Dispatchers.IO) { LoanIconHelper.deleteCustomIconFile(older) }
+                    }
+                    customIconPath = saved
+                }
             }
         }
     }

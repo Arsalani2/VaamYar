@@ -14,7 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +28,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -200,10 +206,15 @@ fun LoanIconDisplay(
 ) {
     val shape = if (iconShape == "CIRCLE") CircleShape else RoundedCornerShape(12.dp)
 
-    // فیکس bug.md/NB-7: کش کردن لود تصویر و بارگذاری با سایز فشرده
-    val customBitmap = remember(customIconPath) {
-        if (!customIconPath.isNullOrBlank()) {
-            LoanIconHelper.loadSampledBitmap(customIconPath)
+    // فیکس bug.md/NB-30: دکود دیسکِ آیکون قبلاً داخل remember روی نخ اصلی انجام
+    // می‌شد و در اولین recomposition هر کارت، فایل از دیسک خوانده و دکود می‌شد —
+    // در فهرست‌های بلند یخ‌زدن می‌کرد. حالا در LaunchedEffect روی Dispatchers.IO
+    // لود می‌شود و تا آماده‌شدن، آیکون برداریِ پیش‌فرض نمایش می‌یابد.
+    var customBitmap by remember(customIconPath) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(customIconPath) {
+        val path = customIconPath
+        customBitmap = if (!path.isNullOrBlank()) {
+            withContext(Dispatchers.IO) { LoanIconHelper.loadSampledBitmap(path) }
         } else null
     }
 
