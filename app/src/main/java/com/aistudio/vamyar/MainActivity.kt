@@ -342,6 +342,11 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onSetCustomDate = { viewModel.setCustomShamsiDate(it) },
                         onClearAllLoans = { viewModel.clearAllLoansAndStartFresh() },
                         onTestNotification = { viewModel.sendTestNotification(context) },
+                        // فیکس bug.md/NB-24: ساعت اعلان روزانه از تنظیمات تغییر
+                        // می‌کند و پس از ثبت، آلارم با ساعت جدید از نو زمان‌بندی می‌شود.
+                        reminderHour = viewModel.reminderHour,
+                        reminderMinute = viewModel.reminderMinute,
+                        onReminderTimeChange = { h, m -> viewModel.setReminderTime(h, m) },
                         onExportBackup = { viewModel.exportBackupJson() },
                         // فیکس bug.md/NB-34+NB-29: انتخاب فایل اول پیش‌نمایش می‌سازد؛
                         // ایمپورت با حالت انتخابی کاربر در دیالوگ تأیید اجرا می‌شود.

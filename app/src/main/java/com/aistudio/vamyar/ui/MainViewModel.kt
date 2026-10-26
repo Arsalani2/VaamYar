@@ -19,6 +19,7 @@ import com.aistudio.vamyar.model.LoanShareCalculator
 import com.aistudio.vamyar.model.PaymentRecord
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.notification.InstallmentAlarmReceiver
+import com.aistudio.vamyar.notification.NotificationHelper
 import com.aistudio.vamyar.ui.components.LoanViewMode
 import com.aistudio.vamyar.ui.theme.AppThemeMode
 import com.aistudio.vamyar.ui.theme.ThemePreset
@@ -848,6 +849,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان سررسید از تنظیمات تغییر می‌کند؛
+    // پس از ذخیرهٔ مقادیر، آلارم همان‌جا با ساعت جدید از نو زمان‌بندی می‌شود
+    // (BootCompletedReceiver بعد از ری‌بوت هم همین مقادیر را از AppPreferences می‌خواند).
+    val reminderHour: Int get() = appPreferences.reminderHour
+    val reminderMinute: Int get() = appPreferences.reminderMinute
+
+    fun setReminderTime(hour: Int, minute: Int) {
+        appPreferences.reminderHour = hour
+        appPreferences.reminderMinute = minute
+        NotificationHelper.scheduleDailyCheck(app)
     }
 
     fun sendTestNotification(context: Context) {

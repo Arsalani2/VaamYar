@@ -37,6 +37,7 @@ import com.aistudio.vamyar.ui.dialogs.AddEditUserDialog
 import com.aistudio.vamyar.ui.dialogs.ShamsiDatePickerDialog
 import com.aistudio.vamyar.ui.theme.AppThemeMode
 import com.aistudio.vamyar.ui.theme.ThemePreset
+import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
 
 enum class SettingsCategory(val titleFa: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -66,6 +67,11 @@ fun SettingsScreen(
     onSetCustomDate: (ShamsiDate) -> Unit,
     onClearAllLoans: () -> Unit,
     onTestNotification: () -> Unit,
+    // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان سررسید از تنظیمات تغییر می‌کند؛
+    // پس از ثبت ساعت جدید، آلارم روزانه با همان ساعت از نو زمان‌بندی می‌شود.
+    reminderHour: Int = 10,
+    reminderMinute: Int = 0,
+    onReminderTimeChange: (Int, Int) -> Unit = { _, _ -> },
     onExportBackup: () -> String = { "" },
     // فیکس bug.md/NB-34+NB-29: قبل از اجرای ایمپورت، پیش‌نمایش (شمارش‌ها + فهرست
     // جدید/تکراری) به کاربر نشان داده می‌شود؛ خودِ ایمپورت فقط پس از انتخاب
@@ -82,6 +88,12 @@ fun SettingsScreen(
 
     var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه (TimePicker متریال ۳)
+    var showReminderTimePicker by remember { mutableStateOf(false) }
+    val reminderTimeLabel = remember(reminderHour, reminderMinute) {
+        NumberFormatter.toPersianDigits("%02d:%02d".format(reminderHour, reminderMinute))
+    }
 
     // فیکس bug.md/NB-34+NB-29: وضعیت پیش‌نمایش ایمپورت — فایل انتخاب‌شده + دادهٔ
     // پیش‌نمایش؛ تا وقتی این null نیست دیالوگِ تأیید/انتخاب حالت باز است و هیچ
@@ -732,6 +744,39 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("ارسال اعلان آزمایشی سررسید")
                                 }
+
+                                HorizontalDivider()
+
+                                // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان‌ها از
+                                // تنظیمات قابل تغییر است (پیش‌فرض ۱۰:۰۰)؛ تغییر ساعت،
+                                // آلارم را همان‌جا با ساعت جدید از نو زمان‌بندی می‌کند.
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "ساعت اعلان روزانهٔ سررسید",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "چکِ روزانهٔ اقساط هر روز ساعت $reminderTimeLabel انجام می‌شود.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    OutlinedButton(
+                                        onClick = { showReminderTimePicker = true },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(reminderTimeLabel)
+                                    }
+                                }
                             }
                         }
                     }
@@ -750,6 +795,57 @@ fun SettingsScreen(
                 onSetCustomDate(picked)
                 showDatePickerDialog = false
                 Toast.makeText(context, "تاریخ برنامه به ${picked.formatted(usePersianDigits)} تغییر یافت", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه — TimePicker متریال ۳
+    // با مقدار اولیهٔ ذخیره‌شده؛ انصراف هیچ تغییری نمی‌کند (فقط پس از «ثبت»
+    // onReminderTimeChange اجرا و آلارم از نو زمان‌بندی می‌شود).
+    if (showReminderTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = reminderHour.coerceIn(0, 23),
+            initialMinute = reminderMinute.coerceIn(0, 59),
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showReminderTimePicker = false },
+            title = { Text("ساعت اعلان روزانه") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "چکِ روزانهٔ اقساط و سررسید هر روز در این ساعت انجام می‌شود.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val h = timePickerState.hour
+                        val m = timePickerState.minute
+                        showReminderTimePicker = false
+                        onReminderTimeChange(h, m)
+                        Toast.makeText(
+                            context,
+                            "ساعت اعلان روزانه به ${NumberFormatter.toPersianDigits("%02d:%02d".format(h, m))} تغییر یافت",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                ) {
+                    Text("ثبت")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReminderTimePicker = false }) {
+                    Text("انصراف")
+                }
             }
         )
     }
