@@ -121,7 +121,9 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          ./gradlew testDebugUnitTest --stacktrace
+          # tee: بدون این، اگر تست/کامپایل شکست بخورد هیچ خطایی در Annotation دیده نمی‌شود (لاگ کامل 403 می‌دهد).
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee gradle-test.log
 
       - name: Build Android App (AAB & APK)
         env:
@@ -139,12 +141,14 @@ jobs:
         run: |
           # Surface the real Gradle error as workflow annotations so it is visible
           # without opening the full raw log.
-          if [ -f gradle-build.log ]; then
-            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:" gradle-build.log | head -25 \
-              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
-            sed -n '/What went wrong/,/Try:/p' gradle-build.log | head -25 | tr '\n' ' ' | cut -c1-1800 \
-              | while IFS= read -r line; do echo "::error title=Gradle failure::${line}"; done
-          fi
+          for LOG in gradle-test.log gradle-build.log; do
+            if [ -f "$LOG" ]; then
+              grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$" "$LOG" | head -25 \
+                | while IFS= read -r line; do echo "::error::[$LOG] ${line:0:900}"; done
+              sed -n '/What went wrong/,/Try:/p' "$LOG" | head -25 | tr '\n' ' ' | cut -c1-1800 \
+                | while IFS= read -r line; do echo "::error title=Gradle failure ($LOG)::${line}"; done
+            fi
+          done
 
       - name: Upload Build Artifacts to Actions
         uses: actions/upload-artifact@v7

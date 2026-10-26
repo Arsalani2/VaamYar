@@ -1100,3 +1100,67 @@ class LoanRepository(
         withContext(Dispatchers.IO) {
             database.withTransaction<Unit> {
                 val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+                val existing = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                findArrearsMonths(current, currentDate, existing).forEach { ar ->
+                    insertInstallmentRecord(current, ar.installmentNumber, ar.year, ar.month, currentDate)
+                }
+                val curNumber = ShamsiDateHelper.installmentNumberForMonth(
+                    current.startYear, current.startMonth, currentDate.year, currentDate.month
+                )
+                val currentMissing = existing.none {
+                    it.year == currentDate.year && it.month == currentDate.month
+                }
+                if (curNumber != null && curNumber <= current.totalMonths && currentMissing) {
+                    insertInstallmentRecord(current, curNumber, currentDate.year, currentDate.month, currentDate)
+                }
+                syncLoanCountersFromRecords(current, currentDate)
+            }
+        }
+
+    /**
+     * افزایش/کاهش دستی (دکمه‌های +/−) — طبق بند ۶ متد فیکس NB-31 همچنان ترتیبی کار
+     * می‌کنند اما روی رکوردهای واقعی: «+» اولین ماهِ بدون رکورد را می‌پردازد و «−»
+     * آخرین رکورد را پس می‌گیرد. فیکس‌های P1-3/NB-3 (حذف آینهٔ تاریخچه، بدون تکراری،
+     * پرچم ماه جاری همگام) به‌طور خودکار از syncLoanCountersFromRecords برقرارند.
+     */
+    suspend fun recordInstallmentPayment(
+        loan: Loan,
+        isIncrement: Boolean,
+        currentDate: ShamsiDate
+    ) = withContext(Dispatchers.IO) {
+        database.withTransaction<Unit> {
+            val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            val existing = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                .sortedBy { it.installmentNumber }
+            if (isIncrement) {
+                val paidNumbers = existing.map { it.installmentNumber }.toSet()
+                val next = (1..current.totalMonths).firstOrNull { it !in paidNumbers }
+                if (next != null) {
+                    val m = ShamsiDateHelper.installmentMonth(current.startYear, current.startMonth, next)
+                    insertInstallmentRecord(current, next, m.year, m.month, currentDate)
+                }
+            } else {
+                existing.lastOrNull()?.let { last ->
+                    removeInstallmentRecord(current, last.installmentNumber, last.year, last.month)
+                }
+            }
+            syncLoanCountersFromRecords(current, currentDate)
+        }
+    }
+
+    suspend fun updateDebtorPaidStatus(shareId: Long, isPaid: Boolean, monthName: String) = withContext(Dispatchers.IO) {
+        debtorShareDao.updatePaidStatus(shareId, isPaid, monthName)
+    }
+
+    /**
+     * رِسِت دستی «شروع ماه جدید» — فیکس bug.md/P1-6:
+     * قبلاً فقط پرچم سهم شرکا صفر می‌شد و پرچم ماه جاری خود وام‌ها تیک‌خورده ماند می‌شد.
+     * اکنون هر دو درون یک تراکنش اتمیک رِسِت می‌شوند.
+     */
+    suspend fun resetMonthlyDebtorStatus() = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            loanDao.resetCurrentMonthPaidFlags()
+            debtorShareDao.resetMonthlyPaidStatus()
+        }
+    }
+}

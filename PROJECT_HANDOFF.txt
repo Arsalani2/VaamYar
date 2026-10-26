@@ -125,6 +125,36 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
   app-release.aab منتشر شد. نتیجه‌ی موفق، استنباط علت (mode گیرِ gradlew + pull --rebase) را تأیید عملی می‌کند.
   گام بعدی: همچنان P1-5 تا P1-9 در bug.md؛ هشدارهای deprecation اکشن‌ها (setup-java@v5 و ...) غیرمسدودکننده‌اند.
 
+[2026-10-26 ~21:30 UTC (ساعت سندباکس) — Claude Sonnet 5.5 (claude-sonnet-5-5)]
+اقدام: بررسی شکست ریلیز بعدی (run 40403171266، workflow_dispatch روی main، commit 518e76e).
+یافته‌ها:
+  - مرحله‌ی شکست‌خورده: «Run Unit Tests» (مرحله‌ی Build به‌خاطر شکست قبلی skipped شد). Annotation فقط
+    «exit code 1» داشت و لاگ کامل 403 بود؛ چون مرحله‌ی تست خروجی را tee نمی‌کرد، مرحله‌ی «Summarize Build Failure»
+    هم چیزی برای نمایش نداشت. بیلد محلی هم ممکن نبود (شبکه به Gradle/Maven/Google نیست).
+  - برای دیدن خطای واقعی، یک ورک‌فلو فقط‌تست (.github/workflows/unit-tests.yml، بدون ریلیز/bump/secret) روی شاخه‌ی
+    fix/ci-test-diagnostics ساخته شد → run 40404225166. نتیجه (علت اصلی، مشاهده‌ی مستقیم Annotation):
+      :app:compileDebugKotlin FAILED
+      e: .../data/LoanRepository.kt:1102:89 Syntax error: Expecting '}'.
+      e: .../data/LoanRepository.kt:73:73 Unresolved reference 'loanInstallmentDao'.
+      e: .../ui/MainViewModel.kt:12-14 Unresolved reference 'matchExistingLoan' / 'matchExistingShare' / 'matchExistingUser'
+      e: .../ui/MainViewModel.kt:593,599,618,624 Unresolved reference 'recordInstallmentPayment' / 'updateDebtorPaidStatus' / 'resetMonthlyDebtorStatus'
+  - ریشه‌ی خطا: کامیت ec15afe (P4-4، تغییر نام پکیج com.example → com.aistudio.vamyar) فایل LoanRepository.kt را هنگام
+    انتقال «بریده» کرده بود: نسخه‌ی جدید 1102 خط و 3 آکولاد باز مانده، نسخه‌ی کامل قبلی (کامیت 3aa4acd) 1166 خط بود.
+    تفاوت دقیقاً ۶۴ خط انتهایی بود (ادامه‌ی payArrearsAndCurrentMonth، recordInstallmentPayment و ...). سایر ارورها
+    (Unresolved reference در MainViewModel) پیامد همین بریدگی‌اند.
+  - چرا زودتر دیده نشد: حدود ۹۶ کامیت بین آخرین ریلیز سبز (f1ec589) و این run همگی [skip ci] داشتند و CI روی
+    آن‌ها اجرا نشد؛ هیچ‌کس بیلد/تست محلی هم نداشت (نبود شبکه در نشست‌های AI).
+  - بررسی سایر فایل‌های منتقل‌شده (۴۹ فایل Kotlin نسبت به والد ec15afe): فقط LoanRepository.kt بریده بود.
+تغییرات:
+  1) app/src/main/java/com/aistudio/vamyar/data/LoanRepository.kt بازسازی شد = نسخه‌ی کامل 3aa4acd با
+     `sed s/com.example/com.aistudio.vamyar/` (بررسی با diff: دقیقاً یکسان، 1166 خط).
+  2) افزودن .github/workflows/unit-tests.yml (فقط تست؛ روی workflow_dispatch، pull_request به main و push به fix/** و ci/**)
+     با Annotation برای خطای کامپایل و تست‌های شکست‌خورده + آپلود گزارش تست.
+  3) افزودن CI_WORKFLOW_GUIDE.md (راهنمای تیم برای جلوگیری از تکرار شکست ورک‌فلو).
+  4) رفع نقص تشخیصی در android-release.yml: مرحله‌ی Run Unit Tests اکنون خروجی را tee می‌کند و در شکست،
+     خطاهای e: و تست‌های fail شده به Annotation تبدیل می‌شوند.
+وضعیت راستی‌آزمایی: (در ادامه‌ی همین فایل با نتیجه‌ی run شاخه تکمیل می‌شود.)
+
 ۳. رویکردهای موفق / ناموفق
 --------------------------
 - موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
