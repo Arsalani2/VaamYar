@@ -64,6 +64,32 @@ object LoanIconHelper {
      * Copies a user-selected image Uri into the app's internal private storage directory
      * and returns the absolute local file path for reliable offline persistence.
      */
+    private val iconCache = androidx.collection.LruCache<String, Bitmap>(30)
+
+    fun loadSampledBitmap(path: String, reqWidth: Int = 120, reqHeight: Int = 120): Bitmap? {
+        iconCache.get(path)?.let { return it }
+        return try {
+            val file = File(path)
+            if (!file.exists()) return null
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, boundsOptions)
+            var inSampleSize = 1
+            val maxDim = maxOf(boundsOptions.outWidth, boundsOptions.outHeight)
+            while (maxDim / (inSampleSize * 2) >= maxOf(reqWidth, reqHeight)) {
+                inSampleSize *= 2
+            }
+            val options = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+            val bmp = BitmapFactory.decodeFile(file.absolutePath, options)
+            if (bmp != null) iconCache.put(path, bmp)
+            bmp
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * فیکس bug.md/NB-7 و P3-6: دکود دومرحله‌ای با inSampleSize برای جلوگیری از OOM
+     */
     fun saveCustomIconImage(context: Context, imageUri: Uri): String? {
         return try {
             val iconsDir = File(context.filesDir, "loan_icons")
@@ -73,23 +99,43 @@ object LoanIconHelper {
             val fileName = "loan_icon_${System.currentTimeMillis()}.png"
             val destFile = File(iconsDir, fileName)
 
-            val inputStream: InputStream? = context.contentResolver.openInputStream(imageUri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
+            // مرحله اول: فقط استخراج ابعاد تصویر
+            val boundsOptions = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            context.contentResolver.openInputStream(imageUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, boundsOptions)
+            }
 
-            if (bitmap != null) {
-                // Resize to max 300x300 for optimal memory and storage efficiency
-                val scaled = if (bitmap.width > 300 || bitmap.height > 300) {
-                    val max = maxOf(bitmap.width, bitmap.height)
-                    val scale = 300f / max
-                    Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
-                } else bitmap
+            val origWidth = boundsOptions.outWidth
+            val origHeight = boundsOptions.outHeight
+            if (origWidth <= 0 || origHeight <= 0) return null
 
-                FileOutputStream(destFile).use { out ->
-                    scaled.compress(Bitmap.CompressFormat.PNG, 90, out)
-                }
-                destFile.absolutePath
-            } else null
+            // محاسبه ضریب کاهش ابعاد (inSampleSize)
+            var inSampleSize = 1
+            val maxDim = maxOf(origWidth, origHeight)
+            while (maxDim / (inSampleSize * 2) >= 300) {
+                inSampleSize *= 2
+            }
+
+            // مرحله دوم: دکود با سایز متناسب برای جلوگیری از مصرف حافظه بالا
+            val decodeOptions = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            val sampledBitmap = context.contentResolver.openInputStream(imageUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, decodeOptions)
+            } ?: return null
+
+            val scaled = if (sampledBitmap.width > 300 || sampledBitmap.height > 300) {
+                val max = maxOf(sampledBitmap.width, sampledBitmap.height)
+                val scale = 300f / max
+                Bitmap.createScaledBitmap(sampledBitmap, (sampledBitmap.width * scale).toInt(), (sampledBitmap.height * scale).toInt(), true)
+            } else sampledBitmap
+
+            FileOutputStream(destFile).use { out ->
+                scaled.compress(Bitmap.CompressFormat.PNG, 90, out)
+            }
+            destFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -99,12 +145,23 @@ object LoanIconHelper {
     fun deleteCustomIconFile(filePath: String?) {
         if (!filePath.isNullOrBlank()) {
             try {
+                iconCache.remove(filePath)
                 val file = File(filePath)
                 if (file.exists()) {
                     file.delete()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+    }
+
+    fun clearAllCustomIcons(context: Context) {
+        runCatching {
+            iconCache.evictAll()
+            val iconsDir = File(context.filesDir, "loan_icons")
+            if (iconsDir.exists()) {
+                iconsDir.listFiles()?.forEach { it.delete() }
             }
         }
     }
@@ -122,12 +179,10 @@ fun LoanIconDisplay(
 ) {
     val shape = if (iconShape == "CIRCLE") CircleShape else RoundedCornerShape(12.dp)
 
+    // فیکس bug.md/NB-7: کش کردن لود تصویر و بارگذاری با سایز فشرده
     val customBitmap = remember(customIconPath) {
         if (!customIconPath.isNullOrBlank()) {
-            val file = File(customIconPath)
-            if (file.exists()) {
-                BitmapFactory.decodeFile(file.absolutePath)
-            } else null
+            LoanIconHelper.loadSampledBitmap(customIconPath)
         } else null
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanShareCalculator
 import com.example.util.LoanIconDisplay
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
@@ -62,8 +63,9 @@ fun LoanItemCard(
     // شامل تاریخ سفارشی و به‌روزرسانی خودکار)؛ قبلاً هر کارت مستقیماً ساعت سیستم را
     // می‌خواند و در remember فریز می‌شد — بعد از نیمه‌شب/مرز ماه (یا با فعال بودن تاریخ
     // سفارشی) «روز مانده» با روزِ غلط محاسبه می‌شد.
+    // فیکس bug.md/NB-12: چیپ روزهای مانده از تقویم شمسی واقعی با ShamsiDateHelper.daysUntilDue محاسبه می‌شود
     val daysRemaining = remember(loan.dueDay, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
-        loan.dueDay - currentShamsiDate.day
+        ShamsiDateHelper.daysUntilDue(loan.dueDay, currentShamsiDate)
     }
 
     val loanAccentColor = Color(loan.colorHex)
@@ -72,11 +74,8 @@ fun LoanItemCard(
     } else {
         loan.othersShareAmount
     }
-    val myShare = if (debtorShares.isNotEmpty()) {
-        (loan.monthlyAmount - partnersTotalShare).coerceAtLeast(0L)
-    } else {
-        loan.effectiveMyShare
-    }
+    // فیکس bug.md/P3-2: منبع واحد محاسبهٔ سهم من
+    val myShare = LoanShareCalculator.computeMyShare(loan, debtorShares)
     val hasPartners = partnersTotalShare > 0L || loan.hasPartners
 
     // Clear paid border / tint

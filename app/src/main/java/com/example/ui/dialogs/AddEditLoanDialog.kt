@@ -405,6 +405,15 @@ fun AddEditLoanDialog(
                             )
                         }
 
+                        // فیکس bug.md/P3-12: هشدار در صورت وارد کردن مدت بیش از ۱۲۰ ماه
+                        if (NumberFormatter.parseInt(totalMonthsText) > 120) {
+                            Text(
+                                text = "⚠️ مدت بیش از ۱۲۰ ماه به ۱۲۰ محدود می‌شود.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+
                         // Quick chips for common loan durations
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -653,6 +662,22 @@ fun AddEditLoanDialog(
                     }
                 }
 
+                // فیکس bug.md/P3-12: خطاهای درون‌خطی برای مقادیر نامعتبر
+                if (title.trim().isBlank()) {
+                    Text(
+                        text = "عنوان وام نمی‌تواند خالی باشد.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                if (rawMonthlyAmount <= 0L) {
+                    Text(
+                        text = "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
                 // Bottom Save & Cancel Buttons
                 Row(
                     modifier = Modifier
@@ -665,9 +690,8 @@ fun AddEditLoanDialog(
                     }
 
                     Button(
-                        // فیکس bug.md/P1-8/P1-9: ذخیره‌ی وامِ ناسازگار (سهم شرکا > مبلغ قسط،
-                        // یا اقساط پرداخت‌شده > کل اقساط) مسدود است
-                        enabled = !sharesExceedMonthly && !paidExceedsTotal,
+                        // فیکس bug.md/P1-8/P1-9 و P3-12: ذخیره برای عنوان خالی یا قسط صفر مسدود است
+                        enabled = !sharesExceedMonthly && !paidExceedsTotal && title.trim().isNotBlank() && rawMonthlyAmount > 0L,
                         onClick = {
                             // فیکس bug.md/P1-9: شمارنده‌ی پرداخت‌شده‌ها همیشه درون بازه‌ی
                             // 0..totalMonths نگه داشته می‌شود (دکمه در حالت ناسازگار غیرفعال است

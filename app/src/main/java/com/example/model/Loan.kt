@@ -64,3 +64,24 @@ data class Loan(
     val payoffCountdownText: String
         get() = if (isCompleted) "تسویه شده" else "$remainingMonths ماه مانده تا تسویه ($endMonthName $endYear)"
 }
+
+/**
+ * فیکس bug.md/P3-2: منبع واحد و خالص برای محاسبهٔ «سهم من».
+ * قاعدهٔ واحد:
+ * - وام بدون شریک یا بدون سهمِ ثبت‌شده: ۱۰۰٪ مبلغ قسط ماهانه (monthlyAmount)
+ * - وام دارای شریک: monthlyAmount منهای مجموع سهم شرکا (با clamp در ≥ ۰)
+ */
+object LoanShareCalculator {
+    fun computeMyShare(loan: Loan, shares: List<DebtorShare>): Long {
+        val loanShares = shares.filter { it.loanId == loan.id }
+        return if (loanShares.isNotEmpty()) {
+            val partnersSum = loanShares.sumOf { it.shareAmount }
+            (loan.monthlyAmount - partnersSum).coerceAtLeast(0L)
+        } else if (loan.hasPartners) {
+            loan.myShareAmount.coerceAtLeast(0L)
+        } else {
+            loan.monthlyAmount
+        }
+    }
+}
+

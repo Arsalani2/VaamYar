@@ -10,6 +10,7 @@ import com.example.VamyarApp
 import com.example.data.UserDeleteCheckResult
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanShareCalculator
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.notification.InstallmentAlarmReceiver
@@ -148,20 +149,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getUserShareForLoan(loan: Loan, shares: List<DebtorShare>, activeUser: String, primaryUserName: String = activeUser): Long {
         val loanShares = shares.filter { it.loanId == loan.id }
-        // فیکس bug.md/P3-1: تطبیق هویت نام‌پایه از کلید استاندارد نام عبور می‌کند (ي/ك
-        // عربی، فاصله/نیم‌فاصله) تا سهم شریک با کوچک‌ترین تفاوتِ تایپی صفر حساب نشود.
-        // (استثنای «من»/«شما» فعلاً همان P3-11 می‌ماند.)
-        val isPrimary = PersianNameNormalizer.namesMatch(activeUser, primaryUserName) || activeUser == "من" || activeUser == "شما"
+        // فیکس bug.md/P3-11: حذف شرط‌های خاص «من» و «شما»؛ مبنا فقط تطبیق استاندارد نام است
+        val isPrimary = PersianNameNormalizer.namesMatch(activeUser, primaryUserName)
 
         return if (isPrimary) {
-            if (loanShares.isNotEmpty()) {
-                val othersTotal = loanShares.sumOf { it.shareAmount }
-                (loan.monthlyAmount - othersTotal).coerceAtLeast(0L)
-            } else if (loan.hasPartners) {
-                loan.myShareAmount
-            } else {
-                loan.monthlyAmount
-            }
+            // فیکس bug.md/P3-2: منبع واحد محاسبهٔ سهم من
+            LoanShareCalculator.computeMyShare(loan, loanShares)
         } else {
             val userDebtorShare = loanShares.find { PersianNameNormalizer.namesMatch(it.personName, activeUser) }
             userDebtorShare?.shareAmount ?: 0L
@@ -175,14 +168,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) { loans, shares, primary ->
         val activeUserName = primary?.name ?: "کاربر من"
         val activeLoans = loans.filter { !it.isCompleted }
+        val activeLoanIds = activeLoans.map { it.id }.toSet()
         val totalMonthlyDue = activeLoans.sumOf { it.monthlyAmount }
 
         val userMonthlyShare = activeLoans.sumOf { getUserShareForLoan(it, shares, activeUserName, activeUserName) }
         val userPaidThisMonth = activeLoans.filter { it.isCurrentMonthPaid }.sumOf { getUserShareForLoan(it, shares, activeUserName, activeUserName) }
         val userUnpaidRemainingThisMonth = (userMonthlyShare - userPaidThisMonth).coerceAtLeast(0L)
 
-        // فیکس bug.md/P3-1: تشخیص «سهمِ خودم یا دیگران» با کلید استاندارد نام، نه مقایسهٔ خام
-        val relevantShares = shares.filter { !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
+        // فیکس bug.md/P3-3 و P3-1: مطالبات فقط از وام‌های تسویه‌نشده و با کلید استاندارد نام محاسبه می‌شوند
+        val relevantShares = shares.filter { it.loanId in activeLoanIds && !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
 
         val othersMonthlyReceivables = relevantShares.sumOf { it.shareAmount }
         val othersReceivedThisMonth = relevantShares.filter { it.isPaidForCurrentMonth }.sumOf { it.shareAmount }
@@ -220,13 +214,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val personSummaries: StateFlow<List<PersonReceivableSummary>> = combine(
         allShares,
+        allLoans,
         primaryUser
-    ) { shares, primary ->
+    ) { shares, loans, primary ->
         val activeUserName = primary?.name ?: "کاربر من"
-        // فیکس bug.md/P3-1: سهم‌های خودِ کاربر با کلید استاندارد نام جدا می‌شوند و
-        // گروه‌بندی هم بر همان شکل استاندارد است تا دو املای متفاوتِ یک نفر، دو نفر
-        // نشان داده نشوند.
-        val otherShares = shares.filter { !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
+        val activeLoanIds = loans.filter { !it.isCompleted }.map { it.id }.toSet()
+        // فیکس bug.md/P3-3 و P3-1: سهم‌های مربوط به وام‌های تسویه‌شده از مطالبات حذف می‌شوند
+        val otherShares = shares.filter { it.loanId in activeLoanIds && !PersianNameNormalizer.namesMatch(it.personName, activeUserName) }
         otherShares.groupBy { PersianNameNormalizer.canonicalName(it.personName) }.map { (person, personShares) ->
             val totalShare = personShares.sumOf { it.shareAmount }
             val paidThisMonth = personShares.filter { it.isPaidForCurrentMonth }.sumOf { it.shareAmount }
@@ -244,14 +238,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Advanced, professional smart financial suggestions with proper formatted numbers
+    // فیکس bug.md/NB-8: استفاده از فلوهای usePersianDigits و compactThousands به جای .value
     val smartFinancialTips: StateFlow<List<SmartFinancialTip>> = combine(
-        allLoans,
-        allShares,
-        primaryUser,
-        currentShamsiDate
-    ) { loans, shares, primary, curDate ->
-        val usePersian = _usePersianDigits.value
-        val compact = _compactThousands.value
+        combine(allLoans, allShares, ::Pair),
+        combine(primaryUser, currentShamsiDate, ::Pair),
+        combine(usePersianDigits, compactThousands, ::Pair)
+    ) { (loans, shares), (primary, curDate), (usePersian, compact) ->
         val tips = mutableListOf<SmartFinancialTip>()
         val activeUserName = primary?.name ?: "کاربر من"
         val activeLoans = loans.filter { !it.isCompleted }

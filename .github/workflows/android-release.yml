@@ -106,6 +106,10 @@ jobs:
           chmod +x gradlew
           ./gradlew --version
 
+      - name: Run Unit Tests
+        run: |
+          ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build Android App (AAB & APK)
         env:
           # Absolute path: app/build.gradle.kts resolves relative paths against the app/ module dir.
@@ -136,7 +140,6 @@ jobs:
           path: |
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: warn
           retention-days: 30
 
@@ -173,13 +176,12 @@ jobs:
             ### 📦 فایل‌های پیوست این انتشار:
             1. **`app-release.apk`**: فایل نصبی مستقیم جهت نصب و تست روی دستگاه‌های اندرویدی.
             2. **`app-release.aab`**: بسته Android App Bundle جهت انتشار در گوگل پلی (Google Play Console).
-            3. **`mapping.txt`**: فایل نگاشت Proguard/R8 (در صورت فعال بودن obfuscation).
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
           files: |
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/apk/release/*.apk
-            app/build/outputs/mapping/release/mapping.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

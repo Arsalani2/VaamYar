@@ -4,11 +4,11 @@
 ### دستیار هوشمند مدیریت وام‌ها، اقساط ماهانه و حساب‌های شراکتی
 *یک برنامه مدرن، سریع و کاملاً بومی با پشتیبانی ۱۰۰٪ از تقویم شمسی و ارقام فارسی*
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-M3-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
 [![Room Database](https://img.shields.io/badge/Room-SQLite-orange.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-brightgreen.svg)](https://android.com)
+[![Platform](https://img.shields.io/badge/Platform-Android%207.0%2B%20(API%2024)-brightgreen.svg)](https://android.com)
 
 </div>
 
@@ -78,13 +78,13 @@
 ### پیش‌نیازها
 - **Android Studio Ladybug** یا نسخه بالاتر
 - **JDK 17** یا بالاتر
-- **Android SDK:** حداقل نسخه ۲۶ (Android 8.0) و نسخه هدف ۳۵
+- **Android SDK:** حداقل نسخه ۲۴ (Android 7.0) و نسخه هدف ۳۵
 
 ### مراحل اجرا
 ۱. مخزن را کلون کنید:
 ```bash
-git clone https://github.com/your-username/vamyar.git
-cd vamyar
+git clone https://github.com/Arsalani2/VaamYar.git
+cd VaamYar
 ```
 
 ۲. پروژه را در **Android Studio** باز کنید و اجازه دهید فرآیند Gradle Sync کامل شود.

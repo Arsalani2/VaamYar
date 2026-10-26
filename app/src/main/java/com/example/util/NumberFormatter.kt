@@ -68,8 +68,51 @@ object NumberFormatter {
         }
     }
 
+    /**
+     * فیکس bug.md/NB-5 (و P3-4):
+     * اعتبارسنجی صریح برای ورودی‌های مالی:
+     * - ارقام فارسی و عربی را استاندارد می‌کند.
+     * - جداکننده‌های هزارگانِ مجاز (, و ، و ٬ و فاصله) و واحدهای «تومان»/«هزار»/«ت» را برمی‌دارد.
+     * - اگر نویسهٔ غیرمجازی مانند ممیز/اعشار (. یا / یا ٫) وجود داشته باشد، null برمی‌گرداند تا از خطای مالی 10x/100x جلوگیری شود.
+     */
+    fun parseAmountStrict(input: String?): Long? {
+        if (input.isNullOrBlank()) return 0L
+        val trimmed = input.trim()
+            .replace("تومان", "")
+            .replace("هزار", "")
+            .replace("ت", "")
+            .trim()
+        if (trimmed.isEmpty()) return 0L
+
+        val sb = StringBuilder()
+        for (ch in trimmed) {
+            when (ch) {
+                in '0'..'9' -> sb.append(ch)
+                in '۰'..'۹' -> sb.append('0' + (ch - '۰'))
+                in '٠'..'٩' -> sb.append('0' + (ch - '٠'))
+                ',', '،', '٬', ' ' -> { /* جداکننده مجاز هزارگان */ }
+                else -> return null // کاراکتر غیرمجاز (مثل . یا / یا ٫)
+            }
+        }
+        val digits = sb.toString()
+        if (digits.isEmpty()) return 0L
+        return digits.toLongOrNull()
+    }
+
+    /**
+     * فیکس bug.md/P3-4: جلوگیری از سرریز به اعداد منفی برای مقادیر بزرگتر از Int.MAX_VALUE
+     */
+    fun parseIntStrict(input: String?): Int? {
+        val amount = parseAmountStrict(input) ?: return null
+        if (amount > Int.MAX_VALUE || amount < 0L) return null
+        return amount.toInt()
+    }
+
     fun parseAmount(input: String): Long {
         if (input.isBlank()) return 0L
+        val strict = parseAmountStrict(input)
+        if (strict != null) return strict
+
         val clean = input
             .replace("،", "")
             .replace("٬", "")
@@ -92,7 +135,9 @@ object NumberFormatter {
     }
 
     fun parseInt(input: String): Int {
-        return parseAmount(input).toInt()
+        val strict = parseIntStrict(input)
+        if (strict != null) return strict
+        return parseAmount(input).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }
 
     /**

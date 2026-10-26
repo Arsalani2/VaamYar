@@ -168,7 +168,7 @@ object BackupHelper {
 
             // 1. Identity Check
             val appIdent = root.optString("appIdentifier", "")
-            if (appIdent.isNotEmpty() && appIdent != APP_IDENTIFIER) {
+            if (appIdent.isNotEmpty() && appIdent != APP_IDENTIFIER && appIdent != "com.aistudio.vamyar.zqnmxk" && appIdent != "com.example") {
                 return Result.failure(IllegalArgumentException("این فایل مربوط به برنامه وام‌یار نیست ($appIdent)"))
             }
 
@@ -189,7 +189,7 @@ object BackupHelper {
 
             val exportDate = root.optString("exportDateShamsi", "نامشخص")
 
-            // 3. Parse Users
+            // 3. Parse and Validate Users (فیکس bug.md/NB-4: تضمین وجود دقیقاً یک کاربر مبنا)
             val usersList = mutableListOf<UserProfile>()
             val usersArray = payload.optJSONArray("users") ?: JSONArray()
             for (i in 0 until usersArray.length()) {
@@ -203,6 +203,11 @@ object BackupHelper {
                         notes = u.optString("notes", "")
                     )
                 )
+            }
+            if (usersList.isNotEmpty() && usersList.none { it.isPrimary }) {
+                usersList[0] = usersList[0].copy(isPrimary = true)
+            } else if (usersList.isEmpty()) {
+                usersList.add(UserProfile(name = "من", isPrimary = true))
             }
 
             // 4. Parse Shares first to assist legacy loan migration
@@ -225,7 +230,7 @@ object BackupHelper {
                 )
             }
 
-            // 5. Parse and Migrate Loans
+            // 5. Parse, Validate, and Migrate Loans
             val loansList = mutableListOf<Loan>()
             val loansArray = payload.optJSONArray("loans") ?: JSONArray()
             for (i in 0 until loansArray.length()) {
@@ -239,15 +244,7 @@ object BackupHelper {
                     existingSharesForLoan.isNotEmpty()
                 }
 
-                // فیکس bug.md/P2-14: بکاپ‌های قدیمی اصلاً کلید myShareAmount ندارند و optLong
-                // برای کلیدِ غایب صفر برمی‌گرداند؛ صفرِ «نبودِ کلید» نباید «سهم من صفر است» تلقی
-                // شود — قبلاً وام شراکتیِ قدیمیِ بدون این کلید با سهمِ صفر بازیابی می‌شد و محاسبات
-                // سهم من (Loan.effectiveMyShare) روی صفر می‌رفت. اکنون برای بکاپ‌های بدون این کلید،
-                // سهم من بازسازی می‌شود:
-                //  • وام بدون شریک → همان ۱۰۰٪ همیشگی (رفعِ موجود از قبل، حفظ شد)
-                //  • وام شراکتی → قسط ماهانه منهای مجموع سهم شرکا (clamp در ≥۰ تا جمعِ
-                //    سهم‌های خراب در فایل، سهم من را منفی نکند)
-                // اگر کلید وجود دارد، مقدار صریحِ ذخیره‌شده عیناً می‌ماند.
+                // فیکس bug.md/P2-14: بازسازی سهم من برای بکاپ‌های قدیمی
                 val migratedMyShare = when {
                     !hasPartnersInJson -> {
                         val rawMyShare = l.optLong("myShareAmount", 0L)
@@ -257,14 +254,18 @@ object BackupHelper {
                     else -> (monthlyAmount - existingSharesForLoan.sumOf { it.shareAmount }).coerceAtLeast(0L)
                 }
 
+                // فیکس bug.md/NB-4: محدودسازی و اعتبارسنجی مقادیر ماه و اقساط
+                val safeTotalMonths = l.optInt("totalMonths", 12).coerceIn(1, 120)
+                val safePaidMonths = l.optInt("paidMonths", 0).coerceIn(0, safeTotalMonths)
+
                 loansList.add(
                     Loan(
                         id = loanId,
                         title = l.optString("title", "وام"),
                         dueDay = l.optInt("dueDay", 1),
                         monthlyAmount = monthlyAmount,
-                        totalMonths = l.optInt("totalMonths", 12),
-                        paidMonths = l.optInt("paidMonths", 0),
+                        totalMonths = safeTotalMonths,
+                        paidMonths = safePaidMonths,
                         startYear = l.optInt("startYear", 1403),
                         startMonth = l.optInt("startMonth", 1),
                         endYear = l.optInt("endYear", 1404),
@@ -301,6 +302,11 @@ object BackupHelper {
                 )
             }
 
+            // فیکس bug.md/NB-4: حذف سهم‌ها و رکوردهای یتیمی که شناسه وام آنها در جدول وام‌ها وجود ندارد
+            val validLoanIds = loansList.map { it.id }.toSet()
+            val sanitizedShares = sharesList.filter { it.loanId in validLoanIds }
+            val sanitizedRecords = recordsList.filter { it.loanId in validLoanIds }
+
             // 7. Parse Preferences
             val prefsObj = payload.optJSONObject("preferences") ?: JSONObject()
             val preferences = BackupPreferences(
@@ -318,8 +324,8 @@ object BackupHelper {
                 BackupRestoreData(
                     users = usersList,
                     loans = loansList,
-                    shares = sharesList,
-                    records = recordsList,
+                    shares = sanitizedShares,
+                    records = sanitizedRecords,
                     preferences = preferences,
                     schemaVersion = schemaVersion,
                     exportedDate = exportDate

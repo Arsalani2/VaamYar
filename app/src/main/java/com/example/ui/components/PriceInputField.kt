@@ -36,6 +36,8 @@ fun PriceInputField(
 ) {
     val amountLong = rawDigitsValue.toLongOrNull() ?: 0L
 
+    var hasInvalidSeparator by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -43,6 +45,13 @@ fun PriceInputField(
         OutlinedTextField(
             value = rawDigitsValue,
             onValueChange = { input ->
+                // فیکس bug.md/NB-5: بررسی وجود ممیز/اعشار برای هشدار فوری به کاربر
+                if (input.any { it == '.' || it == '/' || it == '٫' }) {
+                    hasInvalidSeparator = true
+                } else if (input.isBlank()) {
+                    hasInvalidSeparator = false
+                }
+
                 // Clean input: extract only numeric digits, convert Persian/Arabic digits to ASCII 0-9
                 val digitsOnly = input.filter { it.isDigit() }.map { c ->
                     when (c) {
@@ -60,6 +69,7 @@ fun PriceInputField(
             placeholder = { Text(placeholder) },
             singleLine = true,
             enabled = enabled,
+            isError = hasInvalidSeparator,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 textDirection = TextDirection.Ltr,
@@ -68,7 +78,10 @@ fun PriceInputField(
             trailingIcon = {
                 if (rawDigitsValue.isNotEmpty()) {
                     IconButton(
-                        onClick = { onRawDigitsChange("") },
+                        onClick = { 
+                            hasInvalidSeparator = false
+                            onRawDigitsChange("") 
+                        },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
@@ -82,6 +95,15 @@ fun PriceInputField(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         )
+
+        if (hasInvalidSeparator) {
+            Text(
+                text = "جداکننده اعشار مجاز نیست؛ لطفاً مبلغ را کامل و به تومان وارد کنید.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
 
         // Live formatted price and Persian words preview
         if (amountLong > 0L) {

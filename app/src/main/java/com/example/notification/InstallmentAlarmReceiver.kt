@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.data.AppDatabase
+import com.example.model.LoanShareCalculator
 import com.example.util.AppPreferences
 import com.example.util.NumberFormatter
 import com.example.util.MonthlyRolloverHelper
@@ -73,7 +74,15 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
 
                 if (dueToday.isNotEmpty()) {
                     val titles = dueToday.joinToString("، ") { it.title }
-                    val totalAmount = dueToday.sumOf { it.monthlyAmount }
+                    // فیکس bug.md/NB-13: در وام شراکتی فقط سهم کاربر در متن اعلان نمایش داده می‌شود
+                    val totalAmount = dueToday.sumOf { loan ->
+                        if (loan.hasPartners) {
+                            val shares = db.debtorShareDao().getSharesForLoanOnce(loan.id)
+                            LoanShareCalculator.computeMyShare(loan, shares)
+                        } else {
+                            loan.monthlyAmount
+                        }
+                    }
                     NotificationHelper.showNotification(
                         context = context,
                         title = "سررسید قسط امروز (${NumberFormatter.toPersianDigits(today)} ${currentShamsi.monthName})",

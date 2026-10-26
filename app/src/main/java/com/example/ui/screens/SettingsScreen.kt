@@ -24,7 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.data.UserDeleteCheckResult
 import com.example.model.UserProfile
 import com.example.ui.dialogs.AddEditUserDialog
@@ -78,18 +80,23 @@ fun SettingsScreen(
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
     var userConfirmDeleteDialog by remember { mutableStateOf<UserProfile?>(null) }
 
+    // فیکس bug.md/NB-7: اجرای export و import فایل روی Dispatchers.IO به جای Main thread
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                val json = onExportBackup()
-                context.contentResolver.openOutputStream(uri)?.use { out ->
-                    out.write(json.toByteArray(Charsets.UTF_8))
+            coroutineScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val json = onExportBackup()
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            out.write(json.toByteArray(Charsets.UTF_8))
+                        }
+                    }
+                    Toast.makeText(context, "فایل پشتیبان با موفقیت ذخیره شد", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "خطا در ذخیره فایل پشتیبان: ${e.message}", Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(context, "فایل پشتیبان با موفقیت ذخیره شد", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "خطا در ذخیره فایل پشتیبان: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -98,13 +105,15 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.use { input ->
-                    input.bufferedReader(Charsets.UTF_8).readText()
-                } ?: ""
+            coroutineScope.launch {
+                try {
+                    val jsonString = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            input.bufferedReader(Charsets.UTF_8).readText()
+                        } ?: ""
+                    }
 
-                if (jsonString.isNotBlank()) {
-                    coroutineScope.launch {
+                    if (jsonString.isNotBlank()) {
                         val result = onImportBackup(jsonString)
                         if (result.isSuccess) {
                             Toast.makeText(context, result.getOrNull() ?: "بازیابی با موفقیت انجام شد", Toast.LENGTH_LONG).show()
@@ -112,9 +121,9 @@ fun SettingsScreen(
                             Toast.makeText(context, "خطا در بازیابی پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                         }
                     }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "خطا در خواندن فایل: ${e.message}", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "خطا در خواندن فایل: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

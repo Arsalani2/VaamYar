@@ -7,6 +7,7 @@ import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.util.AppPreferences
+import com.example.util.LoanIconHelper
 import com.example.util.PersianNameNormalizer
 import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +61,6 @@ class LoanRepository(
                     UserProfile(
                         id = 0L,
                         name = "من",
-                        phoneNumber = "",
                         isPrimary = true,
                         avatarColorHex = 0xFF10B981L,
                         notes = "کاربر مبنا"
@@ -70,7 +70,6 @@ class LoanRepository(
                     UserProfile(
                         id = 0L,
                         name = "علی",
-                        phoneNumber = "",
                         isPrimary = false,
                         avatarColorHex = 0xFF3B82F6L,
                         notes = "شریک وام"
@@ -168,6 +167,7 @@ class LoanRepository(
             loanDao.clearAllLoans()
             debtorShareDao.clearAllShares()
         }
+        appPreferences.initialDataSeeded = true
     }
 
     suspend fun clearAllDataAndReset() = withContext(Dispatchers.IO) {
@@ -177,6 +177,7 @@ class LoanRepository(
             paymentRecordDao.clearAllRecords()
             userProfileDao.clearAllUsers()
         }
+        appPreferences.initialDataSeeded = true
     }
 
     /**
@@ -246,15 +247,17 @@ class LoanRepository(
                 }
             }
         } else {
-            if (canonicalUser.id == 0L) {
-                userProfileDao.insertUser(canonicalUser)
-            } else {
-                val existing = userProfileDao.getUserById(canonicalUser.id)
-                if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
-                    // Synchronize name change in all debtor shares!
-                    syncPersonNameInShares(existing.name, canonicalUser.name)
+            database.withTransaction {
+                if (canonicalUser.id == 0L) {
+                    userProfileDao.insertUser(canonicalUser)
+                } else {
+                    val existing = userProfileDao.getUserById(canonicalUser.id)
+                    if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
+                        // Synchronize name change in all debtor shares!
+                        syncPersonNameInShares(existing.name, canonicalUser.name)
+                    }
+                    userProfileDao.updateUser(canonicalUser)
                 }
-                userProfileDao.updateUser(canonicalUser)
             }
         }
     }
@@ -376,11 +379,14 @@ class LoanRepository(
         }
     }
 
-    suspend fun deleteLoan(loanId: Long) = withContext(Dispatchers.IO) {
-        database.withTransaction {
+    suspend fun deleteLoan(loanId: Long): Unit = withContext(Dispatchers.IO) {
+        val iconPath = loanDao.getLoanByIdOnce(loanId)?.customIconPath
+        database.withTransaction<Unit> {
             debtorShareDao.deleteSharesForLoan(loanId)
             loanDao.deleteLoanById(loanId)
         }
+        // فیکس bug.md/NB-6: حذف فایل تصویر اختصاصی آیکون از دیسک پس از commit موفق تراکنش
+        LoanIconHelper.deleteCustomIconFile(iconPath)
     }
 
     /**
@@ -430,6 +436,10 @@ class LoanRepository(
     suspend fun toggleCurrentMonthPaid(loan: Loan, curShamsiFormatted: String) = withContext(Dispatchers.IO) {
         database.withTransaction<Unit> {
             val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            // وام تسویه‌شده تمام اقساطش پرداخت شده است و نمی‌تواند تیک ماه جاری را تغییر دهد یا رکورد شبحی بسازد
+            if (current.isCompleted && current.isCurrentMonthPaid) {
+                return@withTransaction
+            }
             val newPaidStatus = !current.isCurrentMonthPaid
             val newPaidMonths = if (newPaidStatus) {
                 (current.paidMonths + 1).coerceAtMost(current.totalMonths)
@@ -473,7 +483,10 @@ class LoanRepository(
             } else {
                 (current.paidMonths - 1).coerceAtLeast(0)
             }
-            val isPaidNow = if (isIncrement) true else (newPaidMonths > 0)
+            // فیکس bug.md/NB-3: با کاهش شمارنده («−»)، آخرین قسط (که همان قسط ماه جاری بوده)
+            // پس گرفته می‌شود؛ پس پرچم isCurrentMonthPaid باید false شود نه اینکه چون newPaidMonths > 0
+            // است به غلط true بماند.
+            val isPaidNow = if (isIncrement) true else false
             loanDao.updateLoan(
                 current.copy(
                     paidMonths = newPaidMonths,

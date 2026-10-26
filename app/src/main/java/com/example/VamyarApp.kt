@@ -6,14 +6,19 @@ import com.example.data.LoanRepository
 import com.example.notification.NotificationHelper
 import com.example.util.AppPreferences
 import com.example.util.MonthlyRolloverHelper
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class VamyarApp : Application() {
 
     lateinit var repository: LoanRepository
         private set
+
+    // فیکس bug.md/NB-10: CoroutineScope پایدار با SupervisorJob برای کارهای پس‌زمینه اپلیکیشن
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -35,12 +40,15 @@ class VamyarApp : Application() {
         // خوانده می‌شود (پیش‌فرض ۱۰:۰۰) و هر اجرای اپ هم آلارم را دوباره برپا می‌کند.
         NotificationHelper.scheduleDailyCheck(this)
 
-        // فیکس bug.md/P1-6: رِسِت خودکار پرچم‌های «پرداخت ماه جاری»
-        // وقتی ماه شمسی عوض شده باشد — قبل از seed اجرا می‌شود
-        // تا دادهٔ نمایشی هم با پرچم سالم ساخته شود.
-        CoroutineScope(Dispatchers.IO).launch {
-            MonthlyRolloverHelper.rolloverIfNeeded(this@VamyarApp)
-            repository.checkAndSeedInitialData()
+        // فیکس bug.md/P1-6 و NB-10: رِسِت خودکار پرچم‌های «پرداخت ماه جاری»
+        // و seed اولیه داخل runCatching تا هیچ خطایی مانع بالا آمدن UI اپ نشود.
+        appScope.launch {
+            runCatching {
+                MonthlyRolloverHelper.rolloverIfNeeded(this@VamyarApp)
+                repository.checkAndSeedInitialData()
+            }.onFailure { e ->
+                Log.e("VamyarApp", "Startup initialization failed", e)
+            }
         }
     }
 }
