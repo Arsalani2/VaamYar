@@ -10,6 +10,7 @@ import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.util.AppPreferences
+import com.example.util.PublicId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -281,5 +282,64 @@ class LoanRepositoryIntegrityTest {
             "«پاکسازی تمام وام‌ها» نباید رکورد تاریخچهٔ یتیم به جا بگذارد",
             repository.allRecords.first().isEmpty()
         )
+    }
+
+    // ---------------------------------------------------------------- F6 (شناسهٔ یکتای عمومی)
+
+    @Test
+    fun f6_backfillAssignsUniquePublicIdsAndLinksOwnersIdempotently() = runBlocking {
+        // دادهٔ قدیمیِ بدون شناسه — مثل رکوردهای مهاجرت‌خورده از نسخهٔ ۴ دیتابیس
+        val loanId = db.loanDao().insertLoan(
+            Loan(title = "وام قدیمی", dueDay = 5, monthlyAmount = 1_000_000L, totalMonths = 12)
+        )
+        db.debtorShareDao().insertShare(
+            DebtorShare(loanId = loanId, loanTitle = "وام قدیمی", personName = "علی", shareAmount = 500_000L)
+        )
+        db.userProfileDao().insertUser(UserProfile(name = "علی"))
+
+        repository.backfillMissingPublicIds()
+
+        val users = db.userProfileDao().getAllUsersOnce()
+        val loans = repository.allLoans.first()
+        val shares = repository.allShares.first()
+        // همهٔ رکوردها شناسهٔ معتبر دارند
+        assertTrue(users.all { PublicId.isValidUserId(it.publicId) })
+        assertTrue(loans.all { PublicId.isValidLoanId(it.publicId) })
+        assertTrue(shares.all { PublicId.isValidShareId(it.publicId) })
+        // شناسه‌ها یکتا هستند
+        assertEquals(users.size, users.map { it.publicId }.toSet().size)
+        assertEquals(loans.size, loans.map { it.publicId }.toSet().size)
+        assertEquals(shares.size, shares.map { it.publicId }.toSet().size)
+        // پیوند سهم↔کاربر: سهمِ «علی» مالکش publicId کاربرِ «علی» است
+        val aliUser = users.first { it.name == "علی" }
+        val aliShare = shares.first { it.personName == "علی" }
+        assertEquals(aliUser.publicId, aliShare.ownerPublicId)
+
+        // idempotent — اجرای دوباره هیچ شناسه‌ای را عوض نمی‌کند
+        repository.backfillMissingPublicIds()
+        val users2 = db.userProfileDao().getAllUsersOnce()
+        val loans2 = repository.allLoans.first()
+        assertEquals(users.map { it.publicId }.toSet(), users2.map { it.publicId }.toSet())
+        assertEquals(loans.map { it.publicId }.toSet(), loans2.map { it.publicId }.toSet())
+    }
+
+    @Test
+    fun f6_newSavesGetPublicIdsAutomaticallyAndEditPreservesThem() = runBlocking {
+        // ذخیرهٔ جدید از مسیر اصلی اپ: وام و سهم خودبه‌خود شناسه می‌گیرند
+        val loan = insertSharedLoan(paidMonths = 2)
+        val savedLoan = repository.allLoans.first().first { it.id == loan.id }
+        assertTrue(PublicId.isValidLoanId(savedLoan.publicId))
+        val savedShare = repository.allShares.first().first()
+        assertTrue(PublicId.isValidShareId(savedShare.publicId))
+
+        // ویرایش وام (حذف/درج دوبارهٔ سهم‌ها) نباید شناسه‌ها را عوض کند
+        repository.saveLoanWithShares(
+            savedLoan.copy(title = "وام ویرایش‌شده"),
+            listOf(savedShare.copy(shareAmount = 600_000L))
+        )
+        val editedLoan = repository.allLoans.first().first { it.id == loan.id }
+        val editedShare = repository.allShares.first().first()
+        assertEquals("هویت وام نباید با edit عوض شود", savedLoan.publicId, editedLoan.publicId)
+        assertEquals("هویت سهم نباید با edit عوض شود", savedShare.publicId, editedShare.publicId)
     }
 }

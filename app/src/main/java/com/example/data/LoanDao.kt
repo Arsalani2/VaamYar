@@ -47,4 +47,12 @@ interface LoanDao {
     // بازنشانی/جایگزینی کامل جمع می‌شود تا پس از commit موفق، فایل‌های یتیم از دیسک پاک شوند.
     @Query("SELECT * FROM loans WHERE customIconPath IS NOT NULL AND customIconPath != ''")
     suspend fun getLoansWithCustomIcon(): List<Loan>
+
+    // فیکس bug.md/F6: جست‌وجوی وام با شناسهٔ عمومی (کلید تطبیق ادغام/بکاپ — NB-34)
+    @Query("SELECT * FROM loans WHERE publicId = :publicId LIMIT 1")
+    suspend fun getLoanByPublicId(publicId: String): Loan?
+
+    // فیکس bug.md/F6: رکوردهای مهاجرت‌خورده از نسخهٔ ۴ که هنوز شناسهٔ عمومی ندارند
+    @Query("SELECT * FROM loans WHERE publicId = ''")
+    suspend fun getLoansWithoutPublicId(): List<Loan>
 }

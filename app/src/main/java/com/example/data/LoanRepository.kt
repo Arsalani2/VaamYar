@@ -9,6 +9,7 @@ import com.example.model.UserProfile
 import com.example.util.AppPreferences
 import com.example.util.LoanIconHelper
 import com.example.util.PersianNameNormalizer
+import com.example.util.PublicId
 import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -235,6 +236,74 @@ class LoanRepository(
         userProfileDao.setPrimaryUser(userId)
     }
 
+    // ---------------------------------------------------------------- فیکس bug.md/F6 (شناسهٔ یکتای عمومی)
+
+    /**
+     * فیکس bug.md/F6: مولد شناسهٔ یکتا با چک برخورد در دیتابیس. فضای ۶۲^۶/۶۲^۷ نویسه
+     * برخورد را عملاً ناممکن می‌کند؛ چک دفاعی است و بعد از ۱۰ تلاش، آخرین کاندیدا
+     * برگردانده می‌شود (برخورد باقی‌مانده در ادغام NB-34 با منبع واحد مدیریت می‌شود).
+     */
+    private suspend fun uniqueLoanPublicId(): String {
+        var candidate = PublicId.newLoanId()
+        var tries = 0
+        while (loanDao.getLoanByPublicId(candidate) != null && tries < 10) {
+            candidate = PublicId.newLoanId()
+            tries++
+        }
+        return candidate
+    }
+
+    private suspend fun uniqueUserPublicId(): String {
+        var candidate = PublicId.newUserId()
+        var tries = 0
+        while (userProfileDao.getUserByPublicId(candidate) != null && tries < 10) {
+            candidate = PublicId.newUserId()
+            tries++
+        }
+        return candidate
+    }
+
+    private suspend fun uniqueSharePublicId(): String {
+        var candidate = PublicId.newShareId()
+        var tries = 0
+        while (debtorShareDao.getShareByPublicId(candidate) != null && tries < 10) {
+            candidate = PublicId.newShareId()
+            tries++
+        }
+        return candidate
+    }
+
+    /** پیوند سهم به کاربرِ صاحبش؛ فقط با کلید استاندارد نام (fallback بکاپ‌های قدیمی). */
+    private fun resolveOwnerPublicId(personName: String, users: List<UserProfile>): String =
+        users.firstOrNull { PersianNameNormalizer.namesMatch(it.name, personName) }
+            ?.publicId?.takeIf { it.isNotBlank() } ?: ""
+
+    /**
+     * فیکس bug.md/F6: تخصیص شناسهٔ عمومی به رکوردهای قدیمی/مهاجرت‌خورده (publicId خالی).
+     * idempotent است — اجرای دوباره هیچ رکوردی را تغییر نمی‌دهد — و در startup اپ
+     * (پس از rollover و seed) فراخوانی می‌شود. سهم‌ها هم ownerPublicId می‌گیرند
+     * (کاربر هم‌نامِ موجود) تا پیوند هویتی سهم↔کاربر برقرار شود.
+     */
+    suspend fun backfillMissingPublicIds() = withContext(Dispatchers.IO) {
+        userProfileDao.getUsersWithoutPublicId().forEach { user ->
+            userProfileDao.updateUser(user.copy(publicId = uniqueUserPublicId()))
+        }
+        loanDao.getLoansWithoutPublicId().forEach { loan ->
+            loanDao.updateLoan(loan.copy(publicId = uniqueLoanPublicId()))
+        }
+        val users = userProfileDao.getAllUsersOnce()
+        debtorShareDao.getSharesWithoutPublicId().forEach { share ->
+            debtorShareDao.updateShare(
+                share.copy(
+                    publicId = uniqueSharePublicId(),
+                    ownerPublicId = share.ownerPublicId.ifBlank {
+                        resolveOwnerPublicId(share.personName, users)
+                    }
+                )
+            )
+        }
+    }
+
     /**
      * فیکس bug.md/P1-7:
      * درج/ویرایش کاربرِ دارای پرچمِ مبنا (مسیر completeOnboarding و ویرایش کاربر مبنا)
@@ -254,30 +323,52 @@ class LoanRepository(
                 userProfileDao.clearPrimaryFlags()
             }
             if (canonicalUser.id == 0L) {
-                userProfileDao.insertUser(canonicalUser)
+                // فیکس bug.md/F6: کاربر جدید همیشه شناسهٔ عمومی می‌گیرد
+                userProfileDao.insertUser(
+                    if (canonicalUser.publicId.isBlank()) {
+                        canonicalUser.copy(publicId = uniqueUserPublicId())
+                    } else {
+                        canonicalUser
+                    }
+                )
             } else {
                 val existing = userProfileDao.getUserById(canonicalUser.id)
                 if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
                     // Synchronize name change in all debtor shares!
-                    syncPersonNameInShares(existing.name, canonicalUser.name)
+                    syncPersonNameInShares(existing, canonicalUser.name)
                 }
-                userProfileDao.updateUser(canonicalUser)
+                userProfileDao.updateUser(
+                    // فیکس bug.md/F6: شناسهٔ عمومیِ رکورد موجود هرگز از بیرون بازنویسی
+                    // نمی‌شود؛ ورودی بدون شناسه (UI قدیمی) شناسهٔ موجود را نگه می‌دارد.
+                    if (canonicalUser.publicId.isBlank() && existing?.publicId?.isNotBlank() == true) {
+                        canonicalUser.copy(publicId = existing.publicId)
+                    } else {
+                        canonicalUser
+                    }
+                )
             }
         }
     }
 
     /**
-     * فیکس bug.md/P3-1: هم‌گام‌سازی تغییر نامِ شخص در سهم‌های شرکا قبلاً یک UPDATE با
-     * تطبیق خامِ رشته‌ای در SQL بود (renamePersonInShares)؛ نام قدیمی با ي/ك عربی،
-     * فاصله‌های اضافه یا نیم‌فاصله هرگز مچ نمی‌شد و سهم‌های آن شخص بی‌صدا از صاحبشان
-     * جدا می‌ماندند. اکنون تطبیق با کلید استاندارد نام (PersianNameNormalizer) انجام
-     * می‌شود و نام جدید هم در همان شکل استاندارد نوشته می‌شود. باید درون تراکنشِ
-     * فراخواننده صدا زده شود.
+     * فیکس bug.md/P3-1 و ریشه‌حل NB-21 با F6: هم‌گام‌سازی تغییر نام کاربر در سهم‌های
+     * شرکا. پیوند هویتی اول با ownerPublicId مچ می‌شود (دقیق و شکست‌ناپذیر)؛ سهم‌های
+     * قدیمیِ بدون پیوند هنوز با کلید استاندارد نام مچ می‌شوند و همین یک‌بار
+     * ownerPublicId می‌گیرند تا از این پس هویتی باشند. باید درون تراکنش فراخواننده صدا شود.
      */
-    private suspend fun syncPersonNameInShares(oldName: String, canonicalNewName: String) {
+    private suspend fun syncPersonNameInShares(existing: UserProfile, canonicalNewName: String) {
+        val ownerPublicId = existing.publicId
         debtorShareDao.getAllSharesOnce().forEach { share ->
-            if (PersianNameNormalizer.namesMatch(share.personName, oldName)) {
-                debtorShareDao.updateShare(share.copy(personName = canonicalNewName))
+            val linkedById = ownerPublicId.isNotBlank() && share.ownerPublicId == ownerPublicId
+            val legacyNameMatch = share.ownerPublicId.isBlank() &&
+                PersianNameNormalizer.namesMatch(share.personName, existing.name)
+            if (linkedById || legacyNameMatch) {
+                debtorShareDao.updateShare(
+                    share.copy(
+                        personName = canonicalNewName,
+                        ownerPublicId = share.ownerPublicId.ifBlank { ownerPublicId }
+                    )
+                )
             }
         }
     }
@@ -286,17 +377,22 @@ class LoanRepository(
      * Checks if a user is safely deletable.
      * If user is partner in any loans, deletion is blocked and loan titles are returned.
      *
-     * فیکس bug.md/P3-1: تطبیقِ «این کاربر شریکِ کدام وام‌هاست» قبلاً تطبیق خامِ رشته‌ای
-     * بود؛ نام با ي/ك عربی یا فاصلهٔ اضافه مچ نمی‌شد و حذفِ کاربری که هنوز سهم دارد
-     * مجاز می‌شد (سهم یتیم می‌ماند). اکنون تطبیق با کلید استاندارد نام انجام می‌شود.
+     * فیکس bug.md/P3-1 و ریشه‌حل NB-20 با F6: پیوند «این کاربر شریکِ کدام وام‌هاست»
+     * اول با ownerPublicId مچ می‌شود (هویتی و دقیق)؛ سهم‌های قدیمیِ بدون پیوند با
+     * کلید استاندارد نام fallback می‌شوند تا هیچ سهمی بی‌صدا یتیم نماند.
      */
     suspend fun checkCanDeleteUser(userId: Long): UserDeleteCheckResult = withContext(Dispatchers.IO) {
         val user = userProfileDao.getUserById(userId) ?: return@withContext UserDeleteCheckResult(canDelete = true)
         val shares = debtorShareDao.getAllSharesOnce()
-            .filter { PersianNameNormalizer.namesMatch(it.personName, user.name) }
-        if (shares.isNotEmpty()) {
-            val loanTitles = shares.map { it.loanTitle }.distinct()
-            UserDeleteCheckResult(canDelete = false, blockingLoanTitles = loanTitles)
+        val blocking = shares.filter { share ->
+            if (user.publicId.isNotBlank() && share.ownerPublicId.isNotBlank()) {
+                share.ownerPublicId == user.publicId
+            } else {
+                PersianNameNormalizer.namesMatch(share.personName, user.name)
+            }
+        }
+        if (blocking.isNotEmpty()) {
+            UserDeleteCheckResult(canDelete = false, blockingLoanTitles = blocking.map { it.loanTitle }.distinct())
         } else {
             UserDeleteCheckResult(canDelete = true)
         }
@@ -331,54 +427,84 @@ class LoanRepository(
                 paidMonths = safePaidMonths,
                 isCurrentMonthPaid = if (settled) true else loan.isCurrentMonthPaid
             )
-            if (safeLoan.id == 0L) {
-                // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند درج می‌شوند
-                val newLoanId = loanDao.insertLoan(safeLoan)
+            // فیکس bug.md/F6: شناسهٔ عمومی وام — رکورد جدید شناسهٔ تازه می‌گیرد؛
+            // رکورد موجود همیشه شناسهٔ قبلی‌اش را نگه می‌دارد (هویت با edit عوض نمی‌شود).
+            val existingLoanForId = if (safeLoan.id == 0L) null else loanDao.getLoanByIdOnce(safeLoan.id)
+            val loanWithId = when {
+                safeLoan.publicId.isNotBlank() -> safeLoan
+                existingLoanForId?.publicId?.isNotBlank() == true -> safeLoan.copy(publicId = existingLoanForId.publicId)
+                else -> safeLoan.copy(publicId = uniqueLoanPublicId())
+            }
+            val usersForOwners = userProfileDao.getAllUsersOnce()
+            if (loanWithId.id == 0L) {
+                // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند شناسه و پیوند مالک می‌گیرند
+                val newLoanId = loanDao.insertLoan(loanWithId)
                 shares.forEach { share ->
                     debtorShareDao.insertShare(
                         share.copy(
                             // فیکس bug.md/P3-1: نام شریک در شکل استاندارد ذخیره می‌شود
                             personName = PersianNameNormalizer.canonicalName(share.personName),
+                            // فیکس bug.md/F6: شناسهٔ سهم + پیوند به publicId کاربرِ صاحبش
+                            publicId = share.publicId.ifBlank { uniqueSharePublicId() },
+                            ownerPublicId = share.ownerPublicId.ifBlank {
+                                resolveOwnerPublicId(share.personName, usersForOwners)
+                            },
                             loanId = newLoanId,
-                            loanTitle = safeLoan.title,
-                            dueDay = safeLoan.dueDay
+                            loanTitle = loanWithId.title,
+                            dueDay = loanWithId.dueDay
                         )
                     )
                 }
                 newLoanId
             } else {
-                loanDao.updateLoan(safeLoan)
+                loanDao.updateLoan(loanWithId)
                 // رکوردهای تاریخچه با شماره‌ی بالاتر از کل اقساط (باقی‌مانده از داده‌ی قدیمی
                 // یا کاهشِ مدت وام) معنایی ندارند و حذف می‌شوند تا تاریخچه با وام سازگار بماند.
-                paymentRecordDao.deleteRecordsAboveInstallment(safeLoan.id, safeTotalMonths)
-                // فیکس bug.md/P3-1: بازگرداندن وضعیت پرداخت شرکای پابرجا حالا با کلید
-                // استاندارد نام مچ می‌شود (ي/ك عربی، فاصله/نیم‌فاصله) و نامِ شخص هم در
-                // شکل استاندارد ذخیره می‌شود.
-                val existingByName = debtorShareDao
-                    .getSharesForLoanOnce(safeLoan.id)
+                paymentRecordDao.deleteRecordsAboveInstallment(loanWithId.id, loanWithId.totalMonths)
+                // فیکس bug.md/F6: تطبیق شرکای پابرجا اول با publicId است (هویتی) و برای
+                // سهم‌های بدون شناسه با کلید استاندارد نام (P3-1)؛ در هر دو حالت شناسهٔ
+                // سهمِ قدیمی حفظ می‌شود تا edit هرگز هویت را نبُرد.
+                val existingShares = debtorShareDao.getSharesForLoanOnce(loanWithId.id)
+                val existingByPublicId = existingShares
+                    .filter { it.publicId.isNotBlank() }
+                    .associateBy { it.publicId }
+                val existingByName = existingShares
                     .associateBy { PersianNameNormalizer.matchKey(it.personName) }
-                debtorShareDao.deleteSharesForLoan(safeLoan.id)
+                debtorShareDao.deleteSharesForLoan(loanWithId.id)
 
                 shares.forEach { newShare ->
-                    val matched = existingByName[PersianNameNormalizer.matchKey(newShare.personName)]
+                    val matched = if (newShare.publicId.isNotBlank()) {
+                        existingByPublicId[newShare.publicId]
+                    } else {
+                        existingByName[PersianNameNormalizer.matchKey(newShare.personName)]
+                    }
                     val toInsert = if (matched != null) {
                         newShare.copy(
+                            publicId = matched.publicId.ifBlank { uniqueSharePublicId() },
+                            ownerPublicId = matched.ownerPublicId.ifBlank {
+                                resolveOwnerPublicId(newShare.personName, usersForOwners)
+                            },
                             isPaidForCurrentMonth = matched.isPaidForCurrentMonth,
                             lastPaidMonthName = matched.lastPaidMonthName
                         )
                     } else {
-                        newShare
+                        newShare.copy(
+                            publicId = uniqueSharePublicId(),
+                            ownerPublicId = newShare.ownerPublicId.ifBlank {
+                                resolveOwnerPublicId(newShare.personName, usersForOwners)
+                            }
+                        )
                     }
                     debtorShareDao.insertShare(
                         toInsert.copy(
                             personName = PersianNameNormalizer.canonicalName(toInsert.personName),
-                            loanId = safeLoan.id,
-                            loanTitle = safeLoan.title,
-                            dueDay = safeLoan.dueDay
+                            loanId = loanWithId.id,
+                            loanTitle = loanWithId.title,
+                            dueDay = loanWithId.dueDay
                         )
                     )
                 }
-                safeLoan.id
+                loanWithId.id
             }
         }
     }

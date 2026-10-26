@@ -50,4 +50,11 @@ interface DebtorShareDao {
 
     @Query("DELETE FROM debtor_shares")
     suspend fun clearAllShares()
+
+    // فیکس bug.md/F6: جست‌وجوی سهم با شناسهٔ عمومی + سهم‌های مهاجرت‌خوردهٔ بدون شناسه
+    @Query("SELECT * FROM debtor_shares WHERE publicId = :publicId LIMIT 1")
+    suspend fun getShareByPublicId(publicId: String): DebtorShare?
+
+    @Query("SELECT * FROM debtor_shares WHERE publicId = ''")
+    suspend fun getSharesWithoutPublicId(): List<DebtorShare>
 }

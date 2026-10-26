@@ -42,10 +42,13 @@ class VamyarApp : Application() {
 
         // فیکس bug.md/P1-6 و NB-10: رِسِت خودکار پرچم‌های «پرداخت ماه جاری»
         // و seed اولیه داخل runCatching تا هیچ خطایی مانع بالا آمدن UI اپ نشود.
+        // فیکس bug.md/F6: پس از seed، شناسه‌های عمومی به رکوردهای مهاجرت‌خورده/تازه
+        // تخصیص می‌یابند (idempotent — اجرای دوباره بی‌اثر است).
         appScope.launch {
             runCatching {
                 MonthlyRolloverHelper.rolloverIfNeeded(this@VamyarApp)
                 repository.checkAndSeedInitialData()
+                repository.backfillMissingPublicIds()
             }.onFailure { e ->
                 Log.e("VamyarApp", "Startup initialization failed", e)
             }

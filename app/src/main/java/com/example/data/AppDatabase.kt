@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Loan::class, DebtorShare::class, PaymentRecord::class, UserProfile::class],
-    version = 4, // فیکس bug.md/P3-5: حذف ستون phoneNumber از user_profiles
+    version = 5, // فیکس bug.md/F6: ستون‌های publicId (+ownerPublicId سهم‌ها) در سه جدول
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -60,6 +60,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // فیکس bug.md/F6: ستون‌های شناسهٔ یکتای عمومی به سه جدول اضافه می‌شوند.
+        // مقدار پیش‌فرض خالی یعنی «تخصیص‌نیافته»؛ شناسه‌های واقعی در اولین اجرای اپ
+        // توسط LoanRepository.backfillMissingPublicIds تولید و ذخیره می‌شوند (چون در
+        // SQL مهاجرت نمی‌توان مولدِ تصادفیِ تست‌پذیر نوشت و منطق باید یک‌جا باشد).
+        // ایندکس‌ها برای جست‌وجوی سریع با publicId (کلید ادغام آیندهٔ NB-34).
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE loans ADD COLUMN publicId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE debtor_shares ADD COLUMN publicId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE debtor_shares ADD COLUMN ownerPublicId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE user_profiles ADD COLUMN publicId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_loans_publicId` ON `loans` (`publicId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_debtor_shares_publicId` ON `debtor_shares` (`publicId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_debtor_shares_ownerPublicId` ON `debtor_shares` (`ownerPublicId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_user_profiles_publicId` ON `user_profiles` (`publicId`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -67,7 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vamyar_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     // فیکس bug.md/P1-1: fallbackToDestructiveMigration(dropAllTables = true) حذف شد.
                     // هر تغییر اسکیمای آینده بدون Migration واقعی، دیگر داده‌های مالی کاربر را
                     // بی‌سروصدا پاک نمی‌کند؛ بلکه Room خطای IllegalStateException می‌دهد تا در زمان

@@ -1,13 +1,17 @@
 package com.example.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.util.ShamsiDateHelper
 
-@Entity(tableName = "loans")
+@Entity(tableName = "loans", indices = [Index("publicId")])
 data class Loan(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    // فیکس bug.md/F6: شناسهٔ یکتای عمومی — هویت وام در منطق کد با این مدیریت می‌شود،
+    // نه با عنوان (نام فقط نمایشی است). خالی = هنوز تخصیص نیافته (backfill/درج تخصیص می‌دهد).
+    val publicId: String = "",
     val title: String,
     val dueDay: Int,
     val monthlyAmount: Long,

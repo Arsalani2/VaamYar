@@ -47,4 +47,15 @@ interface UserProfileDao {
 
     @Query("DELETE FROM user_profiles")
     suspend fun clearAllUsers()
+
+    // فیکس bug.md/F6: جست‌وجوی کاربر با شناسهٔ عمومی + خواندن یک‌بارهٔ همهٔ کاربران
+    // (برای backfill و پیوند ownerPublicId سهم‌ها)
+    @Query("SELECT * FROM user_profiles WHERE publicId = :publicId LIMIT 1")
+    suspend fun getUserByPublicId(publicId: String): UserProfile?
+
+    @Query("SELECT * FROM user_profiles WHERE publicId = ''")
+    suspend fun getUsersWithoutPublicId(): List<UserProfile>
+
+    @Query("SELECT * FROM user_profiles ORDER BY isPrimary DESC, id ASC")
+    suspend fun getAllUsersOnce(): List<UserProfile>
 }

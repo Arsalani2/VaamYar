@@ -8,9 +8,11 @@ import com.example.util.BackupHelper
 import com.example.util.BackupPreferences
 import com.example.util.InputLimits
 import com.example.util.NumberFormatter
+import com.example.util.PublicId
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -196,6 +198,36 @@ class PureLogicUnitTest {
         val longTitle = "عنوان وام بسیار طولانی".repeat(10)
         assertTrue(longTitle.trim().length > InputLimits.MAX_TITLE_LENGTH)
         assertNotNull(InputLimits.validateTitle(longTitle))
+    }
+
+    // ---------------------------------------------------------------- PublicId (F6)
+
+    @Test
+    fun publicId_formatPrefixLengthAndUniqueness() {
+        val loans = (1..500).map { PublicId.newLoanId() }
+        val users = (1..500).map { PublicId.newUserId() }
+        val shares = (1..500).map { PublicId.newShareId() }
+
+        // قالب: وام L- + ۷ نویسه؛ کاربر U- + ۶؛ سهم S- + ۶
+        loans.forEach { assertTrue(PublicId.isValidLoanId(it)) }
+        users.forEach { assertTrue(PublicId.isValidUserId(it)) }
+        shares.forEach { assertTrue(PublicId.isValidShareId(it)) }
+        assertTrue(loans.all { it.startsWith("L-") && it.length == 9 })
+        assertTrue(users.all { it.startsWith("U-") && it.length == 8 })
+        assertTrue(shares.all { it.startsWith("S-") && it.length == 8 })
+
+        // یکتایی در حجم زیاد (فضای ۶۲^۶/۶۲^۷)
+        assertEquals(500, loans.toSet().size)
+        assertEquals(500, users.toSet().size)
+        assertEquals(500, shares.toSet().size)
+
+        // شناسهٔ خاموشکل/جعلی معتبر نیست (در restore شناسهٔ تازه می‌گیرد)
+        assertFalse(PublicId.isValidLoanId(""))
+        assertFalse(PublicId.isValidLoanId("L-abc"))
+        assertFalse(PublicId.isValidLoanId("L-abcdefg"))
+        assertFalse(PublicId.isValidLoanId("X-abcdefg"))
+        assertFalse(PublicId.isValidUserId("U-abcdefg"))
+        assertFalse(PublicId.isValidShareId("S-abcde"))
     }
 
     // ---------------------------------------------------------------- BackupHelper Validation (NB-4)
