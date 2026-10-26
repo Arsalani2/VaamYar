@@ -31,6 +31,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.data.UserDeleteCheckResult
 import com.example.model.UserProfile
+import com.example.ui.ImportMode
+import com.example.ui.ImportPreview
 import com.example.ui.dialogs.AddEditUserDialog
 import com.example.ui.dialogs.ShamsiDatePickerDialog
 import com.example.ui.theme.AppThemeMode
@@ -65,7 +67,11 @@ fun SettingsScreen(
     onClearAllLoans: () -> Unit,
     onTestNotification: () -> Unit,
     onExportBackup: () -> String = { "" },
-    onImportBackup: suspend (String) -> Result<String> = { Result.success("") },
+    // فیکس bug.md/NB-34+NB-29: قبل از اجرای ایمپورت، پیش‌نمایش (شمارش‌ها + فهرست
+    // جدید/تکراری) به کاربر نشان داده می‌شود؛ خودِ ایمپورت فقط پس از انتخاب
+    // صریح حالت (جایگزینی کامل / ادغام) و تأیید اجرا می‌شود.
+    onPreviewImport: suspend (String) -> Result<ImportPreview> = { Result.failure(IllegalStateException("پیش‌نمایش پشتیبانی نمی‌شود")) },
+    onImportBackup: suspend (String, ImportMode) -> Result<String> = { _, _ -> Result.success("") },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -76,6 +82,13 @@ fun SettingsScreen(
 
     var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    // فیکس bug.md/NB-34+NB-29: وضعیت پیش‌نمایش ایمپورت — فایل انتخاب‌شده + دادهٔ
+    // پیش‌نمایش؛ تا وقتی این null نیست دیالوگِ تأیید/انتخاب حالت باز است و هیچ
+    // تغییری در داده رخ نداده است (لغو در هر مرحله بدون تغییر).
+    var pendingImport by remember { mutableStateOf<Pair<String, ImportPreview>?>(null) }
+    var selectedImportMode by remember { mutableStateOf(ImportMode.REPLACE_ALL) }
+    var importInProgress by remember { mutableStateOf(false) }
 
     // Safe Deletion state
     val coroutineScope = rememberCoroutineScope()
@@ -103,6 +116,8 @@ fun SettingsScreen(
         }
     }
 
+    // فیکس bug.md/NB-34+NB-29: انتخاب فایل فقط «پیش‌نمایش» می‌سازد؛ خودِ ایمپورت
+    // در دیالوگ تأیید (پایین همین فایل) پس از انتخاب صریح حالت اجرا می‌شود.
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -116,11 +131,13 @@ fun SettingsScreen(
                     }
 
                     if (jsonString.isNotBlank()) {
-                        val result = onImportBackup(jsonString)
-                        if (result.isSuccess) {
-                            Toast.makeText(context, result.getOrNull() ?: "بازیابی با موفقیت انجام شد", Toast.LENGTH_LONG).show()
+                        val previewResult = onPreviewImport(jsonString)
+                        val preview = previewResult.getOrNull()
+                        if (previewResult.isSuccess && preview != null) {
+                            selectedImportMode = ImportMode.REPLACE_ALL
+                            pendingImport = jsonString to preview
                         } else {
-                            Toast.makeText(context, "خطا در بازیابی پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "خطا در خواندن پشتیبان: ${previewResult.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                         }
                     }
                 } catch (e: Exception) {
@@ -842,6 +859,110 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearLoansConfirmDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // فیکس bug.md/NB-34+NB-29: دیالوگ پیش‌نمایش + انتخاب حالت ایمپورت —
+    // پیش از تأییدِ صریح کاربر هیچ تغییری در داده انجام نمی‌شود.
+    pendingImport?.let { (importJson, preview) ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!importInProgress) pendingImport = null
+            },
+            title = { Text("پیش‌نمایش ایمپورت پشتیبان") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("تاریخ فایل: ${preview.exportedDate}")
+                    Text("کاربران: ${preview.userCount}  |  وام‌ها: ${preview.loanCount}  |  سهم‌ها: ${preview.shareCount}")
+                    Text("سوابق پرداخت: ${preview.recordCount}  |  اقساط: ${preview.installmentCount}  |  آیکون‌ها: ${preview.iconCount}")
+
+                    if (preview.newUsers.isNotEmpty()) {
+                        Text("کاربران جدید:", fontWeight = FontWeight.Bold)
+                        Text(preview.newUsers.joinToString("، "), fontSize = 12.sp)
+                    }
+                    if (preview.existingUsers.isNotEmpty()) {
+                        Text("کاربران تکراری (موجود):", fontWeight = FontWeight.Bold)
+                        Text(preview.existingUsers.joinToString("، "), fontSize = 12.sp)
+                    }
+                    if (preview.newLoans.isNotEmpty()) {
+                        Text("وام‌های جدید:", fontWeight = FontWeight.Bold)
+                        Text(preview.newLoans.joinToString("، "), fontSize = 12.sp)
+                    }
+                    if (preview.existingLoans.isNotEmpty()) {
+                        Text("وام‌های تکراری (موجود):", fontWeight = FontWeight.Bold)
+                        Text(preview.existingLoans.joinToString("، "), fontSize = 12.sp)
+                    }
+                    if (preview.newShareCount > 0) {
+                        Text("سهم‌های شراکت جدید: ${preview.newShareCount}")
+                    }
+
+                    if (preview.legacyMatch) {
+                        Text(
+                            "⚠️ برخی موارد تکراری با «کلید جایگزین» (نام کانونی / عنوان+مبلغ+ماه شروع) شناخته شده‌اند نه با شناسهٔ یکتای بکاپ؛ در ادغام، این موارد به‌جای درج دوباره به‌روزرسانی/رد می‌شوند.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    HorizontalDivider()
+                    Text("حالت ایمپورت را انتخاب کنید:", fontWeight = FontWeight.Bold)
+                    ImportMode.entries.forEach { mode ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !importInProgress) { selectedImportMode = mode }
+                        ) {
+                            RadioButton(
+                                selected = selectedImportMode == mode,
+                                onClick = null,
+                                enabled = !importInProgress
+                            )
+                            Text(mode.titleFa, fontSize = 13.sp)
+                        }
+                    }
+                    if (selectedImportMode == ImportMode.REPLACE_ALL) {
+                        Text(
+                            "⚠️ جایگزینی کامل، تمام داده‌های فعلی را پاک می‌کند.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = !importInProgress,
+                    onClick = {
+                        importInProgress = true
+                        coroutineScope.launch {
+                            val result = onImportBackup(importJson, selectedImportMode)
+                            importInProgress = false
+                            if (result.isSuccess) {
+                                Toast.makeText(context, result.getOrNull() ?: "ایمپورت با موفقیت انجام شد", Toast.LENGTH_LONG).show()
+                                pendingImport = null
+                            } else {
+                                Toast.makeText(context, "خطا در ایمپورت پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = if (selectedImportMode == ImportMode.REPLACE_ALL) {
+                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    }
+                ) {
+                    Text("شروع ایمپورت")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !importInProgress,
+                    onClick = { pendingImport = null }
+                ) {
                     Text("انصراف")
                 }
             }

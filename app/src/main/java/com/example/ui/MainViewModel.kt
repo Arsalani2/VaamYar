@@ -9,6 +9,9 @@ import com.example.BuildConfig
 import com.example.VamyarApp
 import com.example.data.CurrentMonthPayOutcome
 import com.example.data.UserDeleteCheckResult
+import com.example.data.matchExistingLoan
+import com.example.data.matchExistingShare
+import com.example.data.matchExistingUser
 import com.example.model.DebtorShare
 import com.example.model.Loan
 import com.example.model.LoanInstallment
@@ -79,6 +82,36 @@ enum class TipType {
 data class ArrearsPrompt(
     val loan: Loan,
     val arrearsMonths: List<com.example.data.ArrearsMonth>
+)
+
+/**
+ * فیکس bug.md/NB-34: حالت اجرای ایمپورت — «جایگزینی کامل» (رفتار قبلی) یا «ادغام»
+ * با دو استراتژی برای موارد تکراری (به‌روزرسانی یا رد).
+ */
+enum class ImportMode(val titleFa: String) {
+    REPLACE_ALL("جایگزینی کامل"),
+    MERGE_UPDATE_DUPLICATES("ادغام — به‌روزرسانی موارد تکراری"),
+    MERGE_SKIP_DUPLICATES("ادغام — رد کردن موارد تکراری")
+}
+
+/**
+ * فیکس bug.md/NB-34+NB-29: پیش‌نمایش ایمپورت — قبل از هر تغییری به کاربر نشان داده
+ * می‌شود: شمارش‌های بکاپ + فهرست موارد جدید در برابر موجود (با همان کلید تطبیق merge).
+ */
+data class ImportPreview(
+    val userCount: Int,
+    val loanCount: Int,
+    val shareCount: Int,
+    val recordCount: Int,
+    val installmentCount: Int,
+    val iconCount: Int,
+    val newUsers: List<String>,
+    val existingUsers: List<String>,
+    val newLoans: List<String>,
+    val existingLoans: List<String>,
+    val newShareCount: Int,
+    val exportedDate: String,
+    val legacyMatch: Boolean
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -566,7 +599,82 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    suspend fun importBackupJson(jsonString: String): Result<String> {
+    /**
+     * فیکس bug.md/NB-34+NB-29: پیش‌نمایش ایمپورت بدون هیچ تغییری در داده — فایل فقط
+     * پارس و با دادهٔ فعلی مقایسه می‌شود (همان کلید تطبیق merge: publicId با fallback
+     * نام کانونی/عنوان+مبلغ+ماه شروع) تا UI بتواند «موارد جدید» و «تکراری‌ها» را قبل
+     * از اجرا نشان دهد و کاربر صریحاً حالت را انتخاب و تأیید کند.
+     */
+    suspend fun prepareImportPreview(jsonString: String): Result<ImportPreview> {
+        return try {
+            val parseResult = com.example.util.BackupHelper.parseAndValidateBackup(jsonString)
+            if (parseResult.isFailure) {
+                return Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
+            }
+            val data = parseResult.getOrThrow()
+
+            val curUsers = allUsers.value
+            val curLoans = allLoans.value
+            val curShares = allShares.value
+
+            var legacyMatch = false
+            val newUsers = mutableListOf<String>()
+            val existingUsers = mutableListOf<String>()
+            for (u in data.users) {
+                val matched = matchExistingUser(u, curUsers)
+                if (matched == null) {
+                    newUsers.add(u.name)
+                } else {
+                    existingUsers.add(u.name)
+                    // تطبیق با کلید fallback (نه publicId) → کاربر باید بداند
+                    if (!(com.example.util.PublicId.isValidUserId(u.publicId) && matched.publicId == u.publicId)) {
+                        legacyMatch = true
+                    }
+                }
+            }
+            val newLoans = mutableListOf<String>()
+            val existingLoans = mutableListOf<String>()
+            for (l in data.loans) {
+                val matched = matchExistingLoan(l, curLoans)
+                if (matched == null) {
+                    newLoans.add(l.title)
+                } else {
+                    existingLoans.add(l.title)
+                    if (!(com.example.util.PublicId.isValidLoanId(l.publicId) && matched.publicId == l.publicId)) {
+                        legacyMatch = true
+                    }
+                }
+            }
+            // سهم‌ها فقط شمارش می‌شوند (فهرست‌شان در دیالوگ طولانی می‌شود)
+            val newShareCount = data.shares.count { s ->
+                val matchedLoan = matchExistingLoan(data.loans.firstOrNull { it.id == s.loanId } ?: return@count false, curLoans)
+                val localLoanId = matchedLoan?.id ?: -1L
+                matchExistingShare(s, curShares, localLoanId) == null
+            }
+
+            Result.success(
+                ImportPreview(
+                    userCount = data.users.size,
+                    loanCount = data.loans.size,
+                    shareCount = data.shares.size,
+                    recordCount = data.records.size,
+                    installmentCount = data.installments.size,
+                    iconCount = data.icons.size,
+                    newUsers = newUsers,
+                    existingUsers = existingUsers,
+                    newLoans = newLoans,
+                    existingLoans = existingLoans,
+                    newShareCount = newShareCount,
+                    exportedDate = data.exportedDate,
+                    legacyMatch = legacyMatch
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun importBackupJson(jsonString: String, mode: ImportMode = ImportMode.REPLACE_ALL): Result<String> {
         return try {
             val parseResult = com.example.util.BackupHelper.parseAndValidateBackup(jsonString)
             if (parseResult.isFailure) {
@@ -585,19 +693,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (savedPath != null) bi.loanId to savedPath else null
             }.toMap()
 
-            // Restore Database
+            // Restore Database — فیکس bug.md/NB-34: دو حالت ایمپورت:
+            // - REPLACE_ALL: رفتار قبلی (جایگزینی کامل + هشدار پیش‌نمایش NB-29)
+            // - MERGE_*: ادغام بدون پاک‌شدن دادهٔ فعلی (فقط موارد جدید درج؛
+            //   تکراری‌ها به‌روزرسانی یا رد) — idempotent برای ایمپورت دوبارِ همان فایل
             val restoreResult = runCatching {
-                repository.restoreDatabaseSnapshot(
-                    users = data.users,
-                    loans = data.loans,
-                    shares = data.shares,
-                    records = data.records,
-                    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
-                    // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
-                    installments = data.installments,
-                    // فیکس bug.md/NB-18: مسیرهای محلیِ تازهٔ آیکون‌های بازنویسی‌شده
-                    iconPaths = writtenIconPaths
-                )
+                if (mode == ImportMode.REPLACE_ALL) {
+                    repository.restoreDatabaseSnapshot(
+                        users = data.users,
+                        loans = data.loans,
+                        shares = data.shares,
+                        records = data.records,
+                        // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
+                        // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
+                        installments = data.installments,
+                        // فیکس bug.md/NB-18: مسیرهای محلیِ تازهٔ آیکون‌های بازنویسی‌شده
+                        iconPaths = writtenIconPaths
+                    )
+                } else {
+                    repository.mergeFromBackup(
+                        users = data.users,
+                        loans = data.loans,
+                        shares = data.shares,
+                        records = data.records,
+                        installments = data.installments,
+                        iconPaths = writtenIconPaths,
+                        updateDuplicates = mode == ImportMode.MERGE_UPDATE_DUPLICATES
+                    )
+                }
             }
             if (restoreResult.isFailure) {
                 writtenIconPaths.values.forEach { com.example.util.LoanIconHelper.deleteCustomIconFile(it) }
@@ -625,7 +748,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (_: Exception) {}
 
 
-            val summary = "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
+            // فیکس bug.md/NB-34: پیام موفقیت بر اساس حالتِ انتخابی کاربر —
+            // در ادغام، خلاصهٔ MergeSummary (جدید/به‌روزرسانی/رد) گزارش می‌شود
+            val summary = if (mode == ImportMode.REPLACE_ALL) {
+                "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
+            } else {
+                val ms = restoreResult.getOrNull() as? com.example.data.LoanRepository.MergeSummary
+                if (ms != null) {
+                    "ادغام انجام شد — کاربران: ${ms.newUsers} جدید، ${ms.updatedUsers} به‌روزرسانی، ${ms.skippedUsers} رد؛ وام‌ها: ${ms.newLoans} جدید، ${ms.updatedLoans} به‌روزرسانی، ${ms.skippedLoans} رد؛ سهم‌ها: ${ms.newShares} جدید، ${ms.updatedShares} به‌روزرسانی، ${ms.skippedShares} رد."
+                } else {
+                    "ادغام انجام شد."
+                }
+            }
             Result.success(summary)
         } catch (e: Exception) {
             Result.failure(e)

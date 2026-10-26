@@ -340,7 +340,10 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onClearAllLoans = { viewModel.clearAllLoansAndStartFresh() },
                         onTestNotification = { viewModel.sendTestNotification(context) },
                         onExportBackup = { viewModel.exportBackupJson() },
-                        onImportBackup = { viewModel.importBackupJson(it) }
+                        // فیکس bug.md/NB-34+NB-29: انتخاب فایل اول پیش‌نمایش می‌سازد؛
+                        // ایمپورت با حالت انتخابی کاربر در دیالوگ تأیید اجرا می‌شود.
+                        onPreviewImport = { json -> viewModel.prepareImportPreview(json) },
+                        onImportBackup = { json, mode -> viewModel.importBackupJson(json, mode) }
                     )
                 }
             }

@@ -330,6 +330,269 @@ class LoanRepository(
         staleIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
     }
 
+    // ---------------------------------------------------------------- فیکس bug.md/NB-34+NB-29 (ادغام ایمپورت)
+
+    /**
+     * فیکس bug.md/NB-34: کلید تطبیق کاربر در ادغام — اول publicId معتبر (F6)؛
+     * بکاپ قدیمی بدون شناسه → نام کانونی (PersianNameNormalizer: ي/ك عربی، فاصله‌ها).
+     * همان منطق در پیش‌نمایش (MainViewModel) و خودِ merge استفاده می‌شود تا هرگز واگرا نشود.
+     */
+    fun matchExistingUser(backupUser: UserProfile, existingUsers: List<UserProfile>): UserProfile? {
+        if (PublicId.isValidUserId(backupUser.publicId)) {
+            existingUsers.firstOrNull { it.publicId == backupUser.publicId }?.let { return it }
+        }
+        return existingUsers.firstOrNull { PersianNameNormalizer.namesMatch(it.name, backupUser.name) }
+    }
+
+    /**
+     * فیکس bug.md/NB-34: کلید تطبیق وام — اول publicId؛ fallback بکاپ قدیمی:
+     * عنوان + مبلغ ماهانه + سال/ماه شروع (تصمیم بازبینی ۴.۵).
+     */
+    fun matchExistingLoan(backupLoan: Loan, existingLoans: List<Loan>): Loan? {
+        if (PublicId.isValidLoanId(backupLoan.publicId)) {
+            existingLoans.firstOrNull { it.publicId == backupLoan.publicId }?.let { return it }
+        }
+        return existingLoans.firstOrNull {
+            it.title.trim() == backupLoan.title.trim() &&
+                it.monthlyAmount == backupLoan.monthlyAmount &&
+                it.startYear == backupLoan.startYear &&
+                it.startMonth == backupLoan.startMonth
+        }
+    }
+
+    /**
+     * فیکس bug.md/NB-34: کلید تطبیق سهم — اول publicId؛ fallback: همان وامِ محلی
+     * ([localLoanId] نگاشت‌شده) + نام کانونی شریک.
+     */
+    fun matchExistingShare(
+        backupShare: DebtorShare,
+        existingShares: List<DebtorShare>,
+        localLoanId: Long
+    ): DebtorShare? {
+        if (PublicId.isValidShareId(backupShare.publicId)) {
+            existingShares.firstOrNull { it.publicId == backupShare.publicId }?.let { return it }
+        }
+        return existingShares.firstOrNull {
+            it.loanId == localLoanId &&
+                PersianNameNormalizer.namesMatch(it.personName, backupShare.personName)
+        }
+    }
+
+    /**
+     * فیکس bug.md/NB-34: خلاصهٔ نتیجهٔ ادغام برای نمایش به کاربر.
+     */
+    data class MergeSummary(
+        val newUsers: Int, val updatedUsers: Int, val skippedUsers: Int,
+        val newLoans: Int, val updatedLoans: Int, val skippedLoans: Int,
+        val newShares: Int, val updatedShares: Int, val skippedShares: Int
+    ) {
+        val newTotal: Int get() = newUsers + newLoans + newShares
+        val updatedTotal: Int get() = updatedUsers + updatedLoans + updatedShares
+        val skippedTotal: Int get() = skippedUsers + skippedLoans + skippedShares
+    }
+
+    /**
+     * فیکس bug.md/NB-34 (+NB-29): حالت «ادغام» ایمپورت — برخلاف جایگزینی کامل، دادهٔ
+     * فعلی پاک نمی‌شود؛ فقط موارد جدید درج می‌شوند و موارد تکراری (با کلید publicId،
+     * یا fallback نام کانونی/عنوان+مبلغ+ماه شروع برای بکاپ‌های قدیمی) به انتخاب کاربر
+     * یا به‌روزرسانی می‌شوند یا دست‌نخورده رد می‌شوند ([updateDuplicates]).
+     *
+     * idempotent است (اینوارینت #۱۰): ایمپورت دوبارِ همان فایل هیچ وام/کاربر/شریک
+     * تکراری نمی‌سازد، چون درج فقط برای مواردِ بدون تطبیق اتفاق می‌افتد.
+     * کل عملیات داخل یک تراکنش اتمیک است؛ پرچم کاربر مبنا و شناسه‌های عمومیِ رکوردهای
+     * محلی در به‌روزرسانی حفظ می‌شوند.
+     */
+    suspend fun mergeFromBackup(
+        users: List<UserProfile>,
+        loans: List<Loan>,
+        shares: List<DebtorShare>,
+        records: List<PaymentRecord>,
+        installments: List<LoanInstallment> = emptyList(),
+        iconPaths: Map<Long, String> = emptyMap(),
+        updateDuplicates: Boolean
+    ): MergeSummary = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val existingUsers = userProfileDao.getAllUsersOnce()
+            val existingLoans = loanDao.getAllLoansOnce()
+            val existingShares = debtorShareDao.getAllSharesOnce()
+            val hasLocalPrimary = existingUsers.any { it.isPrimary }
+
+            var newUsers = 0; var updatedUsers = 0; var skippedUsers = 0
+            var newLoans = 0; var updatedLoans = 0; var skippedLoans = 0
+            var newShares = 0; var updatedShares = 0; var skippedShares = 0
+
+            // ۱) کاربران — پرچم مبنا و publicId رکورد محلیِ موجود همیشه حفظ می‌شود
+            for (u in users) {
+                val canonicalName = PersianNameNormalizer.canonicalName(u.name)
+                val matched = matchExistingUser(u, existingUsers)
+                if (matched != null) {
+                    if (updateDuplicates) {
+                        userProfileDao.updateUser(
+                            matched.copy(
+                                name = canonicalName,
+                                notes = u.notes,
+                                avatarColorHex = u.avatarColorHex
+                            )
+                        )
+                        updatedUsers++
+                    } else {
+                        skippedUsers++
+                    }
+                } else {
+                    userProfileDao.insertUser(
+                        u.copy(
+                            id = 0L,
+                            name = canonicalName,
+                            publicId = if (PublicId.isValidUserId(u.publicId)) u.publicId else uniqueUserPublicId(),
+                            // اگر دیتابیس خالی است پرچم مبنا حفظ می‌شود؛ وگرنه کاربر تازه مبنا نمی‌شود
+                            isPrimary = if (hasLocalPrimary) false else u.isPrimary
+                        )
+                    )
+                    newUsers++
+                }
+            }
+            // اینوارینت NB-4: بعد از merge دقیقاً یک کاربر مبنا وجود دارد
+            val mergedUsers = userProfileDao.getAllUsersOnce()
+            if (mergedUsers.isNotEmpty() && mergedUsers.none { it.isPrimary }) {
+                userProfileDao.setPrimaryUser(mergedUsers.first().id)
+            }
+
+            // ۲) وام‌ها — نگاشت id بکاپ → id محلی برای سهم/رکورد/قسط‌ها
+            val backupLoanIdToLocal = mutableMapOf<Long, Long>()
+            val updatedLoanBackupIds = mutableSetOf<Long>()
+            val newLoanBackupIds = mutableSetOf<Long>()
+            for (l in loans) {
+                val matched = matchExistingLoan(l, existingLoans)
+                if (matched != null) {
+                    backupLoanIdToLocal[l.id] = matched.id
+                    if (updateDuplicates) {
+                        loanDao.updateLoan(
+                            matched.copy(
+                                title = l.title,
+                                dueDay = l.dueDay,
+                                monthlyAmount = l.monthlyAmount,
+                                totalMonths = l.totalMonths,
+                                paidMonths = l.paidMonths.coerceIn(0, l.totalMonths),
+                                startYear = l.startYear,
+                                startMonth = l.startMonth,
+                                endYear = l.endYear,
+                                endMonth = l.endMonth,
+                                category = l.category,
+                                colorHex = l.colorHex,
+                                notes = l.notes,
+                                myShareAmount = l.myShareAmount,
+                                hasPartners = l.hasPartners,
+                                isArchived = l.isArchived,
+                                isCurrentMonthPaid = l.isCurrentMonthPaid,
+                                iconName = l.iconName,
+                                iconShape = l.iconShape,
+                                // فیکس bug.md/NB-18: اگر بکاپ آیکون embed داشت جایگزین می‌شود؛
+                                // وگرنه آیکون محلیِ فعلی حفظ می‌شود (ادغام آیکون را نمی‌بلعد)
+                                customIconPath = iconPaths[l.id] ?: matched.customIconPath
+                            )
+                        )
+                        updatedLoanBackupIds.add(l.id)
+                        updatedLoans++
+                    } else {
+                        skippedLoans++
+                    }
+                } else {
+                    val newId = loanDao.insertLoan(
+                        l.copy(
+                            id = 0L,
+                            publicId = if (PublicId.isValidLoanId(l.publicId)) l.publicId else uniqueLoanPublicId(),
+                            customIconPath = iconPaths[l.id]
+                        )
+                    )
+                    backupLoanIdToLocal[l.id] = newId
+                    newLoanBackupIds.add(l.id)
+                    newLoans++
+                }
+            }
+
+            // ۳) اقساط و رکوردهای هر وام — وامِ به‌روزرسانی‌شده: نسخهٔ بکاپ جایگزین می‌شود؛
+            // وامِ جدید: رکوردهای بکاپ (یا بازسازی ترتیبی از paidMonths برای بکاپ قدیمی)؛
+            // وامِ ردشده: کاملاً دست‌نخورده. بعد از آن شمارنده‌ها از رکوردهای واقعی sync می‌شوند.
+            val currentShamsi = ShamsiDateHelper.getEffectiveShamsiDate(appPreferences)
+            for (l in loans) {
+                val localId = backupLoanIdToLocal[l.id] ?: continue
+                val isUpdated = l.id in updatedLoanBackupIds
+                val isNew = l.id in newLoanBackupIds
+                if (!isUpdated && !isNew) continue // وامِ ردشده: اقساط/رکوردهایش دست نمی‌خورد
+                val loanInstallments = installments.filter { it.loanId == l.id }
+                if (isUpdated) {
+                    loanInstallmentDao.deleteInstallmentsForLoan(localId)
+                    paymentRecordDao.deleteRecordsForLoan(localId)
+                }
+                if (loanInstallments.isNotEmpty()) {
+                    loanInstallments.forEach {
+                        loanInstallmentDao.insertInstallment(it.copy(id = 0L, loanId = localId))
+                    }
+                } else {
+                    // بکاپ قدیمی بدون رکورد قسط → بازسازی ترتیبی از paidMonths بکاپ
+                    seedSequentialInstallmentRecords(
+                        loanId = localId,
+                        startYear = l.startYear,
+                        startMonth = l.startMonth,
+                        paidMonths = l.paidMonths.coerceIn(0, l.totalMonths),
+                        monthlyAmount = l.monthlyAmount
+                    )
+                }
+                records.filter { it.loanId == l.id }.forEach {
+                    paymentRecordDao.insertRecord(it.copy(id = 0L, loanId = localId))
+                }
+                loanDao.getLoanByIdOnce(localId)?.let { syncLoanCountersFromRecords(it, currentShamsi) }
+            }
+
+            // ۴) سهم‌ها — ownerPublicId بکاپِ قدیمی با resolveOwnerPublicId پیوند می‌خورد
+            val mergedUsersForShares = userProfileDao.getAllUsersOnce()
+            for (s in shares) {
+                val localLoanId = backupLoanIdToLocal[s.loanId] ?: run { skippedShares++; continue }
+                val canonicalName = PersianNameNormalizer.canonicalName(s.personName)
+                val matched = matchExistingShare(s, existingShares, localLoanId)
+                if (matched != null) {
+                    if (updateDuplicates) {
+                        debtorShareDao.updateShare(
+                            matched.copy(
+                                loanId = localLoanId,
+                                loanTitle = s.loanTitle,
+                                personName = canonicalName,
+                                shareAmount = s.shareAmount,
+                                dueDay = s.dueDay,
+                                isPaidForCurrentMonth = s.isPaidForCurrentMonth,
+                                lastPaidMonthName = s.lastPaidMonthName,
+                                shareDescription = s.shareDescription,
+                                ownerPublicId = s.ownerPublicId.takeIf { it.isNotBlank() }
+                                    ?: resolveOwnerPublicId(canonicalName, mergedUsersForShares)
+                            )
+                        )
+                        updatedShares++
+                    } else {
+                        skippedShares++
+                    }
+                } else {
+                    debtorShareDao.insertShare(
+                        s.copy(
+                            id = 0L,
+                            loanId = localLoanId,
+                            personName = canonicalName,
+                            publicId = if (PublicId.isValidShareId(s.publicId)) s.publicId else uniqueSharePublicId(),
+                            ownerPublicId = s.ownerPublicId.takeIf { it.isNotBlank() }
+                                ?: resolveOwnerPublicId(canonicalName, mergedUsersForShares)
+                        )
+                    )
+                    newShares++
+                }
+            }
+
+            MergeSummary(
+                newUsers = newUsers, updatedUsers = updatedUsers, skippedUsers = skippedUsers,
+                newLoans = newLoans, updatedLoans = updatedLoans, skippedLoans = skippedLoans,
+                newShares = newShares, updatedShares = updatedShares, skippedShares = skippedShares
+            )
+        }
+    }
+
     // User Management Methods
     suspend fun setPrimaryUser(userId: Long) = withContext(Dispatchers.IO) {
         userProfileDao.setPrimaryUser(userId)

@@ -12,6 +12,11 @@ interface LoanDao {
     @Query("SELECT * FROM loans ORDER BY dueDay ASC")
     fun getAllLoans(): Flow<List<Loan>>
 
+    // فیکس bug.md/NB-34: خواندن یک‌بارهٔ همهٔ وام‌ها برای تطبیق ادغام ایمپورت
+    // (پیش‌نمایش و merge داخل تراکنش، بدون Flow)
+    @Query("SELECT * FROM loans ORDER BY dueDay ASC")
+    suspend fun getAllLoansOnce(): List<Loan>
+
     @Query("SELECT * FROM loans WHERE id = :id")
     fun getLoanById(id: Long): Flow<Loan?>
 

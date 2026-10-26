@@ -28,6 +28,9 @@ interface PaymentRecordDao {
     @Query("DELETE FROM payment_records WHERE loanId = :loanId AND installmentNumber > :maxInstallment")
     suspend fun deleteRecordsAboveInstallment(loanId: Long, maxInstallment: Int)
 
+    @Query("DELETE FROM payment_records WHERE loanId = :loanId")
+    suspend fun deleteRecordsForLoan(loanId: Long)
+
     @Query("DELETE FROM payment_records")
     suspend fun clearAllRecords()
 }

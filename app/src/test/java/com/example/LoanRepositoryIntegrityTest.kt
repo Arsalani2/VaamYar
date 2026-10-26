@@ -8,6 +8,7 @@ import com.example.data.CurrentMonthPayOutcome
 import com.example.data.LoanRepository
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.util.AppPreferences
@@ -528,5 +529,133 @@ class LoanRepositoryIntegrityTest {
 
         // سهم قدیمی بدون ownerPublicId به کاربر هم‌نامِ همین مجموعه پیوند خورده است
         assertEquals("سهم قدیمی باید به کاربر هم‌نام پیوند بخورد", mehdiUser.publicId, legacyShareRow.ownerPublicId)
+    }
+
+    // ---------------------------------------------------------------- NB-34+NB-29 (ادغام ایمپورت)
+
+    /**
+     * فیکس bug.md/NB-34 (+NB-29): حالت «ادغام» ایمپورت —
+     *  ۱) اولین merge: موارد جدید درج می‌شوند؛ کاربر «علي» عربی‌نویس با کلید نامِ
+     *     کانونی به همان «علی» مچ می‌شود و کاربر تکراری ساخته نمی‌شود؛
+     *  ۲) merge دومِ همان فایل: idempotent — هیچ مورد جدیدی ساخته نمی‌شود؛
+     *  ۳) merge نسخهٔ قدیمی (بدون publicId): همه با کلید fallback تطبیق می‌شوند؛
+     *  ۴) merge با update=false: موارد تکراری رد می‌شوند و داده دست‌نخورده می‌ماند.
+     */
+    @Test
+    fun nb34_mergeIdempotentAndLegacyFallbackMatching() = runBlocking {
+        // دادهٔ «بکاپ»: علی با شناسهٔ یکتا + «علي» عربی‌نویس با شناسهٔ متفاوت +
+        // دو وام (A با رکورد/قسط، C شراکتی با سهم رضا)
+        val userAli = UserProfile(id = 11L, publicId = "U-aaa111", name = "علی", isPrimary = true)
+        val userAliArabic = UserProfile(id = 12L, publicId = "U-bbb222", name = "\u0639\u0644\u064A") // «علي» با ي عربی
+        val loanA = Loan(
+            id = 21L, publicId = "L-aaa1111", title = "وام رستور",
+            dueDay = 10, monthlyAmount = 4_000_000L, totalMonths = 12, paidMonths = 2,
+            startYear = 1405, startMonth = 4, endYear = 1406, endMonth = 4,
+            myShareAmount = 4_000_000L
+        )
+        val loanC = Loan(
+            id = 23L, publicId = "L-ccc3333", title = "وام جدید ادغام",
+            dueDay = 5, monthlyAmount = 2_000_000L, totalMonths = 6, paidMonths = 1,
+            startYear = 1405, startMonth = 6, endYear = 1405, endMonth = 12,
+            hasPartners = true
+        )
+        val shareReza = DebtorShare(
+            id = 31L, publicId = "S-aaa111", ownerPublicId = "U-aaa111",
+            loanId = 23L, loanTitle = "وام جدید ادغام", personName = "رضا",
+            shareAmount = 1_000_000L, dueDay = 5
+        )
+        val recordA = PaymentRecord(
+            loanId = 21L, loanTitle = "وام رستور", installmentNumber = 1,
+            amountPaid = 4_000_000L, paymentDateShamsi = "1405/04/10", timestamp = 1_000L
+        )
+        val installmentA1 = LoanInstallment(
+            loanId = 21L, installmentNumber = 1, year = 1405, month = 4,
+            amount = 4_000_000L, paidAtTimestamp = 1_000L, paidDateShamsi = "1405/04/10"
+        )
+        val installmentA2 = LoanInstallment(
+            loanId = 21L, installmentNumber = 2, year = 1405, month = 5,
+            amount = 4_000_000L, paidAtTimestamp = 2_000L, paidDateShamsi = "1405/05/10"
+        )
+        val backupInstallments = listOf(installmentA1, installmentA2)
+
+        // ۱) اولین merge — «علي» به‌جای درج دوباره، با نام کانونی به همان «علی» مچ و به‌روزرسانی می‌شود
+        val s1 = repository.mergeFromBackup(
+            users = listOf(userAli, userAliArabic),
+            loans = listOf(loanA, loanC),
+            shares = listOf(shareReza),
+            records = listOf(recordA),
+            installments = backupInstallments,
+            updateDuplicates = true
+        )
+        assertEquals(1, s1.newUsers)
+        assertEquals(1, s1.updatedUsers)
+        assertEquals(2, s1.newLoans)
+        assertEquals(1, s1.newShares)
+
+        // نام عربی‌نویس کانونی ذخیره شده و کاربر تکراری ساخته نشده است
+        val users1 = db.userProfileDao().getAllUsersOnce()
+        assertEquals(1, users1.size)
+        assertEquals("علی", users1.single().name)
+        assertEquals("U-aaa111", users1.single().publicId)
+        assertTrue("اینوارینت NB-4: بعد از merge دقیقاً یک کاربر مبنا", users1.single().isPrimary)
+
+        val loans1 = repository.allLoans.first()
+        assertEquals(2, loans1.size)
+        assertEquals(1, repository.allShares.first().size)
+
+        // اقساط واقعی وام تازه از خود بکاپ درج شده‌اند (نه بازسازی ترتیبی)
+        val localLoanAId = loans1.first { it.publicId == "L-aaa1111" }.id
+        assertEquals(
+            2,
+            db.loanInstallmentDao().getInstallmentsForLoanOnce(localLoanAId).size
+        )
+        // شمارنده‌ها با رکوردهای واقعی sync شده‌اند
+        assertEquals(2, repository.allLoans.first().first { it.publicId == "L-aaa1111" }.paidMonths)
+
+        // ۲) merge دومِ همان فایل — idempotent: هیچ مورد جدیدی ساخته نمی‌شود و تعدادها ثابت می‌مانند
+        val s2 = repository.mergeFromBackup(
+            users = listOf(userAli, userAliArabic),
+            loans = listOf(loanA, loanC),
+            shares = listOf(shareReza),
+            records = listOf(recordA),
+            installments = backupInstallments,
+            updateDuplicates = true
+        )
+        assertEquals(0, s2.newTotal)
+        assertEquals(1, db.userProfileDao().getAllUsersOnce().size)
+        assertEquals(2, repository.allLoans.first().size)
+        assertEquals(1, repository.allShares.first().size)
+
+        // ۳) merge نسخهٔ قدیمی (بدون publicId) — همه با کلید fallback (نام کانونی / عنوان+مبلغ+ماه شروع) مچ می‌شوند
+        val s3 = repository.mergeFromBackup(
+            users = listOf(userAli.copy(publicId = "")),
+            loans = listOf(loanA.copy(publicId = ""), loanC.copy(publicId = "")),
+            shares = listOf(shareReza.copy(publicId = "")),
+            records = listOf(recordA),
+            installments = backupInstallments,
+            updateDuplicates = true
+        )
+        assertEquals(0, s3.newTotal)
+        assertEquals(1, db.userProfileDao().getAllUsersOnce().size)
+        assertEquals(2, repository.allLoans.first().size)
+        assertEquals(1, repository.allShares.first().size)
+
+        // ۴) merge با update=false — همهٔ موارد تکراری رد می‌شوند و دادهٔ فعلی دست‌نخورده می‌ماند
+        val s4 = repository.mergeFromBackup(
+            users = listOf(userAli),
+            loans = listOf(loanA.copy(paidMonths = 5), loanC),
+            shares = listOf(shareReza),
+            records = listOf(recordA),
+            installments = backupInstallments,
+            updateDuplicates = false
+        )
+        assertEquals(0, s4.newTotal)
+        assertEquals(0, s4.updatedTotal)
+        assertEquals(4, s4.skippedTotal) // ۱ کاربر + ۲ وام + ۱ سهم
+        assertEquals(
+            "وام ردشده نباید به‌روزرسانی شود",
+            2,
+            repository.allLoans.first().first { it.publicId == "L-aaa1111" }.paidMonths
+        )
     }
 }
