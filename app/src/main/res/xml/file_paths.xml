@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- فیکس bug.md/NB-15: مسیرهای قابل‌اشتراک FileProvider — فایل بکاپ موقت در
+     cacheDir/backup نوشته می‌شود و فقط همین زیرمسیر به بیرون expose می‌شود. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="vaamyar_backups"
+        path="backup/" />
+</paths>

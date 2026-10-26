@@ -24,9 +24,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import com.example.data.UserDeleteCheckResult
 import com.example.model.UserProfile
 import com.example.ui.dialogs.AddEditUserDialog
@@ -609,16 +611,34 @@ fun SettingsScreen(
 
                                     OutlinedButton(
                                         onClick = {
-                                            try {
-                                                val json = onExportBackup()
-                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = "application/json"
-                                                    putExtra(Intent.EXTRA_SUBJECT, "فایل پشتیبان وام‌یار")
-                                                    putExtra(Intent.EXTRA_TEXT, json)
+                                            // فیکس bug.md/NB-15: اشتراک‌گذاری «فایل» واقعی به‌جای متن خام —
+                                            // JSON در cacheDir/backup نوشته می‌شود و با EXTRA_STREAM (Uri امنِ
+                                            // FileProvider + FLAG_GRANT_READ_URI_PERMISSION) ارسال می‌شود تا
+                                            // پیام‌رسان‌ها آن را به‌عنوان فایل پیوست قبول کنند.
+                                            coroutineScope.launch {
+                                                try {
+                                                    val shareUri = withContext(Dispatchers.IO) {
+                                                        val backupDir = File(context.cacheDir, "backup").apply { mkdirs() }
+                                                        // فایل‌های قدیمیِ این مسیرِ موقت پاک شوند (cacheDir هم خودش قابل پاک‌شدن است)
+                                                        backupDir.listFiles()?.forEach { it.delete() }
+                                                        val backupFile = File(backupDir, "VaamYar_Backup_${System.currentTimeMillis()}.json")
+                                                        backupFile.writeText(onExportBackup(), Charsets.UTF_8)
+                                                        FileProvider.getUriForFile(
+                                                            context,
+                                                            "${context.packageName}.fileprovider",
+                                                            backupFile
+                                                        )
+                                                    }
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = "application/json"
+                                                        putExtra(Intent.EXTRA_STREAM, shareUri)
+                                                        putExtra(Intent.EXTRA_SUBJECT, "فایل پشتیبان وام‌یار")
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(Intent.createChooser(shareIntent, "ارسال و اشتراک فایل پشتیبان"))
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
                                                 }
-                                                context.startActivity(Intent.createChooser(shareIntent, "ارسال و اشتراک فایل پشتیبان"))
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         modifier = Modifier.weight(1f),

@@ -50,6 +50,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- فیکس bug.md/NB-15: اشتراک‌گذاری واقعی «فایل» بکاپ با FileProvider —
+             قبلاً ACTION_SEND با EXTRA_TEXT فقط متن خام JSON را در پیام‌رسان‌ها
+             می‌چسباند. JSON در cacheDir/backup نوشته و Uri امن از این provider
+             به EXTRA_STREAM داده می‌شود (مسیرها در res/xml/file_paths.xml). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>
