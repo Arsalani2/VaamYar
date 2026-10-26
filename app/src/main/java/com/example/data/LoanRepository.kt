@@ -163,6 +163,10 @@ class LoanRepository(
     }
 
     suspend fun clearAllLoansAndReset() = withContext(Dispatchers.IO) {
+        // فیکس bug.md/NB-19: مسیر آیکون‌های سفارشیِ موجود پیش از تراکنش جمع می‌شود و پس از
+        // commit موفق، فایل‌ها از دیسک پاک می‌شوند تا هیچ فایل آیکونِ یتیمی نماند
+        // (عیناً الگوی NB-6 در deleteLoan — فقط بعد از commit، تا در صورت rollback چیزی از دست نرود).
+        val orphanIconPaths = loanDao.getLoansWithCustomIcon().mapNotNull { it.customIconPath }
         database.withTransaction {
             // فیکس bug.md/NB-14: رکوردهای تاریخچهٔ پرداخت وابستهٔ وام‌ها هستند؛ پیش از حذفِ
             // خودِ وام‌ها پاک می‌شوند تا هیچ رکورد یتیمی در دیتابیس — و در نتیجه در هر
@@ -171,6 +175,7 @@ class LoanRepository(
             loanDao.clearAllLoans()
             debtorShareDao.clearAllShares()
         }
+        orphanIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
         appPreferences.initialDataSeeded = true
     }
 
@@ -198,6 +203,14 @@ class LoanRepository(
         shares: List<DebtorShare>,
         records: List<PaymentRecord>
     ) = withContext(Dispatchers.IO) {
+        // فیکس bug.md/NB-19: آیکون‌های سفارشیِ دادهٔ قبلی که در دادهٔ ورودی هیچ مرجعی به آن‌ها
+        // نیست، پس از commit موفق از دیسک پاک می‌شوند (فایل یتیم نماند)؛ آیکون‌هایی که خودِ
+        // بکاپ به آن‌ها اشاره می‌کند دست‌نخورده می‌مانند. فقط بعد از commit حذف می‌شود تا در
+        // صورت rollback، دادهٔ قبلی و فایل‌هایش سرِ جای سالمشان بمانند.
+        val importedIconPaths = loans.mapNotNull { it.customIconPath?.takeIf(String::isNotBlank) }.toSet()
+        val staleIconPaths = loanDao.getLoansWithCustomIcon()
+            .mapNotNull { it.customIconPath }
+            .filterNot { it in importedIconPaths }
         database.withTransaction {
             loanDao.clearAllLoans()
             debtorShareDao.clearAllShares()
@@ -217,6 +230,7 @@ class LoanRepository(
             }
             records.forEach { paymentRecordDao.insertRecord(it) }
         }
+        staleIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
     }
 
     // User Management Methods

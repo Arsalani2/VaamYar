@@ -42,4 +42,9 @@ interface LoanDao {
     // (رِسِت خودکار ماهانه + دکمهٔ دستی «شروع ماه جدید»)
     @Query("UPDATE loans SET isCurrentMonthPaid = 0 WHERE isCurrentMonthPaid = 1")
     suspend fun resetCurrentMonthPaidFlags()
+
+    // فیکس bug.md/NB-19: وام‌های دارای آیکون سفارشی — مسیر فایل‌ها پیش از تراکنشِ
+    // بازنشانی/جایگزینی کامل جمع می‌شود تا پس از commit موفق، فایل‌های یتیم از دیسک پاک شوند.
+    @Query("SELECT * FROM loans WHERE customIconPath IS NOT NULL AND customIconPath != ''")
+    suspend fun getLoansWithCustomIcon(): List<Loan>
 }
