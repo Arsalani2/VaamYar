@@ -604,3 +604,37 @@
 - **تست:** `f7_liquidityForecastSumsOnlyUnpaidInstallmentsWithinWindow` (پنجرهٔ آبان ۱۴۰۵؛ وامِ با آبانِ پرداخت‌شده و وامِ شروع آذر و وام تک‌قسطیِ تسویه‌شده بعد از آبان؛ مرز سال ۱۴۰۶؛ مجموع ۳=۱۳م و ۶=۳۱م؛ میانگین تاریخچه) و `f7_liquidityForecastHistoryAverageFromRealRecords` (مجموع چند وام در یک ماه یک نمونه شمرده می‌شود؛ وام تسویه‌شده در تاریخچه می‌ماند؛ تقسیم صحیح؛ بدون رکورد → میانگین null و پنجره‌ها صفر) در PureLogicUnitTest.
 
 ⚠️ بیلد و تست در محیط تهیهٔ این گزارش اجرا نشد (نبود Gradle/Android SDK). پیش از ریلیز بعدی حتماً `./gradlew assembleDebug testDebugUnitTest` اجرا شود — به‌خصوص برای کامپایل `util/LiquidityForecast.kt`، combine پنج‌جریانی جدید MainViewModel، شاخهٔ جدید `TipType.LIQUIDITY_FORECAST` در هر دو `when` آیکون/رنگ SmartFinancialAdvisorCard، دیالوگ HomeScreen، و تست‌های f7.
+
+## فاز ۷ نقشهٔ راه بازبینی ۴.۵ — زیرساخت و کیفیت (P4-4/5/6 + NB-28/30/24)
+**تاریخ ثبت:** ۲۰۲۶-۱۰-۲۶ (۱۴۰۵/۰۸/۰۵) — کامیت‌های جداگانهٔ `[skip ci]` روی شاخه main؛ ریلیزی trigger نشد. شرح کامل در bug.md (نسخهٔ ۴).
+
+### رفع P4-4 — تغییر نام پکیج com.example → com.aistudio.vamyar (کامیت `ec15afe`)
+- **شرح مشکل:** namespace = com.example ولی applicationId = com.aistudio.vamyar.zqnmxk (پسوند تصادفی قالب AI Studio).
+- **اقدام اصلاحی:**
+  - همهٔ ۴۹ فایل Kotlin به مسیر `com/aistudio/vamyar` منتقل شدند؛ package/importها و ارجاع‌های inline (FQN) استاندارد شدند. string literalهای شناسهٔ legacy در BackupHelper («com.example»، «com.aistudio.vamyar.zqnmxk») عمداً دست‌نخورده ماندند تا بکاپ‌های قبل از rename قابل restore باشند (شرط NB-9 — معیار پذیرش P4-4). شناسه‌های اکشن broadcast داخلی InstallmentAlarmReceiver به com.aistudio.vamyar تغییر کردند.
+  - `app/build.gradle.kts`: namespace و applicationId هر دو → `com.aistudio.vamyar` (حذف پسوند zqnmxk). AndroidManifest ارجاع com.example نداشت (authorities داینامیک `${applicationId}.fileprovider`).
+  - ۴۹ فایل مسیر قدیمی `com/example` حذف شدند (کامیت‌های حذف جداگانه).
+  - ⚠️ تغییر applicationId یعنی اندروید آن را اپ جدید می‌شناسد؛ نصب روی نسخهٔ قبلی update نیست و باید کنار نصب قبلی نصب شود و داده از مسیر بکاپ JSON منتقل گردد.
+
+### رفع P4-5 — حذف وابستگی‌های آنلاین از اپ آفلاین (کامیت `fda94be` + ۹ کامیت حذف)
+- **شرح مشکل:** firebase.ai، firebase-appcheck، google-services، secrets-gradle، retrofit، okhttp، moshi در اپ «کاملاً آفلاین» حجم و مجوز اضافه می‌آوردند — بدون هیچ ارجاعی در سورس Kotlin.
+- **اقدام اصلاحی:**
+  - `app/build.gradle.kts`: حذف پلاگین‌های secrets/google-services و import مربوطه، بلاک‌های `secrets {}` و `googleServices {}`، platform(firebase-bom)، firebase.ai، appcheck.recaptcha/debug، retrofit، converter-moshi، moshi-kotlin (+ksp codegen)، okhttp، logging-interceptor.
+  - `build.gradle.kts` روت: حذف دو alias پلاگین؛ `gradle.properties`: حذف `googleServices.missing.passthrough`؛ `libs.versions.toml`: حذف همهٔ ورودی‌های firebase/secrets/googleServices/retrofit/moshi/okhttp/credentials/googleid.
+  - پاک‌سازی بقایای AI Studio: `.env.example`، دایرکتوری `.aistudio/` (۵ فایل)، `metadata.json`، `public/assets/aistudio/` (۲ عکس) حذف شدند. grep ارجاع در سورس پس از حذف: صفر (معیار پذیرش).
+
+### رفع NB-28 — ارتقای actionهای ورک‌فلو (کامیت `869f162`)
+- checkout@v4→v7، setup-java@v4→v6، setup-gradle@v3→v6، upload-artifact@v4→v7، softprops/action-gh-release@v2→v3 — آخرین نسخهٔ اصلی هر اکشن (راستی‌آزمایی‌شده با صفحهٔ Releases هر ریپو در اکتبر ۲۰۲۶).
+
+### رفع P4-6 — هشدار طول فایل در CI (کامیت `ff15bde`)
+- گام جدید «Warn on Oversized Kotlin Files (P4-6)» در `android-release.yml`: فایل‌های Kotlin بلندتر از ۷۰۰ خط به‌صورت `::warning` (غیرمسدودکننده) فهرست می‌شوند — تفکیک تدریجی هنگام لمس هر فایل انجام می‌شود، نه refactor یکجا.
+
+### رفع NB-30 — I/O دیسک خارج از نخ اصلی (کامیت `79cc6bf`)
+- `LoanIconDisplay` (`LoanIconHelper.kt`): دکود دیسکِ آیکون از `remember{}` (حین کامپوزیشن روی main) به `LaunchedEffect` + `withContext(Dispatchers.IO)` منتقل شد — state پیش‌فرض null تا لود؛ آیکون برداری جایگزین نمایش می‌یابد.
+- `AddEditLoanDialog`: callback فتوپیکر اکنون در `rememberCoroutineScope` + `withContext(Dispatchers.IO)` عکس را کپی/دکود/کمپرس و فایل قبلی را پاک می‌کند (قفل UI برای عکس‌های بزرگ حذف شد).
+
+### رفع NB-24 — ساعت اعلان روزانهٔ قابل تنظیم (کامیت `30df10b`)
+- SettingsScreen: ردیف «ساعت اعلان روزانهٔ سررسید» با نمایش ساعت فعلی (ارقام فارسی) + دیالوگ TimePicker متریال ۳ (مقدار اولیه از AppPreferences؛ انصراف بدون تغییر)؛ ثبت → onReminderTimeChange.
+- MainViewModel: `reminderHour/reminderMinute` + `setReminderTime(hour, minute)` — ذخیره در AppPreferences (پیش‌فرض ۱۰:۰۰ از فیکس P2-7) و فراخوانی `NotificationHelper.scheduleDailyCheck(app)` برای زمان‌بندی مجدد آلارم با ساعت جدید (BootCompletedReceiver بعد از ری‌بوت هم از همین منبع می‌خواند — معیار پذیرش: ساعت تنظیم‌شده در اعلان روز بعد اعمال شود).
+
+⚠️ بیلد و تست در محیط تهیهٔ این گزارش اجرا نشد (نبود Gradle/Android SDK). پیش از ریلیز بعدی حتماً `./gradlew assembleDebug testDebugUnitTest` اجرا شود — به‌خصوص برای **rename پکیج کل** (هر ۴۹ فایل)، حذف وابستگی‌ها از فایل‌های gradle (KSP بدون moshi codegen)، ورک‌فلوی ارتقایافته (اکشن‌های v6/v7)، و کامپایل SettingsScreen/MainViewModel/MainActivity با API جدید NB-24.
