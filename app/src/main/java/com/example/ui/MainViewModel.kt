@@ -84,6 +84,8 @@ data class ArrearsPrompt(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = (application as VamyarApp).repository
+    // فیکس bug.md/NB-18: برای نوشتن فایل آیکون‌های بازسازی‌شده از بکاپ لازم است
+    private val app = application as VamyarApp
     private val appPreferences = AppPreferences(application)
 
     val allLoans: StateFlow<List<Loan>> = repository.allLoans
@@ -520,6 +522,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentRecords = allRecords.value
         val currentUsers = allUsers.value
 
+        // فیکس bug.md/NB-18: فایل آیکون‌های سفارشی به‌صورت base64 داخل خودِ بکاپ
+        // embed می‌شوند تا روی دستگاه/نصب دیگر بی‌صدا به vector برنگردند؛ اگر فایل
+        // روی دیسک نباشد، همان وام بدون آیکون embed می‌شود و فیلد path هم حذف می‌شود.
+        val currentIcons = currentLoans.mapNotNull { l ->
+            val path = l.customIconPath?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val iconFile = java.io.File(path)
+            if (!iconFile.exists()) return@mapNotNull null
+            com.example.util.BackupIcon(
+                loanId = l.id,
+                fileName = iconFile.name,
+                dataBase64 = android.util.Base64.encodeToString(iconFile.readBytes(), android.util.Base64.NO_WRAP)
+            )
+        }
+
         val prefs = com.example.util.BackupPreferences(
             themeMode = _themeMode.value.name,
             themePreset = _themePreset.value.name,
@@ -539,6 +555,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط در بکاپ ذخیره می‌شوند تا
             // ماه‌های پرداخت‌شدهٔ واقعی بعد از restore عیناً برگردند
             installments = allInstallments.value,
+            // فیکس bug.md/NB-18: خودِ فایل آیکون‌های سفارشی هم داخل بکاپ می‌رود
+            icons = currentIcons,
             preferences = prefs,
             // فیکس bug.md/P2-13: نسخهٔ درج‌شده در فایل بکاپ دیگر هاردکد نیست؛ از
             // BuildConfig.VERSION_NAME خوانده می‌شود که در زمان بیلد از version.properties
@@ -557,16 +575,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val data = parseResult.getOrThrow()
 
+            // فیکس bug.md/NB-18: فایل آیکون‌های embedشدهٔ بکاپ اول روی دیسکِ همین
+            // دستگاه نوشته می‌شوند و مسیر محلیِ تازه به restore داده می‌شود؛ اگر
+            // restore با خطا rolback شود، همین فایل‌های تازه دوباره پاک می‌شوند
+            // تا فایل یتیم نماند.
+            val writtenIconPaths = data.icons.mapNotNull { bi ->
+                val bytes = android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
+                val savedPath = com.example.util.LoanIconHelper.saveCustomIconBytes(app, bytes)
+                if (savedPath != null) bi.loanId to savedPath else null
+            }.toMap()
+
             // Restore Database
-            repository.restoreDatabaseSnapshot(
-                users = data.users,
-                loans = data.loans,
-                shares = data.shares,
-                records = data.records,
-                // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
-                // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
-                installments = data.installments
-            )
+            val restoreResult = runCatching {
+                repository.restoreDatabaseSnapshot(
+                    users = data.users,
+                    loans = data.loans,
+                    shares = data.shares,
+                    records = data.records,
+                    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
+                    // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
+                    installments = data.installments,
+                    // فیکس bug.md/NB-18: مسیرهای محلیِ تازهٔ آیکون‌های بازنویسی‌شده
+                    iconPaths = writtenIconPaths
+                )
+            }
+            if (restoreResult.isFailure) {
+                writtenIconPaths.values.forEach { com.example.util.LoanIconHelper.deleteCustomIconFile(it) }
+                return Result.failure(restoreResult.exceptionOrNull() ?: Exception("بازیابی ناموفق بود."))
+            }
 
             // Restore preferences
             // فیکس bug.md/P2-12: تنظیماتِ بازیابی‌شده قبلاً فقط در StateFlowها نوشته می‌شد

@@ -16,6 +16,7 @@ import com.example.util.ShamsiDateHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.io.File
 
 data class UserDeleteCheckResult(
     val canDelete: Boolean,
@@ -240,7 +241,10 @@ class LoanRepository(
         shares: List<DebtorShare>,
         records: List<PaymentRecord>,
         // فیکس bug.md/F1+NB-31 (بخش بکاپ): رکوردهای واقعی اقساط از بکاپ‌های جدید
-        installments: List<LoanInstallment> = emptyList()
+        installments: List<LoanInstallment> = emptyList(),
+        // فیکس bug.md/NB-18: مسیر محلیِ فایل‌های آیکونی که از دادهٔ embedشدهٔ بکاپ
+        // قبلاً روی دیسکِ همین دستگاه نوشته شده‌اند (loanId → absolute path)
+        iconPaths: Map<Long, String> = emptyMap()
     ) = withContext(Dispatchers.IO) {
         // فیکس bug.md/NB-19: آیکون‌های سفارشیِ دادهٔ قبلی که در دادهٔ ورودی هیچ مرجعی به آن‌ها
         // نیست، پس از commit موفق از دیسک پاک می‌شوند (فایل یتیم نماند)؛ آیکون‌هایی که خودِ
@@ -275,7 +279,14 @@ class LoanRepository(
             loans.forEach {
                 loanDao.insertLoan(
                     it.copy(
-                        publicId = if (PublicId.isValidLoanId(it.publicId)) it.publicId else uniqueLoanPublicId()
+                        publicId = if (PublicId.isValidLoanId(it.publicId)) it.publicId else uniqueLoanPublicId(),
+                        // فیکس bug.md/NB-18: اگر آیکون embedشدهٔ بکاپ روی دیسک نوشته شده
+                        // باشد مسیر تازهٔ محلی می‌نشیند؛ بدون دادهٔ آیکون، مسیرِ ورودی فقط
+                        // وقتی نگه داشته می‌شود که فایلش واقعاً روی همین دستگاه باشد
+                        // (بکاپ قدیمی روی همان دستگاه) — وگرنه صریحاً به fallback
+                        // برداری می‌رود و آیکون بی‌صورت نمی‌ماند.
+                        customIconPath = iconPaths[it.id]
+                            ?: it.customIconPath?.takeIf { p -> p.isNotBlank() && File(p).exists() }
                     )
                 )
             }

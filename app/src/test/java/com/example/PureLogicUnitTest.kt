@@ -6,8 +6,10 @@ import com.example.model.LoanInstallment
 import com.example.model.LoanShareCalculator
 import com.example.model.UserProfile
 import com.example.util.BackupHelper
+import com.example.util.BackupIcon
 import com.example.util.BackupPreferences
 import com.example.util.InputLimits
+import com.example.util.LoanIconHelper
 import com.example.util.NumberFormatter
 import com.example.util.PublicId
 import com.example.util.ShamsiDate
@@ -404,6 +406,70 @@ class PureLogicUnitTest {
         val data = result.getOrNull()!!
         assertTrue(data.installments.isEmpty())
         assertEquals(3, data.loans.first().paidMonths)
+    }
+
+    // ---------------------------------------------------------------- NB-18 (آیکون سفارشی در بکاپ)
+
+    @Test
+    fun nb18_backupEmbedsIconAndSanitizesPath() {
+        val loanWithIcon = Loan(
+            id = 10L, title = "وام با آیکون", dueDay = 10,
+            monthlyAmount = 1_000_000L, totalMonths = 12, paidMonths = 1,
+            startYear = 1405, startMonth = 4,
+            myShareAmount = 1_000_000L, publicId = "L-aaa1111",
+            // مسیر absolute دستگاه — نباید عیناً در JSON بیاید (نشت مسیر فایلسیستم)
+            customIconPath = "/data/user/0/com.aistudio.vamyar/files/loan_icons/loan_icon_123.png"
+        )
+        val loanMissingIcon = Loan(
+            id = 11L, title = "وام بدون فایل آیکون", dueDay = 5,
+            monthlyAmount = 500_000L, totalMonths = 6, paidMonths = 1,
+            startYear = 1405, startMonth = 4,
+            myShareAmount = 500_000L, publicId = "L-bbb2222",
+            customIconPath = "/data/user/0/com.aistudio.vamyar/files/loan_icons/loan_icon_missing.png"
+        )
+
+        // فقط وام ۱۰ فایلش «روی دیسک هست» و embed می‌شود؛ وام ۱۱ چون در icons نیست، path حذف می‌شود
+        val json = BackupHelper.createBackupJson(
+            users = listOf(UserProfile(id = 1L, name = "علی", isPrimary = true, publicId = "U-aaa111")),
+            loans = listOf(loanWithIcon, loanMissingIcon),
+            shares = emptyList(),
+            records = emptyList(),
+            preferences = BackupPreferences(),
+            appVersion = "1.0.4",
+            icons = listOf(
+                BackupIcon(loanId = 10L, fileName = "loan_icon_123.png", dataBase64 = "AQIDBA==")
+            )
+        )
+
+        // مسیر absolute نباید در خروجی باشد
+        assertFalse(json.contains("/data/user/0/"))
+
+        val data = BackupHelper.parseAndValidateBackup(json).getOrNull()!!
+        // وام ۱۰: path فقط «نام فایل» + دادهٔ آیکون embed شده
+        assertEquals("loan_icon_123.png", data.loans.first { it.id == 10L }.customIconPath)
+        assertEquals(1, data.icons.size)
+        assertEquals(10L, data.icons.first().loanId)
+        assertEquals("AQIDBA==", data.icons.first().dataBase64)
+        // وام ۱۱: فایل روی دیسک نبود → فیلد path حذف شد (restore به fallback برداری می‌رود)
+        assertNull(data.loans.first { it.id == 11L }.customIconPath)
+    }
+
+    @Test
+    fun nb18_saveCustomIconBytesRoundTripsFileContent() {
+        // چرخهٔ restore: بایت‌های base64 بکاپ → فایل واقعی روی دیسکِ همین دستگاه
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val iconBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A)
+
+        val savedPath = LoanIconHelper.saveCustomIconBytes(context, iconBytes)
+        assertNotNull(savedPath)
+
+        val savedFile = java.io.File(savedPath!!)
+        assertTrue(savedFile.exists())
+        assertTrue(savedFile.readBytes().contentEquals(iconBytes))
+        assertTrue(savedFile.parentFile?.name == "loan_icons")
+        // پاک‌سازی فایل تست
+        LoanIconHelper.deleteCustomIconFile(savedPath)
+        assertFalse(savedFile.exists())
     }
 
     // ---------------------------------------------------------------- F1+NB-31 (نگاشت قسط ↔ ماه شمسی)

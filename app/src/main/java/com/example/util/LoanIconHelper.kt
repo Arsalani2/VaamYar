@@ -142,6 +142,27 @@ object LoanIconHelper {
         }
     }
 
+    /**
+     * فیکس bug.md/NB-18: نوشتن فایل آیکونِ بازسازی‌شده از بکاپ (بایت‌های خام PNG که
+     * در JSON به‌صورت base64 حمل شده بودند) در همان دایرکتوری خصوصی loan_icons —
+     * مثل saveCustomIconImage ولی ورودی Uri نیست تا چرخهٔ بکاپ/restore بدون
+     * ContentResolver و روی هر دستگاهی کار کند.
+     */
+    fun saveCustomIconBytes(context: Context, bytes: ByteArray): String? {
+        return try {
+            val iconsDir = File(context.filesDir, "loan_icons")
+            if (!iconsDir.exists()) {
+                iconsDir.mkdirs()
+            }
+            val destFile = File(iconsDir, "loan_icon_${System.currentTimeMillis()}.png")
+            FileOutputStream(destFile).use { out -> out.write(bytes) }
+            destFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     fun deleteCustomIconFile(filePath: String?) {
         if (!filePath.isNullOrBlank()) {
             try {

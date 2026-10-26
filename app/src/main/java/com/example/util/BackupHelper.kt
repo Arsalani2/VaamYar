@@ -23,6 +23,16 @@ data class BackupPreferences(
     val isCustomDateEnabled: Boolean = false
 )
 
+/**
+ * فیکس bug.md/NB-18: آیکون سفارشیِ embedشدهٔ وام در بکاپ — خودِ فایل (base64)،
+ * نه مسیر absoluteِ دستگاه قبلی که روی نصب دیگر بی‌معناست و به JSON هم نشت می‌کرد.
+ */
+data class BackupIcon(
+    val loanId: Long,
+    val fileName: String,
+    val dataBase64: String
+)
+
 data class BackupRestoreData(
     val users: List<UserProfile>,
     val loans: List<Loan>,
@@ -31,6 +41,8 @@ data class BackupRestoreData(
     // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط (بکاپ قدیمی → خالی؛ restore در
     // آن حالت به بازسازی ترتیبی از paidMonths برمی‌گردد)
     val installments: List<LoanInstallment> = emptyList(),
+    // فیکس bug.md/NB-18: فایل‌های آیکون سفارشیِ embedشده (بکاپ قدیمی → خالی)
+    val icons: List<BackupIcon> = emptyList(),
     val preferences: BackupPreferences,
     val schemaVersion: Int,
     val exportedDate: String
@@ -53,6 +65,9 @@ object BackupHelper {
         // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط هم در بکاپ ذخیره می‌شوند تا
         // ماه‌های پرداخت‌شدهٔ واقعی (حتی نامرتّب/عقب‌مانده) بعد از restore سر جایشان بمانند
         installments: List<LoanInstallment> = emptyList(),
+        // فیکس bug.md/NB-18: فایل‌های آیکون سفارشی به‌صورت base64 embed می‌شوند؛
+        // به‌ازای هر وام فقط وقتی که فایلش واقعاً روی دیسک باشد (وگرنه path هم حذف می‌شود)
+        icons: List<BackupIcon> = emptyList(),
         preferences: BackupPreferences,
         // فیکس bug.md/P2-13: پارامتر نسخه دیگر پیش‌فرض هاردکد ندارد تا هیچ فراخوانی
         // ناخواسته نسخهٔ کهره در فایل بکاپ درج نکند؛ تنها فراخوانیِ فعلی مقدار را از
@@ -108,7 +123,12 @@ object BackupHelper {
             lObj.put("isCurrentMonthPaid", l.isCurrentMonthPaid)
             lObj.put("iconName", l.iconName)
             lObj.put("iconShape", l.iconShape)
-            lObj.put("customIconPath", l.customIconPath ?: JSONObject.NULL)
+            // فیکس bug.md/NB-18: خودِ آیکون در آرایهٔ icons (base64) حمل می‌شود؛ در
+            // customIconPath فقط «نام فایل» می‌ماند (نه مسیر absolute) تا مسیرِ
+            // فایلسیستم به JSON نشت نکند. اگر فایل روی دیسک نباشد (icons ندارد)،
+            // فیلد حذف می‌شود و restore به fallback برداری می‌رود.
+            val embeddedIcon = icons.firstOrNull { it.loanId == l.id }
+            lObj.put("customIconPath", embeddedIcon?.fileName ?: JSONObject.NULL)
             lObj.put("publicId", l.publicId)
             loansArray.put(lObj)
         }
@@ -163,6 +183,17 @@ object BackupHelper {
             installmentsArray.put(iObj)
         }
         payload.put("installments", installmentsArray)
+
+        // 4.6. Icons (فیکس bug.md/NB-18: فایل آیکون سفارشی وام داخل خودِ بکاپ)
+        val iconsArray = JSONArray()
+        for (ic in icons) {
+            val icObj = JSONObject()
+            icObj.put("loanId", ic.loanId)
+            icObj.put("fileName", ic.fileName)
+            icObj.put("data", ic.dataBase64)
+            iconsArray.put(icObj)
+        }
+        payload.put("icons", iconsArray)
 
         // 5. Preferences
         val prefsObj = JSONObject()
@@ -367,6 +398,23 @@ object BackupHelper {
                     it.installmentNumber in 1..(loanTotalMonthsById[it.loanId] ?: 0)
             }
 
+            // 6.7. Parse Icons (فیکس bug.md/NB-18: بکاپ قدیمی آرایهٔ icons را ندارد →
+            // خالی؛ آیکونِ چنین بکاپی اگر فایلش روی همان دستگاه موجود نباشد به
+            // fallback برداری برمی‌گردد)
+            val iconsList = mutableListOf<BackupIcon>()
+            val iconsArray = payload.optJSONArray("icons") ?: JSONArray()
+            for (i in 0 until iconsArray.length()) {
+                val ic = iconsArray.getJSONObject(i)
+                iconsList.add(
+                    BackupIcon(
+                        loanId = ic.optLong("loanId", 0L),
+                        fileName = ic.optString("fileName", ""),
+                        dataBase64 = ic.optString("data", "")
+                    )
+                )
+            }
+            val sanitizedIcons = iconsList.filter { it.loanId in validLoanIds && it.dataBase64.isNotBlank() }
+
             // 7. Parse Preferences
             val prefsObj = payload.optJSONObject("preferences") ?: JSONObject()
             val preferences = BackupPreferences(
@@ -387,6 +435,7 @@ object BackupHelper {
                     shares = sanitizedShares,
                     records = sanitizedRecords,
                     installments = sanitizedInstallments,
+                    icons = sanitizedIcons,
                     preferences = preferences,
                     schemaVersion = schemaVersion,
                     exportedDate = exportDate
