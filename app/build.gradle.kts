@@ -11,7 +11,7 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.aistudio.vamyar"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   val versionPropsFile = rootProject.file("version.properties")
@@ -24,7 +24,7 @@ android {
   val propVersionName = versionProps.getProperty("VERSION_NAME", "1.0.0")
 
   defaultConfig {
-    applicationId = "com.aistudio.vamyar.zqnmxk"
+    applicationId = "com.aistudio.vamyar"
     minSdk = 24
     targetSdk = 36
     versionCode = propVersionCode
