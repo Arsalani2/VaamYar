@@ -175,6 +175,25 @@ class PureLogicUnitTest {
     }
 
     @Test
+    fun nb17_effectiveDueDay_clampsDueDayToMonthLength() {
+        // فیکس bug.md/NB-17: سررسید ۳۱ در ماه‌های ۳۰روزه → ۳۰
+        assertEquals(30, ShamsiDateHelper.effectiveDueDay(1405, 7, 31))  // مهر
+        assertEquals(30, ShamsiDateHelper.effectiveDueDay(1405, 11, 31)) // بهمن
+
+        // اسفندِ سال عادی (۱۴۰۵، ۲۹ روز): سررسید ۳۰/۳۱ → ۲۹
+        assertEquals(29, ShamsiDateHelper.effectiveDueDay(1405, 12, 31))
+        assertEquals(29, ShamsiDateHelper.effectiveDueDay(1405, 12, 30))
+
+        // ماه ۳۱روزه: سررسید ۳۱ دست‌نخورده
+        assertEquals(31, ShamsiDateHelper.effectiveDueDay(1405, 1, 31)) // فروردین
+        assertEquals(31, ShamsiDateHelper.effectiveDueDay(1405, 6, 31)) // شهریور
+
+        // سررسیدهای عادی تغییری نمی‌کنند
+        assertEquals(15, ShamsiDateHelper.effectiveDueDay(1405, 8, 15))
+        assertEquals(1, ShamsiDateHelper.effectiveDueDay(1405, 8, 1))
+    }
+
+    @Test
     fun getDaysInShamsiMonth_matchesStandardCalendar() {
         // شش ماه اول ۳۱ روزه
         for (m in 1..6) {

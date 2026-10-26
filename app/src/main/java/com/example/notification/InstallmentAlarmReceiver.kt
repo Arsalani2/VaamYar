@@ -66,10 +66,30 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                 // یادآوریِ «فردا» هم فقط وقتی حذف می‌شود که فردا در همین ماه باشد و قسط همین
                 // ماه پرداخت شده باشد؛ برای سررسیدِ اول ماه بعد (که پرچم هنوز وجود ندارد)
                 // یادآوری مثل همیشه پخش می‌شود.
+                // فیکس bug.md/NB-17: مقایسهٔ روز سررسید با «روز مؤثر» انجام می‌شود؛
+                // سررسیدِ ۳۱ در ماه ۳۰روزه (مهر..بهمن) → ۳۰ و در اسفندِ ۲۹روزه → ۲۹.
+                // قبلاً dueDay=31 در شهریورِ ۳۰روزه هیچ‌وقت == 30 نمی‌شد و اعلانِ
+                // «امروز/فردا» برای این وام‌ها هرگز پخش نمی‌شد. برای «فردا»ی آخرِ ماه،
+                // سررسید در ماهِ بعد clamp می‌شود (فردا اولِ ماه بعد → سررسید clampشدهٔ
+                // آخرِ ماه جاری مثل ۳۰/۳۱ آبانِ مؤثر همان ۳۰، فردا یادآوری می‌شود).
                 val activeLoans = loans.filter { !it.isCompleted }
-                val dueToday = activeLoans.filter { !it.isCurrentMonthPaid && it.dueDay == today }
+                val tomorrowYear = if (tomorrowIsNextMonth) {
+                    if (currentShamsi.month == 12) currentShamsi.year + 1 else currentShamsi.year
+                } else {
+                    currentShamsi.year
+                }
+                val tomorrowMonth = if (tomorrowIsNextMonth) {
+                    if (currentShamsi.month == 12) 1 else currentShamsi.month + 1
+                } else {
+                    currentShamsi.month
+                }
+                val dueToday = activeLoans.filter {
+                    !it.isCurrentMonthPaid &&
+                        ShamsiDateHelper.effectiveDueDay(currentShamsi.year, currentShamsi.month, it.dueDay) == today
+                }
                 val dueTomorrow = activeLoans.filter {
-                    it.dueDay == tomorrowDay && (tomorrowIsNextMonth || !it.isCurrentMonthPaid)
+                    ShamsiDateHelper.effectiveDueDay(tomorrowYear, tomorrowMonth, it.dueDay) == tomorrowDay &&
+                        (tomorrowIsNextMonth || !it.isCurrentMonthPaid)
                 }
 
                 if (dueToday.isNotEmpty()) {
