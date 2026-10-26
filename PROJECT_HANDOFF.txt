@@ -120,7 +120,10 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
 تغییرات:
   1) .github/workflows/android-release.yml: `git pull --rebase --autostash origin main`.
   2) `git update-index --chmod=+x gradlew` (mode در ریپو 100755 شد).
-وضعیت راستی‌آزمایی: هنوز اجرا نشده؛ پس از push باید run بعدی روی main بررسی شود (نتیجه در ورودی بعدی).
+نتیجه (راستی‌آزمایی‌شده با gh): کامیت f1ec589 → run 40378239145 کاملاً موفق شد (Commit and Push Version Bump، Tag و
+  GitHub Release همگی success). ربات کامیت 68f92b6 (bump به 1.0.5) را push کرد و ریلیز v1.0.5 با app-release.apk و
+  app-release.aab منتشر شد. نتیجه‌ی موفق، استنباط علت (mode گیرِ gradlew + pull --rebase) را تأیید عملی می‌کند.
+  گام بعدی: همچنان P1-5 تا P1-9 در bug.md؛ هشدارهای deprecation اکشن‌ها (setup-java@v5 و ...) غیرمسدودکننده‌اند.
 
 ۳. رویکردهای موفق / ناموفق
 --------------------------
