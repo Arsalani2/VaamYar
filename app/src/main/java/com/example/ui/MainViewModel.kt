@@ -457,19 +457,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun clearAllDataAndStartFresh() {
-        viewModelScope.launch {
-            repository.clearAllDataAndReset()
-        }
-    }
-
+    // فیکس bug.md/NB-23: توابع مردهٔ clearAllDataAndStartFresh و resetToDefaults (بدون هیچ
+    // فراخواننده‌ای در UI؛ دوباره‌کاریِ همین مسیر) حذف شدند — این تنها نقطهٔ ورود
+    // «پاکسازی تمام وام‌ها» است و clearAllDataAndResetِ بدون فراخواننده هم از ریپو حذف شد.
     fun clearAllLoansAndStartFresh() {
-        viewModelScope.launch {
-            repository.clearAllLoansAndReset()
-        }
-    }
-
-    fun resetToDefaults() {
         viewModelScope.launch {
             repository.clearAllLoansAndReset()
         }

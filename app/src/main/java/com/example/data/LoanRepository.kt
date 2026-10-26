@@ -186,16 +186,6 @@ class LoanRepository(
         appPreferences.initialDataSeeded = true
     }
 
-    suspend fun clearAllDataAndReset() = withContext(Dispatchers.IO) {
-        database.withTransaction {
-            loanDao.clearAllLoans()
-            debtorShareDao.clearAllShares()
-            paymentRecordDao.clearAllRecords()
-            userProfileDao.clearAllUsers()
-        }
-        appPreferences.initialDataSeeded = true
-    }
-
     /**
      * فیکس bug.md/P1-4:
      * پاک‌سازی چهار جدول و درج داده‌های پشتیبان قبلاً بدون تراکنش انجام می‌شد؛ کشته شدن اپ یا
@@ -257,32 +247,21 @@ class LoanRepository(
         // فاصله‌های اضافه) و هم‌گام‌سازی تغییر نام در سهم‌ها با کلیدِ تطبیقِ استاندارد
         // انجام می‌شود تا سهم‌های شرکا هرگز از صاحبشان جدا نمانند.
         val canonicalUser = user.copy(name = PersianNameNormalizer.canonicalName(user.name))
-        if (canonicalUser.isPrimary) {
-            database.withTransaction {
+        // فیکس bug.md/NB-23: دو شاخهٔ if/else با بدنهٔ یکسان ادغام شدند؛ تنها تفاوت واقعی —
+        // پاک‌کردن پرچم‌های کاربر مبنای قبلی — فقط برای کاربرِ مبنا انجام می‌شود.
+        database.withTransaction {
+            if (canonicalUser.isPrimary) {
                 userProfileDao.clearPrimaryFlags()
-                if (canonicalUser.id == 0L) {
-                    userProfileDao.insertUser(canonicalUser)
-                } else {
-                    val existing = userProfileDao.getUserById(canonicalUser.id)
-                    if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
-                        // Synchronize name change in all debtor shares!
-                        syncPersonNameInShares(existing.name, canonicalUser.name)
-                    }
-                    userProfileDao.updateUser(canonicalUser)
-                }
             }
-        } else {
-            database.withTransaction {
-                if (canonicalUser.id == 0L) {
-                    userProfileDao.insertUser(canonicalUser)
-                } else {
-                    val existing = userProfileDao.getUserById(canonicalUser.id)
-                    if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
-                        // Synchronize name change in all debtor shares!
-                        syncPersonNameInShares(existing.name, canonicalUser.name)
-                    }
-                    userProfileDao.updateUser(canonicalUser)
+            if (canonicalUser.id == 0L) {
+                userProfileDao.insertUser(canonicalUser)
+            } else {
+                val existing = userProfileDao.getUserById(canonicalUser.id)
+                if (existing != null && !PersianNameNormalizer.namesMatch(existing.name, canonicalUser.name)) {
+                    // Synchronize name change in all debtor shares!
+                    syncPersonNameInShares(existing.name, canonicalUser.name)
                 }
+                userProfileDao.updateUser(canonicalUser)
             }
         }
     }

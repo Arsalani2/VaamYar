@@ -38,11 +38,6 @@ object ShamsiDateHelper {
         return MONTH_NAMES[index]
     }
 
-    /**
-     * System Shamsi date computed from Gregorian device clock
-     */
-    fun getCurrentShamsiDate(): ShamsiDate = getSystemShamsiDate()
-
     fun getSystemShamsiDate(): ShamsiDate {
         val cal = Calendar.getInstance()
         return gregorianToJalali(

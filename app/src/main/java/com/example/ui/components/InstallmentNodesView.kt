@@ -129,7 +129,7 @@ fun InstallmentNodesView(
                 val year = startYear + (monthFromZero / 12)
                 val month = (monthFromZero % 12) + 1
                 val monthName = ShamsiDateHelper.getMonthName(month)
-                val shortYear = year % 100 // e.g. 03 for 1403
+                // فیکس bug.md/NB-23: متغیر مردهٔ shortYear (بدون هیچ استفاده‌ای) حذف شد.
 
                 val nodeBgColor by animateColorAsState(
                     targetValue = when {
