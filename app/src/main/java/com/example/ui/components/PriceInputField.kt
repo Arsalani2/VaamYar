@@ -46,11 +46,9 @@ fun PriceInputField(
             value = rawDigitsValue,
             onValueChange = { input ->
                 // فیکس bug.md/NB-5: بررسی وجود ممیز/اعشار برای هشدار فوری به کاربر
-                if (input.any { it == '.' || it == '/' || it == '٫' }) {
-                    hasInvalidSeparator = true
-                } else if (input.isBlank()) {
-                    hasInvalidSeparator = false
-                }
+                // فیکس bug.md/NB-26: خطا در هر تغییر دوباره ارزیابی می‌شود؛ اصلاحِ ورودی،
+                // خطا را بدون خالی‌کردن فیلد برمی‌دارد (قبلاً فقط با پاک‌شدن کامل فیلد ریست می‌شد)
+                hasInvalidSeparator = input.any { it == '.' || it == '/' || it == '٫' }
 
                 // Clean input: extract only numeric digits, convert Persian/Arabic digits to ASCII 0-9
                 val digitsOnly = input.filter { it.isDigit() }.map { c ->
@@ -146,3 +144,4 @@ fun PriceInputField(
         }
     }
 }
+
