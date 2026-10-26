@@ -198,7 +198,6 @@
 **راه‌حل (کامیت `d190f43`):**
 - `MainViewModel.refreshCurrentShamsiDate()` «تاریخ مؤثر» را دوباره می‌خواند و فقط در صورت تغییر، `currentShamsiDate` را تازه می‌کند.
 - چک دوره‌ایِ سبک در `init` (کوروتین با `delay(60_000)` — هر دقیقه یک خواندن از حافظهٔ SharedPreferences) عبور از نیمه‌شب/مرز ماه و حتی تغییر دستی ساعت سیستم را می‌پوشاند؛ چون SmartTips و مصرف‌کنندگان دیگر روی همین StateFlow سوارند، همه به‌صورت خودکار دوباره محاسبه می‌شوند.
-
 - `LoanItemCard` تاریخ را حالا به‌صورت پارامتر از ViewModel می‌گیرد (هر دو فراخوانی در `HomeScreen` به‌روز شدند)؛ خواندنِ مستقیم ساعت سیستم از UI برای همیشه حذف شد.
 
 ⚠️ مانند فیکس‌های قبلی، بیلد و تست در محیط تهیهٔ این گزارش ممکن نبود؛ پیش از merge/ریلیز یک‌بار `./gradlew testDebugUnitTest` اجرا شود.
@@ -399,7 +398,6 @@
 ### ۱. رفع باگ بازسازی مکرر وام‌های پیش‌فرض (Demo Loans Reseeding)
 - **شرح باگ:** کاربر با حذف وام‌های دمو یا خروج و ورود مجدد به برنامه، با ساخته‌شدن دوبارهٔ وام‌های پیش‌فرض مواجه می‌شد.
 - **اقدام اصلاحی:**
-
   - در `LoanRepository.kt` توابع بازنشانی داده (`clearAllLoansAndReset` و `clearAllDataAndReset`) صریحاً پرچم `appPreferences.initialDataSeeded = true` را ذخیره و حفظ می‌کنند تا حذف وام‌ها توسط کاربر به‌عنوان اجرای اول تلقی نشود.
   - متد `checkAndSeedInitialData` فقط زمانی اقدام به درج وام‌های اولیه می‌کند که این پرچم تا به حال تنظیم نشده باشد.
 
@@ -566,3 +564,29 @@
 
 ⚠️ بیلد و تست در محیط تهیهٔ این گزارش اجرا نشد (نبود Gradle/Android SDK). پیش از ریلیز بعدی حتماً `./gradlew assembleDebug testDebugUnitTest` اجرا شود — به‌خصوص برای **Migration 5→6** و اسکیمای Room نسخهٔ ۶ (جدول loan_installments + ایندکس یکتا)، کامپایل LoanInstallment/DAO و مسیرهای جدید MainViewModel/HomeScreen، و تست‌های بازنویسی‌شدهٔ P1-3.
 
+## فاز ۵ نقشهٔ راه بازبینی ۴.۵ — بکاپ و ایمپورت (NB-15/18/34+29/22)
+**تاریخ ثبت:** ۲۰۲۶-۱۰-۲۶ (۱۴۰۵/۰۸/۰۴) — چهار کامیت جداگانهٔ `[skip ci]` روی شاخه main؛ ریلیزی trigger نشد. شرح کامل در bug.md (نسخهٔ ۴، موارد NB-15/NB-18/NB-34+NB-29/NB-22).
+
+### رفع NB-15 — اشتراک‌گذاری واقعی فایل بکاپ (کامیت `054fe13`)
+- **شرح مشکل:** دکمهٔ «اشتراک‌گذاری» JSON خام را با `EXTRA_TEXT` می‌فرستاد؛ پیام‌رسان‌ها آن را به‌صورت متن می‌چسباندند نه فایل.
+- **اقدام اصلاحی:** FileProvider در AndroidManifest (authorities = `${applicationId}.fileprovider`) + `res/xml/file_paths.xml` (cache-path `backup/`). SettingsScreen: نوشتن JSON در `cacheDir/backup/` روی Dispatchers.IO → `FileProvider.getUriForFile` → `ACTION_SEND` با `EXTRA_STREAM` و `FLAG_GRANT_READ_URI_PERMISSION` → فایل واقعی با نام `vaamyar-backup-YYYYMMDD-HHmm.json` به اشتراک گذاشته می‌شود.
+
+### رفع NB-18 — آیکون سفارشی embedشده در بکاپ (کامیت `c583adc`)
+- **شرح مشکل:** بکاپ فقط مسیر absolute فایل آیکون را ذخیره می‌کرد؛ روی دستگاه/نصب دیگر فایل وجود نداشت (آیکون بی‌صدا به vector برمی‌گشت) و مسیر فایلسیستم در JSON هم نشت می‌کرد.
+- **اقدام اصلاحی:** BackupHelper: `BackupIcon(loanId, fileName, dataBase64)` + آرایهٔ `icons` در JSON (Base64 فایل PNG)؛ در loans فقط `fileName` نوشته می‌شود نه مسیر absolute (بدون آیکون → null). parse: sanitize (loanId موجود + dataBase64 غیرخالی) — بکاپ‌های قدیمی بدون آرایه → خالی، سازگار. LoanIconHelper: `saveCustomIconBytes` (نوشتن PNG خام در filesDir/loan_icons)؛ MainViewModel فایل‌های embedشده را قبل از restore روی دیسک می‌نویسد و `iconPaths` (loanId → مسیر تازه) را به restore/merge پاس می‌دهد؛ در rollback فایل‌های تازه پاک می‌شوند (فایل یتیم نمی‌ماند — هم‌راستا با NB-19).
+- **تست:** `nb18_backupEmbedsIconAndSanitizesPath` (بدون مسیر absolute در JSON؛ path=fileName؛ وام بدون فایل → null؛ icons حفظ) و `nb18_saveCustomIconBytesRoundTripsFileContent` (چرخهٔ بایت→فایل→خواندن→حذف) در PureLogicUnitTest.
+
+### رفع NB-34+NB-29 — پیش‌نمایش ایمپورت + حالت جایگزینی کامل/ادغام (کامیت `3aa4acd`)
+- **شرح مشکل:** ایمپورت بلافاصله کل دیتابیس را پاک و جایگزین می‌کرد؛ بدون پیش‌نمایش، بدون انتخاب حالت، بدون اطلاع از موارد تکراری (گزارش کاربر — بازخورد ۴.۵).
+- **اقدام اصلاحی:**
+  - کلید تطبیق (پیش‌نیاز F6 فاز ۳): `publicId`؛ fallback بکاپ قدیمی: کاربر/شریک با **نام کانونی** (PersianNameNormalizer)، وام با **عنوان + مبلغ ماهانه + سال/ماه شروع**.
+  - LoanRepository: `mergeFromBackup(users, loans, shares, records, installments, iconPaths, updateDuplicates)` داخل یک تراکنش اتمیک — کاربر جدید درج / تکراری به‌روزرسانی (حفظ isPrimary و publicId محلی) یا رد؛ وام تکراری → نسخهٔ بکاپ (اقساط/رکوردهایش جایگزین و شمارنده‌ها sync از رکوردهای واقعی) و وام جدید → رکوردهای بکاپ (یا بازسازی ترتیبی برای بکاپ قدیمی)؛ سهم‌ها با canonicalName + resolveOwnerPublicId؛ اینوارینت NB-4 (دقیقاً یک مبنا) حفظ می‌شود. `MergeSummary` (جدید/به‌روزرسانی/رد برای هر نوع) برای گزارش به کاربر. **idempotent** (اینوارینت #۱۰): ایمپورت دوبار همان فایل هیچ تکراری نمی‌سازد.
+  - MainViewModel: `ImportMode` (جایگزینی کامل / ادغام — به‌روزرسانی تکراری‌ها / ادغام — رد تکراری‌ها) + `prepareImportPreview` (شمارش‌ها + فهرست کاربر/وام جدید و موجود + پرچم legacyMatch وقتی تطبیق با fallback است) + `importBackupJson(json, mode)` با پیام موفقیتِ متمایز برای ادغام (از MergeSummary).
+  - SettingsScreen: انتخاب فایل فقط پیش‌نمایش می‌سازد؛ دیالوگ پیش‌نمایش (شمارش‌ها، فهرست جدید/تکراری، هشدار legacyMatch، هشدار جایگزینی کامل) + ۳ RadioButton حالت + تأیید «شروع ایمپورت» — تا قبل از تأییدِ صریح هیچ تغییری در داده رخ نمی‌دهد و انصراف در هر مرحله بدون تغییر است (NB-29 جذب شد). DAOهای جدید: `LoanDao.getAllLoansOnce` و `PaymentRecordDao.deleteRecordsForLoan`.
+- **تست:** `nb34_mergeIdempotentAndLegacyFallbackMatching` در LoanRepositoryIntegrityTest — ۴ مرحله: merge اول («علي» عربی‌نویس با نام کانونی به همان «علی» مچ و کاربر تکراری ساخته نمی‌شود؛ اقساط واقعی بکاپ درج و شمارنده‌ها sync)؛ merge دوم همان فایل (idempotent — صفر مورد جدید، تعدادها ثابت)؛ merge نسخهٔ قدیمی بدون publicId (همه با کلید fallback)؛ merge با update=false (همهٔ تکراری‌ها رد و دادهٔ فعلی دست‌نخورده).
+
+### رفع NB-22 — دیالوگ تأیید پیش از حذف وام (کامیت `b9869bb`)
+- **شرح مشکل:** دکمهٔ حذف در LoanItemCard مستقیم `deleteLoan` را صدا می‌زد (حذف دائمی + پاک شدن سابقه/آیکون) بدون هیچ تأییدی.
+- **اقدام اصلاحی:** ضربهٔ حذف فقط دیالوگ تأیید را باز می‌کند («وام X برای همیشه حذف شود؟ سابقهٔ پرداخت‌ها، اقساط و آیکون هم پاک می‌شود — فقط با فایل پشتیبان قابل بازیابی است»)؛ حذف فقط با «بله، حذف شود» انجام و «انصراف» هیچ تغییری نمی‌کند (اینوارینت #۹). تست دستی طبق قید bug.md.
+
+⚠️ بیلد و تست در محیط تهیهٔ این گزارش اجرا نشد (نبود Gradle/Android SDK). پیش از ریلیز بعدی حتماً `./gradlew assembleDebug testDebugUnitTest` اجرا شود — به‌خصوص برای **mergeFromBackup** و توابع تطبیق، entryهای جدید AndroidManifest/FileProvider (provider + file_paths.xml)، کامپایل SettingsScreen/MainActivity با API جدید ایمپورت، آیکون Base64 در چرخهٔ بکاپ/restore، و تست `nb34_mergeIdempotentAndLegacyFallbackMatching`.
