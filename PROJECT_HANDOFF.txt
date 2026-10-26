@@ -106,6 +106,22 @@ PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
   - برای جلوگیری از ریلیز عمومی تأییدنشده، تغییرات روی شاخه‌ی جدا push شد نه main (هر push به main ریلیز می‌سازد).
 محدودیت‌ها: رکوردهای تکراری ازقبل‌موجود در دیتابیس کاربران پاک‌سازی نمی‌شوند (نیازمند Migration نسخه 4؛ موکول به F1).
 
+[2026-10-26 (ساعت دقیق در دسترس نبود) — Claude Sonnet 5.5 (claude-sonnet-5-5)]
+اقدام: بررسی شکست ریلیز 1.0.5 (run 40374838798، commit b7d35b7 روی main).
+یافته‌ها (از وضعیت steps با gh):
+  - همه‌ی مراحل Unit Tests، Build (AAB/APK) و Upload موفق بودند؛ فقط مرحله‌ی «Commit and Push Version Bump»
+    با «Process completed with exit code 128» شکست خورد و مراحل Tag و Release رد شدند (skipped).
+  - دو Annotation مربوط به KSP (ApplicationManager.getApplication() is null) در همین run دیده شد، ولی چون
+    مرحله‌ی Build موفق بود، علت شکست نیست.
+  - لاگ کامل در دسترس نبود (403)، بنابراین علت زیر «استنباط قوی» است نه مشاهده‌ی مستقیم پیام git:
+    gradlew در ایندکس با mode 100644 ثبت شده؛ مرحله‌ی «Grant Execute Permission» با chmod +x آن را تغییر می‌دهد،
+    و `git pull --rebase origin main` با تغییر ردیابی‌شده‌ی commitنشده خطای
+    «cannot pull with rebase: You have unstaged changes» با exit code 128 می‌دهد.
+تغییرات:
+  1) .github/workflows/android-release.yml: `git pull --rebase --autostash origin main`.
+  2) `git update-index --chmod=+x gradlew` (mode در ریپو 100755 شد).
+وضعیت راستی‌آزمایی: هنوز اجرا نشده؛ پس از push باید run بعدی روی main بررسی شود (نتیجه در ورودی بعدی).
+
 ۳. رویکردهای موفق / ناموفق
 --------------------------
 - موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
