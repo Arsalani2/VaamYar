@@ -6,6 +6,7 @@ import com.example.model.LoanShareCalculator
 import com.example.model.UserProfile
 import com.example.util.BackupHelper
 import com.example.util.BackupPreferences
+import com.example.util.InputLimits
 import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
 import com.example.util.ShamsiDateHelper
@@ -19,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * تست‌های واحد JUnit برای منطق‌های خالص و مستقل (bug.md/P4-2 و NB-5 و P3-2 و NB-4).
+ * تست‌های واحد JUnit برای منطق‌های خالص و مستقل (bug.md/P4-2 و NB-5 و P3-2 و NB-4 و NB-33).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -141,6 +142,43 @@ class PureLogicUnitTest {
         for (m in 7..11) {
             assertEquals(30, ShamsiDateHelper.getDaysInShamsiMonth(1405, m))
         }
+    }
+
+    // ---------------------------------------------------------------- InputLimits (NB-33)
+
+    @Test
+    fun validateDurationMonths_validAndInvalidValues() {
+        // مقادیر معتبر — نباید خطا بدهند (شامل ارقام فارسی)
+        assertNull(InputLimits.validateDurationMonths("12"))
+        assertNull(InputLimits.validateDurationMonths("1"))
+        assertNull(InputLimits.validateDurationMonths("120"))
+        assertNull(InputLimits.validateDurationMonths("۲۴"))
+
+        // خارج از بازه — خطای صریح به‌جای clamp بی‌صدا (اینوارینت #۶: تایپ ۲۰۰ ≠ ذخیرهٔ ۱۲۰)
+        assertNotNull(InputLimits.validateDurationMonths("121"))
+        assertNotNull(InputLimits.validateDurationMonths("200"))
+        assertNotNull(InputLimits.validateDurationMonths("0"))
+        assertNotNull(InputLimits.validateDurationMonths("00"))
+
+        // خالی/غیرعددی — باید خطای صریح بدهد نه پذیرشِ بی‌صدا با مقدار پیش‌فرض
+        assertNotNull(InputLimits.validateDurationMonths(""))
+        assertNotNull(InputLimits.validateDurationMonths("abc"))
+    }
+
+    @Test
+    fun validateTitle_lengthAndBlank() {
+        // معتبر
+        assertNull(InputLimits.validateTitle("وام مسکن"))
+        assertNull(InputLimits.validateTitle("  بانک رسالت  "))
+
+        // خالی/فاصله — خطا
+        assertNotNull(InputLimits.validateTitle(""))
+        assertNotNull(InputLimits.validateTitle("   "))
+
+        // بلندتر از سقف — خطای صریح (نه برش بی‌صدا)
+        val longTitle = "عنوان وام بسیار طولانی".repeat(10)
+        assertTrue(longTitle.trim().length > InputLimits.MAX_TITLE_LENGTH)
+        assertNotNull(InputLimits.validateTitle(longTitle))
     }
 
     // ---------------------------------------------------------------- BackupHelper Validation (NB-4)

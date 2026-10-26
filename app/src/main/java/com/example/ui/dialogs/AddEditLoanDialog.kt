@@ -37,6 +37,7 @@ import com.example.model.Loan
 import com.example.model.UserProfile
 import com.example.ui.components.InstallmentNodesView
 import com.example.ui.components.PriceInputField
+import com.example.util.InputLimits
 import com.example.util.LoanIconDisplay
 import com.example.util.LoanIconHelper
 import com.example.util.NumberFormatter
@@ -104,6 +105,12 @@ fun AddEditLoanDialog(
     val totalMonths = remember(totalMonthsText) {
         NumberFormatter.parseInt(totalMonthsText).coerceIn(1, 120)
     }
+
+    // فیکس bug.md/NB-33: اعتبارسنجی صریح با بازخورد زنده — هیچ مقداری بی‌صدا clamp یا
+    // تغییر نمی‌شود؛ مقدار خارج از بازه فقط با اصلاحِ خود کاربر ذخیره می‌شود (ذخیره مسدود).
+    // coerceIn بالا فقط برای محاسبات نمایشی میانی است؛ مقدار ذخیره‌شده همان ورودی معتبر کاربر است.
+    val durationError = InputLimits.validateDurationMonths(totalMonthsText)
+    val titleError = InputLimits.validateTitle(title)
 
     // Auto-detected paid months from start date to current date
     val autoElapsed = remember(startDate.year, startDate.month, startDate.day, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day, totalMonths) {
@@ -448,12 +455,13 @@ fun AddEditLoanDialog(
                             )
                         }
 
-                        // فیکس bug.md/P3-12: هشدار در صورت وارد کردن مدت بیش از ۱۲۰ ماه
-                        if (NumberFormatter.parseInt(totalMonthsText) > 120) {
+                        // فیکس bug.md/NB-33: خطای صریح بازهٔ ۱..۱۲۰ با بازخورد زنده —
+                        // جایگزین clamp بی‌صدای P3-12؛ ذخیره تا اصلاح کاربر مسدود می‌ماند.
+                        durationError?.let {
                             Text(
-                                text = "⚠️ مدت بیش از ۱۲۰ ماه به ۱۲۰ محدود می‌شود.",
+                                text = it,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.tertiary
+                                color = MaterialTheme.colorScheme.error
                             )
                         }
 
@@ -676,10 +684,10 @@ fun AddEditLoanDialog(
                     // 8. Color Picker — فیکس bug.md/NB-32: به داخل ردیف فیلد نام منتقل شد (بخش ۱)
                 }
 
-                // فیکس bug.md/P3-12: خطاهای درون‌خطی برای مقادیر نامعتبر
-                if (title.trim().isBlank()) {
+                // فیکس bug.md/P3-12 و NB-33: خطاهای درون‌خطی برای مقادیر نامعتبر
+                titleError?.let {
                     Text(
-                        text = "عنوان وام نمی‌تواند خالی باشد.",
+                        text = it,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -704,8 +712,8 @@ fun AddEditLoanDialog(
                     }
 
                     Button(
-                        // فیکس bug.md/P1-8/P1-9 و P3-12: ذخیره برای عنوان خالی یا قسط صفر مسدود است
-                        enabled = !sharesExceedMonthly && !paidExceedsTotal && title.trim().isNotBlank() && rawMonthlyAmount > 0L,
+                        // فیکس bug.md/P1-8/P1-9 و P3-12 و NB-33: ذخیره برای عنوان/مدت نامعتبر یا قسط صفر مسدود است
+                        enabled = !sharesExceedMonthly && !paidExceedsTotal && titleError == null && durationError == null && rawMonthlyAmount > 0L,
                         onClick = {
                             // فیکس bug.md/P1-9: شمارنده‌ی پرداخت‌شده‌ها همیشه درون بازه‌ی
                             // 0..totalMonths نگه داشته می‌شود (دکمه در حالت ناسازگار غیرفعال است
