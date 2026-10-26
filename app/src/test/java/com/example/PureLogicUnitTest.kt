@@ -117,7 +117,24 @@ class PureLogicUnitTest {
         assertEquals(0L, myShare)
     }
 
-    // ---------------------------------------------------------------- ShamsiDateHelper (NB-12)
+    // ---------------------------------------------------------------- ShamsiDateHelper (NB-12, NB-25)
+
+    @Test
+    fun calculateEndDate_matchesSeedLoanSchedule() {
+        // فیکس bug.md/NB-25: پایان وام‌های seed باید دقیقاً خروجی calculateEndDate باشد
+        // (قسط اول = ماه شروع؛ قسط آخر = ماه شروع + مدت − ۱).
+        // loan1: شروع 1403/4، ۲۴ ماه → قسط آخر 1405/03 (نه 1405/04)
+        assertEquals(ShamsiDate(1405, 3, 1), ShamsiDateHelper.calculateEndDate(1403, 4, 24))
+        // loan2: شروع 1402/11، ۳۶ ماه → قسط آخر 1405/10 (نه 1405/11)
+        assertEquals(ShamsiDate(1405, 10, 1), ShamsiDateHelper.calculateEndDate(1402, 11, 36))
+        // loan3: شروع 1403/8، ۱۲ ماه → قسط آخر 1404/07 (نه 1404/08)
+        assertEquals(ShamsiDate(1404, 7, 1), ShamsiDateHelper.calculateEndDate(1403, 8, 12))
+        // مرزها: وام یک‌قسطه و وامِ دقیقاً ۱۲ماهه
+        assertEquals(ShamsiDate(1405, 1, 1), ShamsiDateHelper.calculateEndDate(1405, 1, 1))
+        assertEquals(ShamsiDate(1405, 12, 1), ShamsiDateHelper.calculateEndDate(1405, 1, 12))
+        // عبور از سال: شروع آذر ۱۲۰ ماه → قسط آخر اسفند
+        assertEquals(ShamsiDate(1415, 11, 1), ShamsiDateHelper.calculateEndDate(1405, 12, 120))
+    }
 
     @Test
     fun daysUntilDue_calculatesAccurately() {

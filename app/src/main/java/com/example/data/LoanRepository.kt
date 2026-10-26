@@ -79,6 +79,13 @@ class LoanRepository(
 
             // 2. Only seed 3 attractive guide loans if the loan database is completely empty
             if (loanDao.getCount() == 0) {
+                // فیکس bug.md/NB-25: پایان هر وام seed با همان calculateEndDate محاسبه می‌شود
+                // که payoffCountdownText و بقیهٔ اپ استفاده می‌کنند. ثابت‌های دستیِ قبلی یک
+                // ماه جلوتر بودند (قسط اول = ماه شروع؛ قسط آخر = ماه شروع + مدت − ۱) و
+                // «پایان وام» را در کارت‌ها غلط نشان می‌دادند.
+                val end1 = ShamsiDateHelper.calculateEndDate(1403, 4, 24)
+                val end2 = ShamsiDateHelper.calculateEndDate(1402, 11, 36)
+                val end3 = ShamsiDateHelper.calculateEndDate(1403, 8, 12)
                 // Loan 1: Personal loan - وام قرض‌الحسنه مهر ایران
                 val loan1 = Loan(
                     id = 0L,
@@ -89,8 +96,8 @@ class LoanRepository(
                     paidMonths = 8,
                     startYear = 1403,
                     startMonth = 4,
-                    endYear = 1405,
-                    endMonth = 4,
+                    endYear = end1.year,
+                    endMonth = end1.month,
                     category = "قرض‌الحسنه",
                     colorHex = 0xFF10B981L,
                     notes = "وام انفرادی جهت پس‌انداز و گردش حساب",
@@ -111,8 +118,8 @@ class LoanRepository(
                     paidMonths = 12,
                     startYear = 1402,
                     startMonth = 11,
-                    endYear = 1405,
-                    endMonth = 11,
+                    endYear = end2.year,
+                    endMonth = end2.month,
                     category = "خودرو",
                     colorHex = 0xFF2563EBL,
                     notes = "خرید خودرو مشترک با علی (سهم ۵۰-۵۰)",
@@ -143,8 +150,8 @@ class LoanRepository(
                     paidMonths = 4,
                     startYear = 1403,
                     startMonth = 8,
-                    endYear = 1404,
-                    endMonth = 8,
+                    endYear = end3.year,
+                    endMonth = end3.month,
                     category = "کالا",
                     colorHex = 0xFFF59E0BL,
                     notes = "اقساط خرید لوازم خانگی",
