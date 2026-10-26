@@ -71,6 +71,13 @@ fun LoanItemCard(
         ShamsiDateHelper.daysUntilDue(loan.dueDay, currentShamsiDate)
     }
 
+    // فیکس bug.md/NB-16: فاصله تا سررسیدِ «همین ماه» — منفی یعنی از موعدِ این ماه
+    // گذشته است؛ daysUntilDue برای سررسیدِ سپری‌شده به ماهِ بعد می‌پرد و عقب‌افتادگی
+    // را پنهان می‌کرد. چیپِ وامِ پرداخت‌نشده با این مقدار «X روز عقب» قرمز می‌شود.
+    val daysToDueThisMonth = remember(loan.dueDay, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
+        ShamsiDateHelper.daysUntilDueThisMonth(loan.dueDay, currentShamsiDate)
+    }
+
     // فیکس bug.md/F1+NB-31: نودها از رکوردهای واقعی اقساط رنگ می‌گیرند؛ ماه‌های
     // سپری‌شدهٔ بدون رکورد «عقب‌افتاده» شمرده می‌شوند (نه تیکِ ترتیبی از ماه شروع).
     val paidYearMonths = remember(installments) { installments.map { it.year to it.month }.toSet() }
@@ -192,6 +199,8 @@ fun LoanItemCard(
                                 shape = RoundedCornerShape(8.dp),
                                 color = when {
                                     loan.isCompleted -> MaterialTheme.colorScheme.surfaceVariant
+                                    // فیکس bug.md/NB-16: سررسیدِ این ماه سپری شده و هنوز پرداخت نشده → قرمز
+                                    daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.errorContainer
                                     daysRemaining == 0 -> MaterialTheme.colorScheme.errorContainer
                                     daysRemaining in 1..3 -> MaterialTheme.colorScheme.tertiaryContainer
                                     else -> MaterialTheme.colorScheme.surfaceVariant
@@ -200,6 +209,8 @@ fun LoanItemCard(
                                 Text(
                                     text = when {
                                         loan.isCompleted -> "تسویه کامل شده"
+                                        // فیکس bug.md/NB-16: «X روز عقب» به‌جای «در انتظار پرداخت» بی‌علامت
+                                        daysToDueThisMonth < 0 -> "عقب‌افتاده (${NumberFormatter.formatNumber(-daysToDueThisMonth, usePersian = usePersianDigits)} روز از سررسید)"
                                         daysRemaining == 0 -> "سررسید امروز!"
                                         daysRemaining > 0 -> "در انتظار پرداخت (${NumberFormatter.formatNumber(daysRemaining, usePersian = usePersianDigits)} روز مانده)"
                                         else -> "در انتظار پرداخت"
@@ -208,6 +219,7 @@ fun LoanItemCard(
                                     fontWeight = FontWeight.Bold,
                                     color = when {
                                         loan.isCompleted -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.error
                                         daysRemaining == 0 -> MaterialTheme.colorScheme.error
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     },

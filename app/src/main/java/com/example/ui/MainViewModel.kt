@@ -277,12 +277,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // فیکس bug.md/P2-6: فاصله تا سررسید با تقویم شمسیِ واقعی محاسبه می‌شود
             // (ماه‌های ۳۱روزه، اسفند ۲۹/۳۰روزه و سررسیدِ افتاده در ماه بعد) — قبلاً فقط
             // dueDay - day بود و روزهای منفی یا شمارشِ اشتباه می‌داد.
-            val daysDiff = ShamsiDateHelper.daysUntilDue(nextLoan.dueDay, curDate)
+            // فیکس bug.md/NB-16: عقب‌افتادگیِ سررسیدِ همین ماه هم دیده می‌شود؛
+            // daysUntilDue برای سررسیدِ سپری‌شده به ماهِ بعد می‌پرد و وضعیت عقب‌ماندن
+            // را از UI پنهان می‌کرد؛ حالا «X روز سپری شده» صریح اعلام می‌شود.
+            val daysThisMonth = ShamsiDateHelper.daysUntilDueThisMonth(nextLoan.dueDay, curDate)
 
             val timingText = when {
-                daysDiff == 0 -> "امروز موعد پرداخت است!"
-                daysDiff > 0 -> "${NumberFormatter.formatNumber(daysDiff, usePersian)} روز دیگر"
-                else -> "موعد این ماه سپری شده"
+                daysThisMonth == 0 -> "امروز موعد پرداخت است!"
+                daysThisMonth > 0 -> "${NumberFormatter.formatNumber(daysThisMonth, usePersian)} روز دیگر"
+                else -> "موعد این ماه ${NumberFormatter.formatNumber(-daysThisMonth, usePersian)} روز سپری شده است"
             }
 
             tips.add(

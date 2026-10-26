@@ -163,6 +163,17 @@ object ShamsiDateHelper {
     }
 
     /**
+     * فیکس bug.md/NB-16: فاصله تا سررسیدِ «همین ماه» — منفی یعنی X روز از موعدِ این
+     * ماه گذشته است (عقب‌افتادگیِ سررسید). برخلاف daysUntilDue که برای سررسیدِ سپری‌شده
+     * به ماهِ بعد می‌پرد و همیشه ≥ ۰ برمی‌گرداند، این تابع وضعیت واقعیِ همین ماه را
+     * برمی‌گرداند تا UI «X روز عقب» را نشان بدهد.
+     */
+    fun daysUntilDueThisMonth(dueDay: Int, currentDate: ShamsiDate): Int {
+        val effectiveDueDay = dueDay.coerceIn(1, getDaysInShamsiMonth(currentDate.year, currentDate.month))
+        return effectiveDueDay - currentDate.day
+    }
+
+    /**
      * فیکس bug.md/F1+NB-31: سال/ماه شمسیِ واقعیِ قسط [installmentNumber]-اُم (از ۱)
      * نسبت به ماه شروع وام — قسط ۱ = ماه شروع؛ قسط ۱۳ِ وامِ مهرماهِ ۱۴۰۳ = مهر ۱۴۰۴.
      * عبور از سال و مرز اسفند/فروردین درست حساب می‌شود. day=1 است (ماه، نه روز).

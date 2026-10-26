@@ -153,6 +153,28 @@ class PureLogicUnitTest {
     }
 
     @Test
+    fun nb16_daysUntilDueThisMonth_negativeMeansOverdue() {
+        // فیکس bug.md/NB-16: موعدِ همین ماه سپری شده → مقدار منفی = X روز عقب‌افتادگی
+        val today = ShamsiDate(1405, 8, 10)
+
+        // سررسید روز ۵، امروز ۱۰ آبان → ۵- روز از موعد گذشته
+        assertEquals(-5, ShamsiDateHelper.daysUntilDueThisMonth(5, today))
+
+        // همان روز → صفر
+        assertEquals(0, ShamsiDateHelper.daysUntilDueThisMonth(10, today))
+
+        // هنوز نرسیده → مثبت
+        assertEquals(3, ShamsiDateHelper.daysUntilDueThisMonth(13, today))
+
+        // clamp روز سررسید به طول ماه: آبان ۳۰روزه است؛ سررسید ۳۱ → ۳۰
+        assertEquals(20, ShamsiDateHelper.daysUntilDueThisMonth(31, today))
+
+        // اسفند ۱۴۰۵ (سال عادی، ۲۹ روز): سررسید ۳۰/۳۱ → ۲۹
+        val esfand = ShamsiDate(1405, 12, 20)
+        assertEquals(9, ShamsiDateHelper.daysUntilDueThisMonth(31, esfand))
+    }
+
+    @Test
     fun getDaysInShamsiMonth_matchesStandardCalendar() {
         // شش ماه اول ۳۱ روزه
         for (m in 1..6) {
