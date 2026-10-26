@@ -26,7 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.UserProfile
+import com.example.ui.ArrearsPrompt
 import com.example.ui.FinancialOverview
 import com.example.ui.SmartFinancialTip
 import com.example.ui.components.FinancialSummaryCard
@@ -34,6 +36,7 @@ import com.example.ui.components.LoanItemCard
 import com.example.ui.components.LoanViewMode
 import com.example.ui.components.SmartFinancialAdvisorCard
 import com.example.ui.dialogs.AddEditLoanDialog
+import com.example.util.NumberFormatter
 import com.example.util.ShamsiDate
 
 @Composable
@@ -41,6 +44,8 @@ fun HomeScreen(
     loans: List<Loan>,
     allShares: List<DebtorShare>,
     allUsers: List<UserProfile>,
+    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط (رنگ نودها) + دیالوگ عقب‌ماندگی
+    allInstallments: List<LoanInstallment>,
     currentShamsiDate: ShamsiDate,
     overview: FinancialOverview,
     smartTips: List<SmartFinancialTip>,
@@ -51,6 +56,10 @@ fun HomeScreen(
     onTogglePaidThisMonth: (Loan) -> Unit,
     onIncrementPaid: (Loan) -> Unit,
     onDecrementPaid: (Loan) -> Unit,
+    arrearsPrompt: ArrearsPrompt?,
+    onPayOnlyCurrentMonth: (Loan) -> Unit,
+    onPayAllArrears: (Loan) -> Unit,
+    onDismissArrearsPrompt: () -> Unit,
     onSaveLoan: (Loan, List<DebtorShare>) -> Unit,
     onDeleteLoan: (Long) -> Unit,
     onAddNewUser: (UserProfile) -> Unit,
@@ -98,11 +107,15 @@ fun HomeScreen(
                     val loanShares = remember(allShares, loan.id) {
                         allShares.filter { it.loanId == loan.id }
                     }
+                    val loanInstallments = remember(allInstallments, loan.id) {
+                        allInstallments.filter { it.loanId == loan.id }
+                    }
                     LoanItemCard(
                         loan = loan,
                         viewMode = LoanViewMode.SQUARE,
                         currentShamsiDate = currentShamsiDate,
                         debtorShares = loanShares,
+                        installments = loanInstallments,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
                         onTogglePaidThisMonth = { onTogglePaidThisMonth(loan) },
@@ -209,11 +222,15 @@ fun HomeScreen(
                         val loanShares = remember(allShares, loan.id) {
                             allShares.filter { it.loanId == loan.id }
                         }
+                        val loanInstallments = remember(allInstallments, loan.id) {
+                            allInstallments.filter { it.loanId == loan.id }
+                        }
                         LoanItemCard(
                             loan = loan,
                             viewMode = viewMode,
                             currentShamsiDate = currentShamsiDate,
                             debtorShares = loanShares,
+                            installments = loanInstallments,
                             usePersianDigits = usePersianDigits,
                             compactThousands = compactThousands,
                             onTogglePaidThisMonth = { onTogglePaidThisMonth(loan) },
@@ -239,6 +256,38 @@ fun HomeScreen(
         ) {
             Icon(imageVector = Icons.Default.Add, contentDescription = "افزودن وام")
         }
+    }
+
+    // فیکس bug.md/F1+NB-31: دیالوگ «فقط این ماه / همهٔ عقب‌مانده‌ها» — فقط وقتی
+    // عقب‌ماندگی هست پرسیده می‌شود (تصمیم کاربر، بند ۵ متد فیکس NB-31).
+    arrearsPrompt?.let { prompt ->
+        val monthsText = prompt.arrearsMonths.joinToString("، ") { it.monthName }
+        val countText = NumberFormatter.formatNumber(prompt.arrearsMonths.size, usePersian = true)
+        AlertDialog(
+            onDismissRequest = onDismissArrearsPrompt,
+            title = { Text("عقب‌ماندگی اقساط: ${prompt.loan.title}") },
+            text = {
+                Text(
+                    "این وام $countText ماهِ سررسیدگذشتهٔ پرداخت‌نشده دارد ($monthsText).\n" +
+                        "فقط قسط همین ماه ثبت شود یا همهٔ عقب‌مانده‌ها تا الان؟"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onPayAllArrears(prompt.loan) }) {
+                    Text("همهٔ عقب‌مانده‌ها")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { onPayOnlyCurrentMonth(prompt.loan) }) {
+                        Text("فقط این ماه")
+                    }
+                    TextButton(onClick = onDismissArrearsPrompt) {
+                        Text("انصراف")
+                    }
+                }
+            }
+        )
     }
 
     // Redesigned Add/Edit Loan Dialog

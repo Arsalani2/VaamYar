@@ -105,6 +105,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
     val loans by viewModel.allLoans.collectAsStateWithLifecycle()
     val allShares by viewModel.allShares.collectAsStateWithLifecycle()
     val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
+    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط + دیالوگ عقب‌ماندگی
+    val allInstallments by viewModel.allInstallments.collectAsStateWithLifecycle()
+    val arrearsPrompt by viewModel.arrearsPrompt.collectAsStateWithLifecycle()
     val primaryUser by viewModel.primaryUser.collectAsStateWithLifecycle()
     val overview by viewModel.financialOverview.collectAsStateWithLifecycle()
     val personSummaries by viewModel.personSummaries.collectAsStateWithLifecycle()
@@ -282,6 +285,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         loans = loans,
                         allShares = allShares,
                         allUsers = allUsers,
+                        allInstallments = allInstallments,
                         currentShamsiDate = currentShamsiDate,
                         overview = overview,
                         smartTips = smartTips,
@@ -292,6 +296,10 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onTogglePaidThisMonth = { viewModel.toggleLoanCurrentMonthPaid(it) },
                         onIncrementPaid = { viewModel.incrementPaidInstallment(it) },
                         onDecrementPaid = { viewModel.decrementPaidInstallment(it) },
+                        arrearsPrompt = arrearsPrompt,
+                        onPayOnlyCurrentMonth = { viewModel.payOnlyCurrentMonth(it) },
+                        onPayAllArrears = { viewModel.payAllArrearsAndCurrent(it) },
+                        onDismissArrearsPrompt = { viewModel.dismissArrearsPrompt() },
                         onSaveLoan = { loan, shares -> viewModel.saveLoan(loan, shares) },
                         onDeleteLoan = { viewModel.deleteLoan(it) },
                         onAddNewUser = { viewModel.saveUser(it) },

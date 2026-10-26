@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.LoanShareCalculator
 import com.example.util.LoanIconDisplay
 import com.example.util.NumberFormatter
@@ -44,6 +45,8 @@ fun LoanItemCard(
     currentShamsiDate: ShamsiDate,
     viewMode: LoanViewMode = LoanViewMode.RECTANGLE,
     debtorShares: List<DebtorShare> = emptyList(),
+    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط این وام — رنگ‌آمیزی نودها و تشخیص عقب‌افتاده‌ها
+    installments: List<LoanInstallment> = emptyList(),
     usePersianDigits: Boolean = true,
     compactThousands: Boolean = false,
     onTogglePaidThisMonth: () -> Unit,
@@ -66,6 +69,24 @@ fun LoanItemCard(
     // فیکس bug.md/NB-12: چیپ روزهای مانده از تقویم شمسی واقعی با ShamsiDateHelper.daysUntilDue محاسبه می‌شود
     val daysRemaining = remember(loan.dueDay, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day) {
         ShamsiDateHelper.daysUntilDue(loan.dueDay, currentShamsiDate)
+    }
+
+    // فیکس bug.md/F1+NB-31: نودها از رکوردهای واقعی اقساط رنگ می‌گیرند؛ ماه‌های
+    // سپری‌شدهٔ بدون رکورد «عقب‌افتاده» شمرده می‌شوند (نه تیکِ ترتیبی از ماه شروع).
+    val paidYearMonths = remember(installments) { installments.map { it.year to it.month }.toSet() }
+    val currentYearMonth = remember(currentShamsiDate.year, currentShamsiDate.month) {
+        currentShamsiDate.year to currentShamsiDate.month
+    }
+    val overdueYearMonths = remember(
+        loan.id, loan.totalMonths, loan.startYear, loan.startMonth,
+        installments, currentShamsiDate.year, currentShamsiDate.month
+    ) {
+        val curTotal = currentShamsiDate.year * 12 + (currentShamsiDate.month - 1)
+        (1..loan.totalMonths).mapNotNull { k ->
+            val m = ShamsiDateHelper.installmentMonth(loan.startYear, loan.startMonth, k)
+            val t = m.year * 12 + (m.month - 1)
+            if (t < curTotal && (m.year to m.month) !in paidYearMonths) m.year to m.month else null
+        }.toSet()
     }
 
     val loanAccentColor = Color(loan.colorHex)
@@ -330,7 +351,10 @@ fun LoanItemCard(
                                 startYear = loan.startYear,
                                 startMonth = loan.startMonth,
                                 accentColor = loanAccentColor,
-                                usePersianDigits = usePersianDigits
+                                usePersianDigits = usePersianDigits,
+                                paidYearMonths = paidYearMonths,
+                                overdueYearMonths = overdueYearMonths,
+                                currentYearMonth = currentYearMonth
                             )
 
                             // Clear Shamsi Calendar Schedule Card
@@ -561,7 +585,10 @@ fun LoanItemCard(
                                 startYear = loan.startYear,
                                 startMonth = loan.startMonth,
                                 accentColor = loanAccentColor,
-                                usePersianDigits = usePersianDigits
+                                usePersianDigits = usePersianDigits,
+                                paidYearMonths = paidYearMonths,
+                                overdueYearMonths = overdueYearMonths,
+                                currentYearMonth = currentYearMonth
                             )
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
@@ -707,7 +734,10 @@ fun LoanItemCard(
                                 startYear = loan.startYear,
                                 startMonth = loan.startMonth,
                                 accentColor = loanAccentColor,
-                                usePersianDigits = usePersianDigits
+                                usePersianDigits = usePersianDigits,
+                                paidYearMonths = paidYearMonths,
+                                overdueYearMonths = overdueYearMonths,
+                                currentYearMonth = currentYearMonth
                             )
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = onEdit) {

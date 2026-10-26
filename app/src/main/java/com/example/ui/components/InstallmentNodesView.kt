@@ -32,10 +32,20 @@ fun InstallmentNodesView(
     startMonth: Int,
     accentColor: Color,
     usePersianDigits: Boolean = true,
+    // فیکس bug.md/F1+NB-31: نودها از رکوردهای واقعی رنگ می‌گیرند، نه از شمارندهٔ ترتیبی —
+    // paidYearMonths = مجموعهٔ (سال، ماه) اقساط پرداخت‌شده (null = fallback ترتیبیِ قدیمی)،
+    // overdueYearMonths = ماه‌های سررسیدگذشتهٔ بدون رکورد، currentYearMonth = ماه جاریِ تقویم.
+    paidYearMonths: Set<Pair<Int, Int>>? = null,
+    overdueYearMonths: Set<Pair<Int, Int>> = emptySet(),
+    currentYearMonth: Pair<Int, Int>? = null,
     onNodeClick: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val currentMonthIndex = (paidMonths + 1).coerceAtMost(totalMonths)
+    // قسطِ متناظر با ماهِ جاریِ تقویم (اگر داخل بازهٔ وام باشد) — نه «قسط بعدیِ ترتیبی»
+    val currentMonthIndex = currentYearMonth?.let { (cy, cm) ->
+        val n = (cy * 12 + cm - 1) - (startYear * 12 + startMonth - 1) + 1
+        if (n in 1..totalMonths) n else null
+    } ?: (paidMonths + 1).coerceAtMost(totalMonths)
 
     // Pulsing animation for the current active month
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -98,6 +108,20 @@ fun InstallmentNodesView(
                     Text("قسط پیش‌رو", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
                 }
 
+                // فیکس bug.md/F1+NB-31: راهنمای وضعیت عقب‌افتاده
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                    )
+                    Text("عقب‌افتاده", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
+                }
+
                 // Remaining
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -121,9 +145,6 @@ fun InstallmentNodesView(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             for (k in 1..totalMonths) {
-                val isPaid = k <= paidMonths
-                val isCurrent = k == currentMonthIndex && paidMonths < totalMonths
-
                 // Calculate exact Shamsi month and year for this installment
                 val monthFromZero = (startMonth - 1) + (k - 1)
                 val year = startYear + (monthFromZero / 12)
@@ -131,9 +152,16 @@ fun InstallmentNodesView(
                 val monthName = ShamsiDateHelper.getMonthName(month)
                 // فیکس bug.md/NB-23: متغیر مردهٔ shortYear (بدون هیچ استفاده‌ای) حذف شد.
 
+                // فیکس bug.md/F1+NB-31: پرداخت‌بودن از رکوردهای واقعی (ماه شمسی)؛
+                // ماهِ سررسیدگذشتهٔ بدون رکورد = عقب‌افتاده
+                val isPaid = paidYearMonths?.contains(year to month) ?: (k <= paidMonths)
+                val isOverdue = !isPaid && overdueYearMonths.contains(year to month)
+                val isCurrent = k == currentMonthIndex && !isPaid && paidMonths < totalMonths
+
                 val nodeBgColor by animateColorAsState(
                     targetValue = when {
                         isPaid -> accentColor
+                        isOverdue -> MaterialTheme.colorScheme.errorContainer
                         isCurrent -> MaterialTheme.colorScheme.primaryContainer
                         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     },
@@ -180,10 +208,11 @@ fun InstallmentNodesView(
                             Text(
                                 text = monthName,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isCurrent || isPaid) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (isCurrent || isPaid || isOverdue) FontWeight.Bold else FontWeight.Medium,
                                 fontSize = 11.sp,
                                 color = when {
                                     isPaid -> Color.White
+                                    isOverdue -> MaterialTheme.colorScheme.onErrorContainer
                                     isCurrent -> MaterialTheme.colorScheme.onPrimaryContainer
                                     else -> MaterialTheme.colorScheme.onSurface
                                 }
@@ -197,6 +226,7 @@ fun InstallmentNodesView(
                             fontSize = 9.sp,
                             color = when {
                                 isPaid -> Color.White.copy(alpha = 0.85f)
+                                isOverdue -> MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                                 isCurrent -> MaterialTheme.colorScheme.primary
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }

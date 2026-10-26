@@ -7,9 +7,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.VamyarApp
+import com.example.data.CurrentMonthPayOutcome
 import com.example.data.UserDeleteCheckResult
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.LoanShareCalculator
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
@@ -70,6 +72,15 @@ enum class TipType {
     BUDGET_ADVICE
 }
 
+/**
+ * فیکس bug.md/F1+NB-31: دادهٔ دیالوگ «فقط این ماه / همهٔ عقب‌مانده‌ها» — وقتی کاربر
+ * «پرداخت این ماه» را می‌زند و وام ماه‌های سررسیدگذشتهٔ پرداخت‌نشده دارد.
+ */
+data class ArrearsPrompt(
+    val loan: Loan,
+    val arrearsMonths: List<com.example.data.ArrearsMonth>
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = (application as VamyarApp).repository
@@ -82,6 +93,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allRecords: StateFlow<List<PaymentRecord>> = repository.allRecords
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط — منبع رنگ‌آمیزی نودها و تشخیص عقب‌ماندگی
+    val allInstallments: StateFlow<List<LoanInstallment>> = repository.allInstallments
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allUsers: StateFlow<List<UserProfile>> = repository.allUsers
@@ -110,6 +125,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     )
     val currentShamsiDate: StateFlow<ShamsiDate> = _currentShamsiDate.asStateFlow()
+
+    // فیکس bug.md/F1+NB-31: دیالوگ انتخاب «فقط این ماه / همهٔ عقب‌مانده‌ها»
+    private val _arrearsPrompt = MutableStateFlow<ArrearsPrompt?>(null)
+    val arrearsPrompt: StateFlow<ArrearsPrompt?> = _arrearsPrompt.asStateFlow()
 
     // فیکس bug.md/P2-12: این فلو قبلاً یک val فریز‌شده در لحظهٔ ساختِ ViewModel بود؛
     // چون exportBackupJson از آن می‌خواند، خروجیِ بکاپ در همان نشستی که کاربر تاریخ
@@ -413,22 +432,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLoanCurrentMonthPaid(loan: Loan) {
         viewModelScope.launch {
-            val curDateStr = _currentShamsiDate.value.formatted()
-            repository.toggleCurrentMonthPaid(loan, curDateStr)
+            val cur = _currentShamsiDate.value
+            // فیکس bug.md/F1+NB-31: «پرداخت این ماه» به ماه جاریِ واقعیِ تقویم وصل است؛
+            // اگر عقب‌ماندگی باشد، طبق تصمیم کاربر (بند ۵ NB-31) دیالوگ انتخاب نشان داده می‌شود.
+            when (val outcome = repository.payCurrentMonthSmart(loan, cur)) {
+                is CurrentMonthPayOutcome.NeedsArrearsChoice -> {
+                    _arrearsPrompt.value = ArrearsPrompt(loan, outcome.arrears)
+                }
+                else -> {}
+            }
         }
+    }
+
+    /** گزینهٔ «فقط این ماه» از دیالوگ عقب‌ماندگی */
+    fun payOnlyCurrentMonth(loan: Loan) {
+        viewModelScope.launch {
+            val cur = _currentShamsiDate.value
+            repository.payInstallmentMonth(loan, cur.year, cur.month, cur)
+            _arrearsPrompt.value = null
+        }
+    }
+
+    /** گزینهٔ «همهٔ عقب‌مانده‌ها تا الان» از دیالوگ عقب‌ماندگی */
+    fun payAllArrearsAndCurrent(loan: Loan) {
+        viewModelScope.launch {
+            repository.payArrearsAndCurrentMonth(loan, _currentShamsiDate.value)
+            _arrearsPrompt.value = null
+        }
+    }
+
+    fun dismissArrearsPrompt() {
+        _arrearsPrompt.value = null
     }
 
     fun incrementPaidInstallment(loan: Loan) {
         viewModelScope.launch {
-            val curDateStr = _currentShamsiDate.value.formatted()
-            repository.recordInstallmentPayment(loan, isIncrement = true, curShamsiFormatted = curDateStr)
+            repository.recordInstallmentPayment(loan, isIncrement = true, currentDate = _currentShamsiDate.value)
         }
     }
 
     fun decrementPaidInstallment(loan: Loan) {
         viewModelScope.launch {
-            val curDateStr = _currentShamsiDate.value.formatted()
-            repository.recordInstallmentPayment(loan, isIncrement = false, curShamsiFormatted = curDateStr)
+            repository.recordInstallmentPayment(loan, isIncrement = false, currentDate = _currentShamsiDate.value)
         }
     }
 

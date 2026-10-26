@@ -163,6 +163,27 @@ object ShamsiDateHelper {
     }
 
     /**
+     * فیکس bug.md/F1+NB-31: سال/ماه شمسیِ واقعیِ قسط [installmentNumber]-اُم (از ۱)
+     * نسبت به ماه شروع وام — قسط ۱ = ماه شروع؛ قسط ۱۳ِ وامِ مهرماهِ ۱۴۰۳ = مهر ۱۴۰۴.
+     * عبور از سال و مرز اسفند/فروردین درست حساب می‌شود. day=1 است (ماه، نه روز).
+     */
+    fun installmentMonth(startYear: Int, startMonth: Int, installmentNumber: Int): ShamsiDate {
+        val n = (installmentNumber.coerceAtLeast(1) - 1)
+        val total = startYear * 12 + (startMonth - 1) + n
+        return ShamsiDate(total / 12, total % 12 + 1, 1)
+    }
+
+    /**
+     * فیکس bug.md/F1+NB-31: معکوسِ installmentMonth — شمارهٔ قسط (از ۱) متناظر با
+     * سال/ماه شمسیِ داده‌شده؛ null = قبل از ماه شروع وام.
+     * (بزرگ‌تر از totalMonths بودن را فراخوانی‌کننده چک می‌کند.)
+     */
+    fun installmentNumberForMonth(startYear: Int, startMonth: Int, year: Int, month: Int): Int? {
+        val diff = (year * 12 + month - 1) - (startYear * 12 + startMonth - 1)
+        return if (diff < 0) null else diff + 1
+    }
+
+    /**
      * فیکس bug.md/P2-2: طول واقعی ماه‌های تقویم شمسی — فروردین تا شهریور ۳۱ روز،
      * مهر تا بهمن ۳۰ روز، اسفند ۲۹ روز و در سال کبیسه ۳۰ روز.
      */

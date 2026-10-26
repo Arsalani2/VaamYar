@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.AppDatabase
+import com.example.data.CurrentMonthPayOutcome
 import com.example.data.LoanRepository
 import com.example.model.DebtorShare
 import com.example.model.Loan
@@ -11,6 +12,7 @@ import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.util.AppPreferences
 import com.example.util.PublicId
+import com.example.util.ShamsiDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -84,52 +86,90 @@ class LoanRepositoryIntegrityTest {
 
     private suspend fun currentLoan(id: Long): Loan = repository.allLoans.first().first { it.id == id }
 
-    // ---------------------------------------------------------------- P1-3
+    // فیکس bug.md/F1+NB-31: وامِ آزمایشِ قسط واقعی — شروع تیر ۱۴۰۵، سررسید ۱۰ هر ماه، ۱۲ قسط
+    private suspend fun insertLoanStartingTir(paidMonths: Int = 3): Loan {
+        val id = repository.saveLoanWithShares(
+            Loan(
+                title = "وام تست اقساط واقعی",
+                dueDay = 10,
+                monthlyAmount = 4_000_000L,
+                totalMonths = 12,
+                paidMonths = paidMonths,
+                startYear = 1405,
+                startMonth = 4, // تیر
+                myShareAmount = 4_000_000L
+            ),
+            emptyList()
+        )
+        return repository.allLoans.first().first { it.id == id }
+    }
+
+    // ---------------------------------------------------------------- P1-3 (روی مدل قسط واقعی F1)
 
     @Test
     fun p1_3_toggleOffRemovesRecord_andToggleOnAgainDoesNotDuplicate() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 3)
+        val loan = insertLoanStartingTir(paidMonths = 3) // رکورد تیر/مرداد/شهریور
+        val cur = ShamsiDate(1405, 8, 15) // آبان
 
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
+        // عقب‌ماندگی مهر (قسط ۴) → دیالوگ انتخاب (NeedsArrearsChoice)
+        val outcome = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(outcome is CurrentMonthPayOutcome.NeedsArrearsChoice)
+        val arrears = (outcome as CurrentMonthPayOutcome.NeedsArrearsChoice).arrears
+        assertEquals(1, arrears.size)
+        assertEquals(7, arrears.single().month) // مهر
+
+        // «همهٔ عقب‌مانده‌ها تا الان»: مهر + آبانِ جاری → ۵ قسط واقعی
+        repository.payArrearsAndCurrentMonth(currentLoan(loan.id), cur)
+        var installments = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(5, installments.size)
+        assertTrue("قسط ماه جاریِ واقعی (آبان ۱۴۰۵) باید ثبت شود", installments.any { it.year == 1405 && it.month == 8 })
+        assertEquals(5, currentLoan(loan.id).paidMonths)
+        assertTrue(currentLoan(loan.id).isCurrentMonthPaid)
+        // آینهٔ تاریخچه (P1-3): فقط دو پرداختِ جدید
         var records = repository.allRecords.first()
-        assertEquals(1, records.size)
-        assertEquals(4, records.single().installmentNumber)
+        assertEquals(2, records.size)
+        assertEquals(setOf(4, 5), records.map { it.installmentNumber }.toSet())
+
+        // برداشتن تیک ماه جاری: قسط آبان پس گرفته شود و شمارنده برگردد
+        val unpaid = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(unpaid is CurrentMonthPayOutcome.Unpaid)
+        installments = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(4, installments.size)
         assertEquals(4, currentLoan(loan.id).paidMonths)
-
-        // برداشتن تیک: رکورد باید حذف شود و شمارنده برگردد
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
-        records = repository.allRecords.first()
-        assertTrue("رکورد پس از برداشتن تیک باید حذف شود", records.isEmpty())
-        assertEquals(3, currentLoan(loan.id).paidMonths)
         assertFalse(currentLoan(loan.id).isCurrentMonthPaid)
-
-        // تیک دوباره: دقیقاً یک رکورد، نه دو تا
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
         records = repository.allRecords.first()
-        assertEquals(1, records.size)
-        assertEquals(4, records.single().installmentNumber)
+        assertEquals("رکورد تاریخچهٔ قسط پس‌گرفته‌شده باید حذف شود", 1, records.size)
+
+        // تیک دوباره: عقب‌ماندگی نمانده → مستقیم؛ دقیقاً یک رکورد اضافه، نه دو
+        val again = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(again is CurrentMonthPayOutcome.PaidDirect)
+        assertEquals(5, db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).size)
+        assertEquals(2, repository.allRecords.first().size)
     }
 
     @Test
     fun p1_3_staleLoanObjectDoesNotCreateDuplicateRecords() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 3)
+        val loan = insertLoanStartingTir(paidMonths = 3)
         val stale = currentLoan(loan.id) // نسخه‌ی کهنه‌ی UI
+        val cur = ShamsiDate(1405, 7, 15) // مهر؛ بدون عقب‌ماندگی (تیر..شهریور پرداخت شده)
 
-        // دوبار ضربه‌ی سریع با همان نسخه‌ی کهنه
-        repository.toggleCurrentMonthPaid(stale, "1405/08/03")
-        repository.toggleCurrentMonthPaid(stale, "1405/08/03")
+        // دوبار ضربه‌ی سریع با همان نسخه‌ی کهنه: اول پرداخت ماه جاری، دوم پس‌گرفتنِ همان
+        repository.payCurrentMonthSmart(stale, cur)
+        repository.payCurrentMonthSmart(stale, cur)
 
-        // دو toggle = برگشت به حالت اول؛ هیچ رکوردی نباید باقی بماند
+        // دو ضربه = برگشت به حالت اول؛ هیچ رکوردی نباید باقی بماند
         assertTrue(repository.allRecords.first().isEmpty())
         assertEquals(3, currentLoan(loan.id).paidMonths)
+        assertEquals(3, db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).size)
     }
 
     @Test
     fun p1_3_amountIsConsistentAcrossToggleAndIncrementPaths() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 3)
+        val loan = insertLoanStartingTir(paidMonths = 3)
+        val cur = ShamsiDate(1405, 7, 15) // مهر
 
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03") // قسط ۴
-        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, curShamsiFormatted = "1405/08/03") // قسط ۵
+        repository.payCurrentMonthSmart(currentLoan(loan.id), cur) // قسط ۴ (مهر) از مسیر ماه جاری
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur) // قسط ۵ (آبان) از مسیر +
 
         val records = repository.allRecords.first().sortedBy { it.installmentNumber }
         assertEquals(listOf(4, 5), records.map { it.installmentNumber })
@@ -139,12 +179,13 @@ class LoanRepositoryIntegrityTest {
 
     @Test
     fun p1_3_decrementRemovesRecordOfThatInstallment() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 3)
-        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, curShamsiFormatted = "1405/08/03") // ۴
-        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, curShamsiFormatted = "1405/08/03") // ۵
+        val loan = insertLoanStartingTir(paidMonths = 3)
+        val cur = ShamsiDate(1405, 8, 15)
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur) // ۴ (تیر)
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur) // ۵ (مرداد)
         assertEquals(2, repository.allRecords.first().size)
 
-        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = false, curShamsiFormatted = "1405/08/03")
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = false, currentDate = cur)
 
         val records = repository.allRecords.first()
         assertEquals(listOf(4), records.map { it.installmentNumber })
@@ -153,10 +194,71 @@ class LoanRepositoryIntegrityTest {
 
     @Test
     fun p1_3_completedLoanTickDoesNotCreateGhostRecord() = runBlocking {
-        val loan = insertSharedLoan(paidMonths = 12) // کاملاً تسویه‌شده (clamp)
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
+        val loan = insertLoanStartingTir(paidMonths = 12) // کاملاً تسویه‌شده
+        val cur = ShamsiDate(1405, 8, 15)
+        val outcome = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(outcome is CurrentMonthPayOutcome.Noop)
         assertTrue(repository.allRecords.first().isEmpty())
         assertEquals(12, currentLoan(loan.id).paidMonths)
+        assertEquals(12, db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).size)
+    }
+
+    // ---------------------------------------------------------------- F1+NB-31 (قسط واقعی)
+
+    @Test
+    fun f1_nb31_payCurrentMonthIsBoundToRealCalendarMonth() = runBlocking {
+        // سناریوی دقیق گزارش کاربر: وامِ شروع‌شده در تیر؛ «پرداخت این ماه» در آبان
+        val loan = insertLoanStartingTir(paidMonths = 0)
+        val cur = ShamsiDate(1405, 8, 15)
+
+        // عقب‌ماندگی هست → دیالوگ، نه تیکِ ترتیبیِ نودِ تیر (باگ قبلی)
+        val outcome = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(outcome is CurrentMonthPayOutcome.NeedsArrearsChoice)
+        val arrears = (outcome as CurrentMonthPayOutcome.NeedsArrearsChoice).arrears
+        assertEquals(listOf(4, 5, 6, 7), arrears.map { it.month }) // تیر، مرداد، شهریور، مهر
+
+        // گزینهٔ «فقط این ماه»: فقط آبان تیک می‌خورد؛ عقب‌مانده‌ها عقب‌افتاده می‌مانند
+        repository.payInstallmentMonth(currentLoan(loan.id), cur.year, cur.month, cur)
+        val installments = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(listOf(8), installments.map { it.month })
+        assertEquals(1, currentLoan(loan.id).paidMonths)
+        assertTrue(currentLoan(loan.id).isCurrentMonthPaid)
+
+        // گزینهٔ «همهٔ عقب‌مانده‌ها تا الان» روی همان وام: تیر..آبان
+        repository.payArrearsAndCurrentMonth(currentLoan(loan.id), cur)
+        val all = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).sortedBy { it.installmentNumber }
+        assertEquals(listOf(1, 2, 3, 4, 5), all.map { it.installmentNumber })
+        assertEquals(listOf(4, 5, 6, 7, 8), all.map { it.month })
+        assertEquals(5, currentLoan(loan.id).paidMonths)
+
+        // بدون عقب‌ماندگی، دیگر سوالی پرسیده نمی‌شود (بند ۵ NB-31): ماه بعد مستقیم ثبت می‌شود
+        val nextMonth = ShamsiDate(1405, 9, 15) // آذر
+        val direct = repository.payCurrentMonthSmart(currentLoan(loan.id), nextMonth)
+        assertTrue(direct is CurrentMonthPayOutcome.PaidDirect)
+        assertEquals(6, currentLoan(loan.id).paidMonths)
+    }
+
+    @Test
+    fun f1_manualIncrementPaysFirstUnpaidMonthAndDecrementUnpaysLast() = runBlocking {
+        val loan = insertLoanStartingTir(paidMonths = 0)
+        val cur = ShamsiDate(1405, 8, 15)
+
+        // «+» ترتیبی کار می‌کند اما روی رکوردهای واقعی: اولین ماهِ بدون رکورد = تیر
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur)
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur)
+        var installments = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).sortedBy { it.installmentNumber }
+        assertEquals(listOf(4, 5), installments.map { it.month }) // تیر و مرداد
+        assertEquals(2, currentLoan(loan.id).paidMonths)
+        // تاریخ واقعی پرداخت (نه تاریخ قسط) ثبت می‌شود
+        assertTrue(installments.all { it.paidAtTimestamp > 0L && it.paidDateShamsi.isNotBlank() })
+
+        // «+» سوم: شهریور؛ «−»: همان آخرین رکورد پس گرفته می‌شود
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = cur)
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = false, currentDate = cur)
+        installments = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(2, installments.size)
+        assertEquals(2, currentLoan(loan.id).paidMonths)
+        assertFalse(currentLoan(loan.id).isCurrentMonthPaid)
     }
 
     // ---------------------------------------------------------------- P1-4
@@ -199,7 +301,7 @@ class LoanRepositoryIntegrityTest {
     @Test
     fun p1_4_failedRestoreRollsBackAndKeepsExistingData() = runBlocking {
         val existing = insertSharedLoan()
-        repository.toggleCurrentMonthPaid(currentLoan(existing.id), "1405/08/03")
+        repository.recordInstallmentPayment(currentLoan(existing.id), isIncrement = true, currentDate = ShamsiDate(1405, 8, 15))
         val loansBefore = repository.allLoans.first()
         val sharesBefore = repository.allShares.first()
         val recordsBefore = repository.allRecords.first()
@@ -271,7 +373,7 @@ class LoanRepositoryIntegrityTest {
     fun nb_14_clearAllLoansLeavesNoOrphanPaymentRecords() = runBlocking {
         // وام با تاریخچهٔ پرداخت واقعی
         val loan = insertSharedLoan(paidMonths = 3)
-        repository.toggleCurrentMonthPaid(currentLoan(loan.id), "1405/08/03")
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = ShamsiDate(1405, 8, 15))
         assertTrue(repository.allRecords.first().isNotEmpty())
 
         repository.clearAllLoansAndReset()

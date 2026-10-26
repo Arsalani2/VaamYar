@@ -282,4 +282,42 @@ class PureLogicUnitTest {
         assertEquals("S-aaa111", data.shares.first().publicId)
         assertEquals("U-aaa111", data.shares.first().ownerPublicId)
     }
+
+    // ---------------------------------------------------------------- F1+NB-31 (نگاشت قسط ↔ ماه شمسی)
+
+    @Test
+    fun f1_installmentMonthMappingAndRoundtrip() {
+        // قسط ۱ = ماه شروع؛ قسط ۹ِ وامِ تیر ۱۴۰۳ = اسفند ۱۴۰۳؛ قسط ۱۰ = فروردین ۱۴۰۴
+        assertEquals(ShamsiDate(1403, 4, 1), ShamsiDateHelper.installmentMonth(1403, 4, 1))
+        assertEquals(ShamsiDate(1403, 12, 1), ShamsiDateHelper.installmentMonth(1403, 4, 9))
+        assertEquals(ShamsiDate(1404, 1, 1), ShamsiDateHelper.installmentMonth(1403, 4, 10))
+        // عبور از مرز سال در دی/بهمن/اسفند
+        assertEquals(ShamsiDate(1404, 1, 1), ShamsiDateHelper.installmentMonth(1403, 12, 2))
+        // ورودی نامعتبر (۰) به قسط ۱ تبدیل می‌شود، نه crash
+        assertEquals(ShamsiDate(1405, 4, 1), ShamsiDateHelper.installmentMonth(1405, 4, 0))
+
+        // معکوس: شمارهٔ قسط از سال/ماه شمسی
+        assertEquals(29, ShamsiDateHelper.installmentNumberForMonth(1403, 4, 1405, 8))
+        assertEquals(1, ShamsiDateHelper.installmentNumberForMonth(1403, 4, 1403, 4))
+        // قبل از شروع وام → null
+        assertNull(ShamsiDateHelper.installmentNumberForMonth(1403, 4, 1403, 3))
+
+        // رفت‌وبرگشت: هر شمارهٔ قسط به ماه و برعکس
+        for (k in 1..36) {
+            val m = ShamsiDateHelper.installmentMonth(1403, 11, k)
+            assertEquals(k, ShamsiDateHelper.installmentNumberForMonth(1403, 11, m.year, m.month))
+        }
+
+        // ماه‌های «سررسیدرسیده» با روزِ سررسید: سناریوی NB-31 (شروع تیر ۱۴۰۵، روز سررسید ۱۰)
+        // در ۱۵ آبان: اقساط ۱..۵ (تیر..آبان) سررسیدشان گذشته/رسیده است
+        assertEquals(
+            5,
+            ShamsiDateHelper.calculateElapsedInstallments(1405, 4, 10, 1405, 8, 15, 12)
+        )
+        // در ۳ آبان (قبل از روز سررسید): فقط تیر..مهر (۴ قسط)
+        assertEquals(
+            4,
+            ShamsiDateHelper.calculateElapsedInstallments(1405, 4, 10, 1405, 8, 3, 12)
+        )
+    }
 }

@@ -6,15 +6,17 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.util.ShamsiDateHelper
 
 @Database(
-    entities = [Loan::class, DebtorShare::class, PaymentRecord::class, UserProfile::class],
-    version = 5, // فیکس bug.md/F6: ستون‌های publicId (+ownerPublicId سهم‌ها) در سه جدول
+    entities = [Loan::class, DebtorShare::class, PaymentRecord::class, UserProfile::class, LoanInstallment::class],
+    version = 6, // فیکس bug.md/F1+NB-31: جدول loan_installments (قسط واقعی با ماه شمسی)
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun debtorShareDao(): DebtorShareDao
     abstract fun paymentRecordDao(): PaymentRecordDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun loanInstallmentDao(): LoanInstallmentDao
 
     companion object {
         @Volatile
@@ -78,6 +81,61 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // فیکس bug.md/F1+NB-31: جدول جدید loan_installments — رکورد به‌ازای هر قسطِ
+        // پرداخت‌شده با سال/ماه شمسیِ واقعی. داده‌های موجودِ هر وام (paidMonths قسطِ
+        // ترتیبی از ماه شروع) به رکوردهای ماهِ واقعی تبدیل می‌شوند تا هیچ پرداختی از
+        // دست نرود؛ رفتارِ قدیمیِ «ترتیبی» فقط به‌عنوان حالتِ آغازین حفظ می‌شود و
+        // از این پس «پرداخت این ماه» همیشه ماهِ جاریِ تقویم را ثبت می‌کند.
+        // مقدار paidAtTimestamp=0 و paidDateShamsi='' یعنی «تاریخ واقعی پرداخت نامعلوم»
+        // (مهاجرت از شمارندهٔ قدیمی) — تاریخ واقعی فقط برای پرداخت‌های جدید ثبت می‌شود.
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `loan_installments` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "`loanId` INTEGER NOT NULL, " +
+                        "`installmentNumber` INTEGER NOT NULL, " +
+                        "`year` INTEGER NOT NULL, " +
+                        "`month` INTEGER NOT NULL, " +
+                        "`amount` INTEGER NOT NULL, " +
+                        "`paidAtTimestamp` INTEGER NOT NULL, " +
+                        "`paidDateShamsi` TEXT NOT NULL)"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_loan_installments_loanId_year_month` " +
+                        "ON `loan_installments` (`loanId`, `year`, `month`)"
+                )
+                // backfill: برای هر وام، قسط‌های ۱..paidMonths با ماه شمسیِ متناظر درج می‌شوند
+                val cursor = database.query(
+                    "SELECT id, startYear, startMonth, paidMonths, monthlyAmount FROM loans WHERE paidMonths > 0"
+                )
+                cursor.use {
+                    while (it.moveToNext()) {
+                        val loanId = it.getLong(0)
+                        val startYear = it.getInt(1)
+                        val startMonth = it.getInt(2)
+                        val paidMonths = it.getInt(3)
+                        val monthlyAmount = it.getLong(4)
+                        for (k in 1..paidMonths) {
+                            val m = ShamsiDateHelper.installmentMonth(startYear, startMonth, k)
+                            val stmt = database.compileStatement(
+                                "INSERT OR IGNORE INTO `loan_installments` " +
+                                    "(`loanId`, `installmentNumber`, `year`, `month`, `amount`, `paidAtTimestamp`, `paidDateShamsi`) " +
+                                    "VALUES (?, ?, ?, ?, ?, 0, '')"
+                            )
+                            stmt.bindLong(1, loanId)
+                            stmt.bindLong(2, k.toLong())
+                            stmt.bindLong(3, m.year.toLong())
+                            stmt.bindLong(4, m.month.toLong())
+                            stmt.bindLong(5, monthlyAmount)
+                            stmt.executeInsert()
+                            stmt.close()
+                        }
+                    }
+                }
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -85,7 +143,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vamyar_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     // فیکس bug.md/P1-1: fallbackToDestructiveMigration(dropAllTables = true) حذف شد.
                     // هر تغییر اسکیمای آینده بدون Migration واقعی، دیگر داده‌های مالی کاربر را
                     // بی‌سروصدا پاک نمی‌کند؛ بلکه Room خطای IllegalStateException می‌دهد تا در زمان
