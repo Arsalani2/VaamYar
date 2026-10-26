@@ -2,6 +2,7 @@ package com.example
 
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.LoanShareCalculator
 import com.example.model.UserProfile
 import com.example.util.BackupHelper
@@ -281,6 +282,87 @@ class PureLogicUnitTest {
         assertEquals("L-aaa1111", data.loans.first().publicId)
         assertEquals("S-aaa111", data.shares.first().publicId)
         assertEquals("U-aaa111", data.shares.first().ownerPublicId)
+    }
+
+    @Test
+    fun f1_nb31_backupCarriesRealInstallmentsAndSanitizesThem() {
+        val json = BackupHelper.createBackupJson(
+            users = listOf(UserProfile(id = 1L, name = "علی", isPrimary = true, publicId = "U-aaa111")),
+            loans = listOf(
+                Loan(
+                    id = 10L, title = "وام تستی", dueDay = 10,
+                    monthlyAmount = 1_000_000L, totalMonths = 12, paidMonths = 2,
+                    startYear = 1405, startMonth = 4,
+                    myShareAmount = 1_000_000L, publicId = "L-aaa1111"
+                )
+            ),
+            shares = emptyList(),
+            records = emptyList(),
+            installments = listOf(
+                // معتبر: قسط ۱ و ۳ وام ۱۰ (قسط ۳ پرداخت‌شده وسط عقب‌ماندگی — سناریوی «فقط این ماه»)
+                LoanInstallment(loanId = 10L, installmentNumber = 1, year = 1405, month = 4, amount = 1_000_000L, paidDateShamsi = "1405/04/05"),
+                LoanInstallment(loanId = 10L, installmentNumber = 3, year = 1405, month = 6, amount = 1_000_000L, paidDateShamsi = "1405/06/05"),
+                // یتیم: وام ۹۹ وجود ندارد
+                LoanInstallment(loanId = 999L, installmentNumber = 1, year = 1405, month = 4, amount = 1_000_000L),
+                // خارج از بازه: قسط ۹۹ وامِ ۱۲ماهه
+                LoanInstallment(loanId = 10L, installmentNumber = 99, year = 1406, month = 4, amount = 1_000_000L)
+            ),
+            preferences = BackupPreferences(),
+            appVersion = "1.0.4"
+        )
+
+        val result = BackupHelper.parseAndValidateBackup(json)
+        assertTrue(result.isSuccess)
+        val data = result.getOrNull()!!
+
+        // فقط قسط‌های متعلق به وام‌های همین بکاپ و در بازهٔ ۱..totalMonths می‌مانند
+        assertEquals(listOf(1 to 4, 3 to 6), data.installments.map { it.installmentNumber to it.month })
+        assertEquals(1_000_000L, data.installments.first().amount)
+        assertEquals("1405/04/05", data.installments.first().paidDateShamsi)
+    }
+
+    @Test
+    fun f1_nb31_legacyBackupWithoutInstallmentsArrayParsesToEmptyList() {
+        // بکاپ قدیمی (قبل از F1+NB-31) آرایهٔ installments را ندارد → خالی برمی‌گردد
+        // و restore به بازسازی ترتیبی از paidMonths برمی‌گردد
+        val usersArray = org.json.JSONArray()
+            .put(
+                org.json.JSONObject()
+                    .put("id", 1L)
+                    .put("name", "علی")
+                    .put("isPrimary", true)
+                    .put("publicId", "U-aaa111")
+            )
+        val loansArray = org.json.JSONArray()
+            .put(
+                org.json.JSONObject()
+                    .put("id", 10L)
+                    .put("title", "وام قدیمی")
+                    .put("dueDay", 10)
+                    .put("monthlyAmount", 1_000_000L)
+                    .put("totalMonths", 12)
+                    .put("paidMonths", 3)
+                    .put("startYear", 1405)
+                    .put("startMonth", 4)
+                    .put("publicId", "L-aaa1111")
+            )
+        // بکاپ قدیمی: فقط users/loans/shares/records/preferences — بدون installments
+        val payload = org.json.JSONObject()
+            .put("users", usersArray)
+            .put("loans", loansArray)
+            .put("shares", org.json.JSONArray())
+            .put("records", org.json.JSONArray())
+        val root = org.json.JSONObject()
+            .put("app", "VaamYar")
+            .put("appIdentifier", "com.aistudio.vamyar")
+            .put("schemaVersion", 1)
+            .put("payload", payload)
+
+        val result = BackupHelper.parseAndValidateBackup(root.toString())
+        assertTrue(result.isSuccess)
+        val data = result.getOrNull()!!
+        assertTrue(data.installments.isEmpty())
+        assertEquals(3, data.loans.first().paidMonths)
     }
 
     // ---------------------------------------------------------------- F1+NB-31 (نگاشت قسط ↔ ماه شمسی)

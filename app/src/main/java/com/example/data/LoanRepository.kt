@@ -238,7 +238,9 @@ class LoanRepository(
         users: List<UserProfile>,
         loans: List<Loan>,
         shares: List<DebtorShare>,
-        records: List<PaymentRecord>
+        records: List<PaymentRecord>,
+        // فیکس bug.md/F1+NB-31 (بخش بکاپ): رکوردهای واقعی اقساط از بکاپ‌های جدید
+        installments: List<LoanInstallment> = emptyList()
     ) = withContext(Dispatchers.IO) {
         // فیکس bug.md/NB-19: آیکون‌های سفارشیِ دادهٔ قبلی که در دادهٔ ورودی هیچ مرجعی به آن‌ها
         // نیست، پس از commit موفق از دیسک پاک می‌شوند (فایل یتیم نماند)؛ آیکون‌هایی که خودِ
@@ -290,18 +292,28 @@ class LoanRepository(
             }
             records.forEach { paymentRecordDao.insertRecord(it) }
 
-            // فیکس bug.md/F1+NB-31 (بخش restore): قسط‌های واقعی هر وامِ بکاپ از
-            // paidMonths آن بازسازی می‌شوند (ترتیبی از ماه شروع) تا شمارندهٔ وام و
-            // رکوردهای اقساط هرگز ناسازگار نمانند. بکاپ‌های نسخهٔ بعد خودِ رکوردها را
-            // همراه می‌آورند و از همین مسیر مستقیم درج می‌شوند.
-            loans.forEach { l ->
-                seedSequentialInstallmentRecords(
-                    loanId = l.id,
-                    startYear = l.startYear,
-                    startMonth = l.startMonth,
-                    paidMonths = l.paidMonths.coerceIn(0, l.totalMonths),
-                    monthlyAmount = l.monthlyAmount
-                )
+            // فیکس bug.md/F1+NB-31 (بخش restore): اگر بکاپ رکوردهای واقعی اقساط را
+            // همراه داشته باشد (بکاپ جدید)، همان ماه‌های واقعیِ پرداخت‌شده مستقیماً
+            // درج می‌شوند — حتی اگر نامرتّب/جُزئی باشند (مثلاً «فقط این ماه» وسط
+            // عقب‌ماندگی). بکاپ قدیمی که آرایهٔ installments ندارد (خالی می‌رسد) به
+            // بازسازی ترتیبی از paidMonths برمی‌گردد تا شمارندهٔ وام و رکوردهای
+            // اقساط هرگز ناسازگار نمانند.
+            val validRestoredLoanIds = loans.map { it.id }.toSet()
+            val sanitizedRestoreInstallments = installments.filter {
+                it.loanId in validRestoredLoanIds
+            }
+            if (sanitizedRestoreInstallments.isNotEmpty()) {
+                sanitizedRestoreInstallments.forEach { loanInstallmentDao.insertInstallment(it) }
+            } else {
+                loans.forEach { l ->
+                    seedSequentialInstallmentRecords(
+                        loanId = l.id,
+                        startYear = l.startYear,
+                        startMonth = l.startMonth,
+                        paidMonths = l.paidMonths.coerceIn(0, l.totalMonths),
+                        monthlyAmount = l.monthlyAmount
+                    )
+                }
             }
         }
         staleIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }

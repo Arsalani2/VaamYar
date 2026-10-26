@@ -533,6 +533,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             loans = currentLoans,
             shares = currentShares,
             records = currentRecords,
+            // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط در بکاپ ذخیره می‌شوند تا
+            // ماه‌های پرداخت‌شدهٔ واقعی بعد از restore عیناً برگردند
+            installments = allInstallments.value,
             preferences = prefs,
             // فیکس bug.md/P2-13: نسخهٔ درج‌شده در فایل بکاپ دیگر هاردکد نیست؛ از
             // BuildConfig.VERSION_NAME خوانده می‌شود که در زمان بیلد از version.properties
@@ -556,7 +559,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 users = data.users,
                 loans = data.loans,
                 shares = data.shares,
-                records = data.records
+                records = data.records,
+                // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
+                // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
+                installments = data.installments
             )
 
             // Restore preferences

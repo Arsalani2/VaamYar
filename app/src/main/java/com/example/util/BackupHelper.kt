@@ -3,6 +3,7 @@ package com.example.util
 import android.content.Context
 import com.example.model.DebtorShare
 import com.example.model.Loan
+import com.example.model.LoanInstallment
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import org.json.JSONArray
@@ -27,6 +28,9 @@ data class BackupRestoreData(
     val loans: List<Loan>,
     val shares: List<DebtorShare>,
     val records: List<PaymentRecord>,
+    // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط (بکاپ قدیمی → خالی؛ restore در
+    // آن حالت به بازسازی ترتیبی از paidMonths برمی‌گردد)
+    val installments: List<LoanInstallment> = emptyList(),
     val preferences: BackupPreferences,
     val schemaVersion: Int,
     val exportedDate: String
@@ -46,6 +50,9 @@ object BackupHelper {
         loans: List<Loan>,
         shares: List<DebtorShare>,
         records: List<PaymentRecord>,
+        // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط هم در بکاپ ذخیره می‌شوند تا
+        // ماه‌های پرداخت‌شدهٔ واقعی (حتی نامرتّب/عقب‌مانده) بعد از restore سر جایشان بمانند
+        installments: List<LoanInstallment> = emptyList(),
         preferences: BackupPreferences,
         // فیکس bug.md/P2-13: پارامتر نسخه دیگر پیش‌فرض هاردکد ندارد تا هیچ فراخوانی
         // ناخواسته نسخهٔ کهره در فایل بکاپ درج نکند؛ تنها فراخوانیِ فعلی مقدار را از
@@ -140,6 +147,22 @@ object BackupHelper {
             recordsArray.put(rObj)
         }
         payload.put("records", recordsArray)
+
+        // 4.5. Installments (فیکس bug.md/F1+NB-31: رکورد واقعی هر قسط با ماه شمسی‌اش)
+        val installmentsArray = JSONArray()
+        for (ins in installments) {
+            val iObj = JSONObject()
+            iObj.put("id", ins.id)
+            iObj.put("loanId", ins.loanId)
+            iObj.put("installmentNumber", ins.installmentNumber)
+            iObj.put("year", ins.year)
+            iObj.put("month", ins.month)
+            iObj.put("amount", ins.amount)
+            iObj.put("paidAtTimestamp", ins.paidAtTimestamp)
+            iObj.put("paidDateShamsi", ins.paidDateShamsi)
+            installmentsArray.put(iObj)
+        }
+        payload.put("installments", installmentsArray)
 
         // 5. Preferences
         val prefsObj = JSONObject()
@@ -318,6 +341,32 @@ object BackupHelper {
             val sanitizedShares = sharesList.filter { it.loanId in validLoanIds }
             val sanitizedRecords = recordsList.filter { it.loanId in validLoanIds }
 
+            // 6.5. Parse Installments (فیکس bug.md/F1+NB-31: بکاپ قدیمی این آرایه را ندارد →
+            // خالی برمی‌گردد و restore به بازسازی ترتیبی از paidMonths برمی‌گردد)
+            val installmentsList = mutableListOf<LoanInstallment>()
+            val installmentsArray = payload.optJSONArray("installments") ?: JSONArray()
+            for (i in 0 until installmentsArray.length()) {
+                val ins = installmentsArray.getJSONObject(i)
+                installmentsList.add(
+                    LoanInstallment(
+                        id = ins.optLong("id", 0L),
+                        loanId = ins.optLong("loanId", 0L),
+                        installmentNumber = ins.optInt("installmentNumber", 1),
+                        year = ins.optInt("year", 1405),
+                        month = ins.optInt("month", 1).coerceIn(1, 12),
+                        amount = ins.optLong("amount", 0L),
+                        paidAtTimestamp = ins.optLong("paidAtTimestamp", System.currentTimeMillis()),
+                        paidDateShamsi = ins.optString("paidDateShamsi", "")
+                    )
+                )
+            }
+            // فقط قسط‌های متعلق به وام‌های همین بکاپ و در بازهٔ ۱..totalMonths وام پذیرفته می‌شوند
+            val loanTotalMonthsById = loansList.associate { it.id to it.totalMonths }
+            val sanitizedInstallments = installmentsList.filter {
+                it.loanId in validLoanIds &&
+                    it.installmentNumber in 1..(loanTotalMonthsById[it.loanId] ?: 0)
+            }
+
             // 7. Parse Preferences
             val prefsObj = payload.optJSONObject("preferences") ?: JSONObject()
             val preferences = BackupPreferences(
@@ -337,6 +386,7 @@ object BackupHelper {
                     loans = loansList,
                     shares = sanitizedShares,
                     records = sanitizedRecords,
+                    installments = sanitizedInstallments,
                     preferences = preferences,
                     schemaVersion = schemaVersion,
                     exportedDate = exportDate

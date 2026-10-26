@@ -11,6 +11,8 @@ import com.example.model.Loan
 import com.example.model.PaymentRecord
 import com.example.model.UserProfile
 import com.example.util.AppPreferences
+import com.example.util.BackupHelper
+import com.example.util.BackupPreferences
 import com.example.util.PublicId
 import com.example.util.ShamsiDate
 import kotlinx.coroutines.flow.first
@@ -259,6 +261,49 @@ class LoanRepositoryIntegrityTest {
         assertEquals(2, installments.size)
         assertEquals(2, currentLoan(loan.id).paidMonths)
         assertFalse(currentLoan(loan.id).isCurrentMonthPaid)
+    }
+
+    @Test
+    fun f1_nb31_backupRestoreRoundTripPreservesRealInstallments() = runBlocking {
+        // سناریو: وام تیر با عقب‌ماندگی؛ کاربر «فقط این ماه» (آبان) را پرداخت می‌کند
+        val loan = insertLoanStartingTir(paidMonths = 0)
+        val cur = ShamsiDate(1405, 8, 15)
+        val outcome = repository.payCurrentMonthSmart(currentLoan(loan.id), cur)
+        assertTrue(outcome is CurrentMonthPayOutcome.NeedsArrearsChoice)
+        repository.payInstallmentMonth(currentLoan(loan.id), cur.year, cur.month, cur)
+        assertEquals(listOf(8), db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).map { it.month })
+
+        // چرخهٔ کامل بکاپ: create → parse → restore با رکوردهای واقعی
+        val json = BackupHelper.createBackupJson(
+            users = repository.allUsers.first(),
+            loans = repository.allLoans.first(),
+            shares = repository.allShares.first(),
+            records = repository.allRecords.first(),
+            installments = repository.allInstallments.first(),
+            preferences = BackupPreferences(),
+            appVersion = "1.0.4"
+        )
+        val data = BackupHelper.parseAndValidateBackup(json).getOrThrow()
+        assertEquals(listOf(8), data.installments.map { it.month })
+
+        repository.restoreDatabaseSnapshot(
+            users = data.users, loans = data.loans, shares = data.shares,
+            records = data.records, installments = data.installments
+        )
+
+        // ماه واقعیِ پرداخت‌شده (آبان) عیناً برگشته — نه بازسازی ترتیبی ۱..paidMonths
+        assertEquals(listOf(8), db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).map { it.month })
+        assertEquals(1, currentLoan(loan.id).paidMonths)
+        assertTrue(currentLoan(loan.id).isCurrentMonthPaid)
+
+        // مسیر بکاپ قدیمی (بدون installments): بازسازی ترتیبی از paidMonths همان وام
+        repository.restoreDatabaseSnapshot(
+            users = data.users, loans = data.loans, shares = data.shares,
+            records = data.records, installments = emptyList()
+        )
+        val legacyMonths = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).map { it.month }
+        assertEquals(listOf(4), legacyMonths) // قسط ۱ = تیر (بازسازی ترتیبی)
+        assertEquals(1, currentLoan(loan.id).paidMonths)
     }
 
     // ---------------------------------------------------------------- P1-4
