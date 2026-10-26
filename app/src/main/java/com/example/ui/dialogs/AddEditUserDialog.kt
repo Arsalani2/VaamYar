@@ -29,14 +29,15 @@ fun AddEditUserDialog(
     var notes by remember { mutableStateOf(userToEdit?.notes ?: "") }
     var selectedColor by remember { mutableLongStateOf(userToEdit?.avatarColorHex ?: 0xFF1976D2L) }
 
+    // فیکس bug.md/NB-27: برچسب‌های عمومی رنگ‌ها جایگزین نام‌های شخصی شد
     val colorOptions = listOf(
-        0xFFD4AF37L, // Gold (Arsalan)
-        0xFFC2185BL, // Ruby (Zahra)
-        0xFFF57C00L, // Orange (Mohammadreza)
-        0xFF0288D1L, // Blue (Amirali)
-        0xFF388E3CL, // Green
-        0xFF7B1FA2L, // Purple
-        0xFF455A64L  // Slate
+        0xFFD4AF37L, // طلایی
+        0xFFC2185BL, // یاقوتی
+        0xFFF57C00L, // نارنجی
+        0xFF0288D1L, // آبی
+        0xFF388E3CL, // سبز
+        0xFF7B1FA2L, // بنفش
+        0xFF455A64L  // خاکستری
     )
 
     Dialog(onDismissRequest = onDismiss) {
