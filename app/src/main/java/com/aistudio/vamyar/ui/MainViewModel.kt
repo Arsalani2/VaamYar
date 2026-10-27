@@ -608,10 +608,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun saveLoan(loan: Loan, shares: List<DebtorShare>) {
+    // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) اقساط از دیالوگ + تاریخِ مؤثر اپ —
+    // Repository در همان تراکنش، رکوردها را هم‌ارز و شمارنده‌ها را sync می‌کند.
+    fun saveLoan(loan: Loan, shares: List<DebtorShare>, paidYearMonths: Set<Pair<Int, Int>>) {
         viewModelScope.launch {
             try {
-                repository.saveLoanWithShares(loan, shares)
+                repository.saveLoanWithShares(loan, shares, paidYearMonths, _currentShamsiDate.value)
             } catch (e: Exception) {
                 // فیکس bug.md/NB-35/36: دفاع در عمق Repository (سهم بی‌مالک / نام و عنوان
                 // تکراری) — پیام کاربر در فیلد مربوطهٔ دیالوگ است؛ اینجا فقط لاگ می‌شود

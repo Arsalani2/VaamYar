@@ -34,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.model.Loan
+import com.aistudio.vamyar.model.LoanInstallment
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.ui.components.InstallmentNodesView
 import com.aistudio.vamyar.ui.components.PriceInputField
@@ -53,6 +54,9 @@ import kotlinx.coroutines.withContext
 fun AddEditLoanDialog(
     loanToEdit: Loan? = null,
     initialShares: List<DebtorShare> = emptyList(),
+    // فیکس bug.md/NB-37: رکوردهای واقعی اقساط وامِ در حال ویرایش — منبع واحدِ
+    // تیک‌های دیالوگ (نه شمارندهٔ ترتیبی).
+    initialInstallments: List<LoanInstallment> = emptyList(),
     allUsers: List<UserProfile> = emptyList(),
     // فیکس bug.md/NB-36: عناوین وام‌های موجود برای چک زندهٔ «عنوان تکراری» (self = ویرایش‌شونده)
     allLoanTitles: List<String> = emptyList(),
@@ -61,7 +65,7 @@ fun AddEditLoanDialog(
     compactThousands: Boolean = false,
     onDismiss: () -> Unit,
     onAddNewUser: (UserProfile) -> Unit,
-    onSave: (Loan, List<DebtorShare>) -> Unit
+    onSave: (Loan, List<DebtorShare>, Set<Pair<Int, Int>>) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -147,12 +151,13 @@ fun AddEditLoanDialog(
         )
     }
 
-    // فیکس bug.md/P1-5: «قسط رسیده» با «قسط پرداخت‌شده» یکی نیست.
-    // autoElapsed فقط تعداد اقساطِ سررسیدرسیده را «نمایش» می‌دهد؛ paidMonths تنها با
-    // تأیید صریح کاربر (دکمهٔ ثبتِ رسیده‌ها یا لمس دایرهٔای اقساط) تغییر می‌کند؛
-    // افکت قدیمی که هنگام تغییر تاریخ شروع/مدت، paidMonths را بازنویسی می‌کرد حذف شد.
-    var paidMonths by remember {
-        mutableIntStateOf(loanToEdit?.paidMonths ?: 0)
+    // فیکس bug.md/P1-5: «قسط رسیده» با «قسط پرداخت‌شده» یکی نیست — autoElapsed فقط
+    // نمایشِ سررسیدرسیده‌هاست؛ تیک‌ها تنها با تأیید صریح کاربر (چیپ ثبتِ رسیده‌ها
+    // یا لمس دایره‌ها) تغییر می‌کنند.
+    // فیکس bug.md/NB-37: تیک‌های دیالوگ مجموعهٔ (سال، ماه) واقعی از رکوردهای
+    // LoanInstallment هستند (مثل LoanItemCard) — نه شمارندهٔ ترتیبی؛ وام جدید از صفر.
+    var paidYearMonths by remember {
+        mutableStateOf(initialInstallments.map { it.year to it.month }.toSet())
     }
 
     // Dynamic list of debtor shares (سهم شرکا)
@@ -180,9 +185,32 @@ fun AddEditLoanDialog(
     val sharesExceedMonthly = hasPartners && othersTotalShare > rawMonthlyAmount
     val primaryUserName = allUsers.firstOrNull { it.isPrimary }?.name?.trim()
 
-    // فیکس bug.md/P1-9: کاهش «مدت وام» زیر «اقساط پرداخت‌شده» دیگر بی‌صدا ذخیره نمی‌شود؛
-    // ذخیره مسدود و دلیلش به کاربر نمایش داده می‌شود تا داده‌ی ناسازگار ساخته نشود.
-    val paidExceedsTotal = paidMonths > totalMonths
+    // فیکس bug.md/NB-37: ماه‌های سررسیدگذشتهٔ بدون تیک (نود عقب‌افتاده) — همان
+    // منطق LoanItemCard؛ ماهِ جاریِ تقویم «عقب‌افتاده» نیست (رسیدگی جداگانه).
+    val overdueYearMonths = remember(totalMonths, startDate.year, startDate.month, currentShamsiDate.year, currentShamsiDate.month, paidYearMonths) {
+        val curTotal = currentShamsiDate.year * 12 + (currentShamsiDate.month - 1)
+        (1..totalMonths).mapNotNull { k ->
+            val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, k)
+            val key = m.year to m.month
+            if (m.year * 12 + (m.month - 1) < curTotal && key !in paidYearMonths) key else null
+        }.toSet()
+    }
+    // فیکس bug.md/NB-37: ماه‌های رسیدهٔ پرداخت‌نشده (ماه جاریِ رسیده هم شامل است) —
+    // چیپ quick-sync همهٔ همین‌ها را یک‌جا تیک می‌زند (معادل payArrearsAndCurrentMonth).
+    val unpaidArrivedMonths = remember(autoElapsed, startDate.year, startDate.month, paidYearMonths) {
+        (1..autoElapsed).mapNotNull { k ->
+            val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, k)
+            val key = m.year to m.month
+            if (key !in paidYearMonths) key else null
+        }.toSet()
+    }
+    // فیکس bug.md/NB-37: شمارندهٔ نمایشی فقط تیک‌های داخل بازهٔ ۱..totalMonths است؛
+    // «پرداخت‌شده > کل» در دیالوگ ممکن نیست (نودها تا totalMonths رندر می‌شوند)
+    // و دفاعِ نهایی P1-9 در Repository می‌ماند.
+    val paidInRangeCount = paidYearMonths.count { (y, m) ->
+        val n = ShamsiDateHelper.installmentNumberForMonth(startDate.year, startDate.month, y, m)
+        n != null && n in 1..totalMonths
+    }
 
     val endDate = remember(startDate, totalMonths) {
         ShamsiDateHelper.calculateEndDate(startDate.year, startDate.month, totalMonths)
@@ -543,7 +571,7 @@ fun AddEditLoanDialog(
                                     color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Text(
-                                        text = "${NumberFormatter.formatNumber(paidMonths, usePersianDigits)} از ${NumberFormatter.formatNumber(totalMonths, usePersianDigits)}",
+                                        text = "${NumberFormatter.formatNumber(paidInRangeCount, usePersianDigits)} از ${NumberFormatter.formatNumber(totalMonths, usePersianDigits)}",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
@@ -552,19 +580,20 @@ fun AddEditLoanDialog(
                                 }
                             }
 
-                            // Quick sync chip button
-                            if (paidMonths != autoElapsed) {
+                            // فیکس bug.md/NB-37: چیپ quick-sync = «ثبت همهٔ ماه‌های
+                            // رسیدهٔ پرداخت‌نشده» — روی مجموعهٔ (سال، ماه) واقعی.
+                            if (unpaidArrivedMonths.isNotEmpty()) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     TextButton(
-                                        onClick = { paidMonths = autoElapsed },
+                                        onClick = { paidYearMonths = paidYearMonths + unpaidArrivedMonths },
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Icon(Icons.Default.AutoMode, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ثبت ${autoElapsed} قسط رسیده به‌عنوان پرداخت‌شده", style = MaterialTheme.typography.labelSmall)
+                                        Text("ثبت همهٔ ${NumberFormatter.formatNumber(unpaidArrivedMonths.size, usePersianDigits)} قسط رسیدهٔ پرداخت‌نشده", style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -572,17 +601,20 @@ fun AddEditLoanDialog(
                             // Interactive Nodes View inside dialog
                             InstallmentNodesView(
                                 totalMonths = totalMonths,
-                                paidMonths = paidMonths,
+                                paidMonths = paidInRangeCount,
                                 startYear = startDate.year,
                                 startMonth = startDate.month,
                                 accentColor = Color(selectedColor),
                                 usePersianDigits = usePersianDigits,
+                                // فیکس bug.md/NB-37: نودها از رکوردهای واقعی (سال، ماه)
+                                // رنگ می‌گیرند — مثل LoanItemCard؛ لمس نود toggle همان ماه است.
+                                paidYearMonths = paidYearMonths,
+                                overdueYearMonths = overdueYearMonths,
+                                currentYearMonth = currentShamsiDate.year to currentShamsiDate.month,
                                 onNodeClick = { clickedInstallment ->
-                                    paidMonths = if (paidMonths == clickedInstallment) {
-                                        clickedInstallment - 1
-                                    } else {
-                                        clickedInstallment
-                                    }
+                                    val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, clickedInstallment)
+                                    val key = m.year to m.month
+                                    paidYearMonths = if (key in paidYearMonths) paidYearMonths - key else paidYearMonths + key
                                 }
                             )
 
@@ -593,14 +625,9 @@ fun AddEditLoanDialog(
                                 fontSize = 10.sp
                             )
 
-                            // فیکس bug.md/P1-9: هشدار ناسازگاریِ «اقساط پرداخت‌شده > کل اقساط»
-                            if (paidExceedsTotal) {
-                                Text(
-                                    text = "⚠️ تعداد اقساط پرداخت‌شده (${NumberFormatter.formatNumber(paidMonths, usePersianDigits)}) از کل اقساط (${NumberFormatter.formatNumber(totalMonths, usePersianDigits)}) بیشتر است؛ مدت وام را بیشتر کنید یا با لمس دایره‌ها اقساط پرداخت‌شده را کاهش دهید.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
+                            // فیکس bug.md/NB-37: هشدار P1-9 حذف شد — تیک‌ها (سال، ماه)
+                            // واقعی‌اند و نودها فقط تا totalMonths رندر می‌شوند؛
+                            // «پرداخت‌شده > کل» در دیالوگ ممکن نیست.
                         }
                     }
 
@@ -733,35 +760,24 @@ fun AddEditLoanDialog(
 
                     Button(
                         // فیکس bug.md/P1-8/P1-9 و P3-12 و NB-33: ذخیره برای عنوان/مدت نامعتبر یا قسط صفر مسدود است
-                        enabled = !sharesExceedMonthly && !paidExceedsTotal && titleError == null && durationError == null && rawMonthlyAmount > 0L,
+                        enabled = !sharesExceedMonthly && titleError == null && durationError == null && rawMonthlyAmount > 0L,
                         onClick = {
-                            // فیکس bug.md/P1-9: شمارنده‌ی پرداخت‌شده‌ها همیشه درون بازه‌ی
-                            // 0..totalMonths نگه داشته می‌شود (دکمه در حالت ناسازگار غیرفعال است
-                            // و این coerceIn صرفاً دفاع در عمق است)…
-                            val effectivePaidMonths = paidMonths.coerceIn(0, totalMonths)
-                            // …و پرچمِ «پرداخت ماه جاری» با ویرایشِ کاربر روی شمارنده sync می‌شود:
-                            // اگر کاربر شمارنده را تغییر داده باشد، مقدار قطعی از مقایسه‌ی پرداخت‌شده‌ها
-                            // با اقساطِ رسیده/کل اقساط محاسبه می‌شود؛ اگر فقط مشخصات دیگر را ویرایش کرده
-                            // باشد، پرچم فعلی وام دست‌نخورده می‌ماند.
-                            val paidCountChanged = effectivePaidMonths != (loanToEdit?.paidMonths ?: 0)
-                            val effectiveCurrentMonthPaid = when {
-                                effectivePaidMonths >= totalMonths -> true // وام تسویه شده است
-                                paidCountChanged -> autoElapsed > 0 && effectivePaidMonths >= autoElapsed
-                                else -> loanToEdit?.isCurrentMonthPaid ?: false
-                            }
+                            // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) واقعی مستقیم به
+                            // Repository می‌رود تا رکوردها هم‌ارز و شمارنده‌ها از روی
+                            // همان رکوردها sync شوند (دفاع P1-9 در Repository می‌ماند).
                             val loan = (loanToEdit ?: Loan(
                                 title = title.ifBlank { "وام جدید" },
                                 dueDay = startDate.day,
                                 monthlyAmount = rawMonthlyAmount,
                                 totalMonths = totalMonths,
-                                paidMonths = effectivePaidMonths
+                                paidMonths = paidInRangeCount
                             )).copy(
                                 title = title.ifBlank { "وام جدید" },
                                 dueDay = startDate.day,
                                 monthlyAmount = rawMonthlyAmount,
                                 totalMonths = totalMonths,
-                                paidMonths = effectivePaidMonths,
-                                isCurrentMonthPaid = effectiveCurrentMonthPaid,
+                                paidMonths = paidInRangeCount,
+                                isCurrentMonthPaid = (currentShamsiDate.year to currentShamsiDate.month) in paidYearMonths,
                                 startYear = startDate.year,
                                 startMonth = startDate.month,
                                 endYear = endDate.year,
@@ -774,7 +790,7 @@ fun AddEditLoanDialog(
                                 customIconPath = customIconPath
                             )
 
-                            onSave(loan, sharesList)
+                            onSave(loan, sharesList, paidYearMonths)
                         },
                         modifier = Modifier.weight(1f)
                     ) {

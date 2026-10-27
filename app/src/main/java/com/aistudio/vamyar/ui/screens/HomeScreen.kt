@@ -63,7 +63,7 @@ fun HomeScreen(
     onPayOnlyCurrentMonth: (Loan) -> Unit,
     onPayAllArrears: (Loan) -> Unit,
     onDismissArrearsPrompt: () -> Unit,
-    onSaveLoan: (Loan, List<DebtorShare>) -> Unit,
+    onSaveLoan: (Loan, List<DebtorShare>, Set<Pair<Int, Int>>) -> Unit,
     onDeleteLoan: (Long) -> Unit,
     onAddNewUser: (UserProfile) -> Unit,
     onTipAction: ((SmartFinancialTip) -> Unit)? = null,
@@ -329,8 +329,8 @@ fun HomeScreen(
             compactThousands = compactThousands,
             onDismiss = { showAddDialog = false },
             onAddNewUser = onAddNewUser,
-            onSave = { newLoan, shares ->
-                onSaveLoan(newLoan, shares)
+            onSave = { newLoan, shares, paidYearMonths ->
+                onSaveLoan(newLoan, shares, paidYearMonths)
                 showAddDialog = false
             }
         )
@@ -340,9 +340,14 @@ fun HomeScreen(
         val existingShares = remember(allShares, loan.id) {
             allShares.filter { it.loanId == loan.id }
         }
+        // فیکس bug.md/NB-37: رکوردهای واقعی اقساط وام — منبع تیک‌های دیالوگ ویرایش
+        val existingInstallments = remember(allInstallments, loan.id) {
+            allInstallments.filter { it.loanId == loan.id }
+        }
         AddEditLoanDialog(
             loanToEdit = loan,
             initialShares = existingShares,
+            initialInstallments = existingInstallments,
             allUsers = allUsers,
             // فیکس bug.md/NB-36: چک زندهٔ عنوان تکراری (خودِ وامِ در حال ویرایش مستثناست)
             allLoanTitles = loans.map { it.title },
@@ -351,8 +356,8 @@ fun HomeScreen(
             compactThousands = compactThousands,
             onDismiss = { loanToEdit = null },
             onAddNewUser = onAddNewUser,
-            onSave = { updatedLoan, shares ->
-                onSaveLoan(updatedLoan, shares)
+            onSave = { updatedLoan, shares, paidYearMonths ->
+                onSaveLoan(updatedLoan, shares, paidYearMonths)
                 loanToEdit = null
             }
         )
