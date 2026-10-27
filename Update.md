@@ -638,3 +638,37 @@
 - MainViewModel: `reminderHour/reminderMinute` + `setReminderTime(hour, minute)` — ذخیره در AppPreferences (پیش‌فرض ۱۰:۰۰ از فیکس P2-7) و فراخوانی `NotificationHelper.scheduleDailyCheck(app)` برای زمان‌بندی مجدد آلارم با ساعت جدید (BootCompletedReceiver بعد از ری‌بوت هم از همین منبع می‌خواند — معیار پذیرش: ساعت تنظیم‌شده در اعلان روز بعد اعمال شود).
 
 ⚠️ بیلد و تست در محیط تهیهٔ این گزارش اجرا نشد (نبود Gradle/Android SDK). پیش از ریلیز بعدی حتماً `./gradlew assembleDebug testDebugUnitTest` اجرا شود — به‌خصوص برای **rename پکیج کل** (هر ۴۹ فایل)، حذف وابستگی‌ها از فایل‌های gradle (KSP بدون moshi codegen)، ورک‌فلوی ارتقایافته (اکشن‌های v6/v7)، و کامپایل SettingsScreen/MainViewModel/MainActivity با API جدید NB-24.
+---
+
+## موج ۱ نقشهٔ راه بازبینی ۵ — بحران‌های داده و هویت (NB-43 + NB-38 + NB-36 + NB-35)
+
+**تاریخ:** ۲۰۲۶-۱۰-۲۷ • **بدون ریلیز** — کامیت‌های `[skip ci]` روی main؛ آخرین ریلیز همچنان v1.0.6. ترتیب اجرا: NB-43 → NB-38 → NB-36 → NB-35 (وابستگی NB-35 به `existingUsers`ِ NB-36).
+
+### رفع NB-43 — حذف گزینهٔ «شروع ماه جدید (صفر کردن واریزها)» از مطالبات (کامیت `f7de2cc`)
+- حذف کامل دکمه از ReceivablesScreen و مسیر `resetMonthlyDebtorStatus` از MainViewModel و MainActivity و LoanRepository — دکمهٔ دستیِ رِسِتِ پرچم‌های ماه جاری، با وجود رِسِت خودکار، زائد و برای کاربر مبهم بود.
+- `MonthlyRolloverHelper` (رِسِت خودکار در هر مرز ماه — فیکس P1-6) عمداً دست‌نخورده ماند.
+
+### رفع NB-38 — نام‌گذاری برخوردناپذیر فایل‌های آیکون وام (کامیت `f2f1766`)
+- ریشه: `saveCustomIconBytes` نام فایل را `loan_icon_${System.currentTimeMillis()}.png` می‌ساخت؛ حلقهٔ ایمپورت بکاپ چند آیکون را در همان میلی‌ثانیه می‌نویسد → برخورد نام فایل → overwrite → «همه یک عکس» یا آیکون‌های قاطی.
+- `uniqueIconFile` در LoanIconHelper (timestamp + nanoTime + حلقهٔ ۵تایی `File.exists` + UUID پشتیبان) جایگزین هر دو مسیر `saveCustomIconImage` و `saveCustomIconBytes` شد (اینوارینت #۱۳).
+- تست رگرسیون: `nb38_fiftyIconsBackToBackGetDistinctFiles` — ۵۰ ذخیرهٔ پشت‌سرهم = ۵۰ فایل متمایز.
+
+### رفع NB-36 — یکتایی نام کاربر و عنوان وام در سه لایه (کامیت `e741988`)
+- **دیالوگ:** `AddEditUserDialog`ِ درونِ دیالوگ وام حالا `existingUsers = allUsers` می‌گیرد (چک تکراری NB-20 دیگر دور زده نمی‌شود)؛ پارامتر `allLoanTitles` در AddEditLoanDialog + خطای زندهٔ `isError` زیر فیلد عنوان.
+- **InputLimits:** `validateUniqueTitle` با کلید استاندارد `PersianNameNormalizer.matchKey` + `selfKey` برای ویرایش (هم‌نویسه‌های عربی و فاصله‌های زائد هم‌نام شمرده می‌شوند).
+- **Repository (دفاع در عمق):** `DuplicateNameException` — `saveUser` و `saveLoanWithShares` نام/عنوان تکراری را رد می‌کنند (ویرایش با حذف خودِ وام مجاز است). استثنای مستند: تطبیق/ادغام ایمپورت بکاپ (NB-34) که به‌روزرسانی/رد است، نه خطا.
+- MainViewModel: try/catch + Log در `saveUser` و `saveLoan`.
+- تست‌ها: `nb36_validateUniqueTitle` (خالص) + `nb36_repositoryRejectsDuplicateUserName` / `nb36_repositoryRejectsDuplicateLoanTitle` (Room).
+
+### رفع NB-35 — شریک فقط از کاربران تعریف‌شده (کامیت `a725bda` — بحرانی‌ترین باگ بازبینی ۵)
+- حذف کامل فیلد آزاد «نام شریک»؛ انتخاب فقط از فهرست کاربران — چیپ‌ها در `LazyRow` (فهرست بلند).
+- دیالوگ «کاربر جدید» به داخل دیالوگ شریک منتقل شد؛ بعد از ثبت، همان کاربرِ جدید خودکار انتخاب می‌شود (`selectedUserName = newUser.name.trim()`).
+- `InputLimits.isDefinedPartner` (matchKey) نام غیرتعریف‌شده را رد می‌کند؛ `DebtorShare` با `ownerPublicId` کاربرِ انتخابی ساخته می‌شود (اینوارینت #۱۱).
+- **Repository (دفاع در عمق):** `OwnerlessShareException` — سهمِ جدیدِ بدون مالک هم در ثبت و هم در ویرایش رد می‌شود (سهم‌های matched قدیمی permissive می‌مانند)؛ rollback داده تضمین‌شده.
+- تست‌ها: `nb35_isDefinedPartner` + `nb35_newShareWithoutDefinedOwnerIsRejected` (ثبت و ویرایش) + فیکسچر `insertSharedLoan` با کاربر «علی» (publicId `U-tst345`).
+
+### تست و CI
+- توسعه روی برنچ `fix/wave-1`: NB-43 (`bb478ca`) → NB-38 (`073cad2`) → NB-36 (`ecf99d0`) → NB-35 (`f621fef`).
+- `unit-tests.yml` روی `fix/wave-1` سبز شد — ران‌های #۱۳ و #۱۴ completed successfully (ران‌های #۱۱/#۱۲ فقط به‌خاطر ران جدیدتر cancelled شدند).
+- سپس همان ۴ فیکس به‌ترتیب روی main بازتولید شد (`f7de2cc` → `f2f1766` → `e741988` → `a725bda`)، همه با `[skip ci]` — بدون trigger ورک‌فلوی ریلیز؛ byte-diff فایل‌های کلیدی (LoanRepository، AddEditLoanDialog، هر دو فایل تست) بین main و fix/wave-1 یکسان تأیید شد.
+- ریلیز (v1.0.7) فقط با دستور صریح کاربر.
