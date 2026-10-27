@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.aistudio.vamyar.ui.screens
 
 import android.content.Intent

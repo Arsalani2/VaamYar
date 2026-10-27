@@ -70,7 +70,7 @@ class LoanRepository(
 
     // فیکس bug.md/F1+NB-31: منبع واحدِ حقیقتِ اقساط واقعی؛ DAO از همان اینستنس
     // دیتابیس گرفته می‌شود تا سازنده (و همهٔ فراخوانی‌های موجود در اپ/تست) دست‌نخورده بماند.
-    private val loanInstallmentDao: LoanInstallmentDao get() = database.loanInstallmentDao()
+    private val loanInstallmentDao: LoanInstallmentDao get() = (database as AppDatabase).loanInstallmentDao()
     val allInstallments: Flow<List<LoanInstallment>> get() = loanInstallmentDao.getAllInstallments()
 
     /**

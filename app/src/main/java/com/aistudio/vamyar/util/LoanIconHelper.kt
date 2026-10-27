@@ -225,9 +225,10 @@ fun LoanIconDisplay(
             .background(tintColor.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center
     ) {
-        if (customBitmap != null) {
+        val loadedBitmap = customBitmap
+        if (loadedBitmap != null) {
             Image(
-                bitmap = customBitmap.asImageBitmap(),
+                bitmap = loadedBitmap.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
