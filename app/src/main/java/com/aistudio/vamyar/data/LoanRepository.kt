@@ -412,7 +412,7 @@ class LoanRepository(
         updateDuplicates: Boolean
     ): MergeSummary = withContext(Dispatchers.IO) {
         database.withTransaction {
-            val existingUsers = userProfileDao.getAllUsersOnce()
+            var existingUsers = userProfileDao.getAllUsersOnce()
             val existingLoans = loanDao.getAllLoansOnce()
             val existingShares = debtorShareDao.getAllSharesOnce()
             val hasLocalPrimary = existingUsers.any { it.isPrimary }
@@ -439,14 +439,25 @@ class LoanRepository(
                         skippedUsers++
                     }
                 } else {
-                    userProfileDao.insertUser(
+                    val newUserPublicId = if (PublicId.isValidUserId(u.publicId)) u.publicId else uniqueUserPublicId()
+                    // اگر دیتابیس خالی است پرچم مبنا حفظ می‌شود؛ وگرنه کاربر تازه مبنا نمی‌شود
+                    val newUserIsPrimary = if (hasLocalPrimary) false else u.isPrimary
+                    val insertedUserId = userProfileDao.insertUser(
                         u.copy(
                             id = 0L,
                             name = canonicalName,
-                            publicId = if (PublicId.isValidUserId(u.publicId)) u.publicId else uniqueUserPublicId(),
-                            // اگر دیتابیس خالی است پرچم مبنا حفظ می‌شود؛ وگرنه کاربر تازه مبنا نمی‌شود
-                            isPrimary = if (hasLocalPrimary) false else u.isPrimary
+                            publicId = newUserPublicId,
+                            isPrimary = newUserIsPrimary
                         )
+                    )
+                    // فیکس تست NB-34: کاربر تازه‌درج‌شده به snapshot موجود هم اضافه می‌شود تا
+                    // رکوردهای بعدیِ همین حلقه (مثلاً نام عربی «علي») او را تکراری ببینند
+                    // و دوباره درج نشود (snapshot کهنه = دو کاربر از یک نفر).
+                    existingUsers = existingUsers + u.copy(
+                        id = insertedUserId,
+                        name = canonicalName,
+                        publicId = newUserPublicId,
+                        isPrimary = newUserIsPrimary
                     )
                     newUsers++
                 }

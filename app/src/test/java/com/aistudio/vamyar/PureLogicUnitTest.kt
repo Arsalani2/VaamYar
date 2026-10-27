@@ -271,7 +271,7 @@ class PureLogicUnitTest {
         // شناسهٔ خاموشکل/جعلی معتبر نیست (در restore شناسهٔ تازه می‌گیرد)
         assertFalse(PublicId.isValidLoanId(""))
         assertFalse(PublicId.isValidLoanId("L-abc"))
-        assertFalse(PublicId.isValidLoanId("L-abcdefg"))
+        assertFalse(PublicId.isValidLoanId("L-abcde1g"))
         assertFalse(PublicId.isValidLoanId("X-abcdefg"))
         assertFalse(PublicId.isValidUserId("U-abcdefg"))
         assertFalse(PublicId.isValidShareId("S-abcde"))

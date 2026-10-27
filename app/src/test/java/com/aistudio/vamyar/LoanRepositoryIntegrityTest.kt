@@ -494,9 +494,9 @@ class LoanRepositoryIntegrityTest {
     @Test
     fun f6_restoreKeepsValidPublicIdsAndBackfillsLegacyOnes() = runBlocking {
         // دستهٔ ۱: رکوردهای بکاپ جدید با شناسهٔ معتبر — باید دست‌نخورده حفظ شوند
-        val userWithId = UserProfile(id = 1L, name = "علی", publicId = "U-aaa111")
-        val loanWithId = Loan(id = 101L, title = "وام رستور", dueDay = 10, monthlyAmount = 2_000_000L, totalMonths = 12, publicId = "L-aaa1111")
-        val shareWithId = DebtorShare(loanId = 101L, loanTitle = "وام رستور", personName = "علی", shareAmount = 1_000_000L, publicId = "S-aaa111", ownerPublicId = "U-aaa111")
+        val userWithId = UserProfile(id = 1L, name = "علی", publicId = "U-aaa234")
+        val loanWithId = Loan(id = 101L, title = "وام رستور", dueDay = 10, monthlyAmount = 2_000_000L, totalMonths = 12, publicId = "L-aaa2345")
+        val shareWithId = DebtorShare(loanId = 101L, loanTitle = "وام رستور", personName = "علی", shareAmount = 1_000_000L, publicId = "S-aaa234", ownerPublicId = "U-aaa234")
         // دستهٔ ۲: رکوردهای بکاپ قدیمی بدون شناسه — باید شناسهٔ تازهٔ یکتا بگیرند
         val legacyUser = UserProfile(id = 2L, name = "مهدی")
         val legacyLoan = Loan(id = 102L, title = "وام قدیمی", dueDay = 15, monthlyAmount = 1_000_000L, totalMonths = 10)
@@ -514,10 +514,10 @@ class LoanRepositoryIntegrityTest {
         val shares = repository.allShares.first()
 
         // شناسه‌های معتبر بکاپ عیناً حفظ شده‌اند (بازیابی idempotent)
-        assertEquals("U-aaa111", users.first { it.name == "علی" }.publicId)
-        assertEquals("L-aaa1111", loans.first { it.title == "وام رستور" }.publicId)
-        assertEquals("S-aaa111", shares.first { it.personName == "علی" }.publicId)
-        assertEquals("U-aaa111", shares.first { it.personName == "علی" }.ownerPublicId)
+        assertEquals("U-aaa234", users.first { it.name == "علی" }.publicId)
+        assertEquals("L-aaa2345", loans.first { it.title == "وام رستور" }.publicId)
+        assertEquals("S-aaa234", shares.first { it.personName == "علی" }.publicId)
+        assertEquals("U-aaa234", shares.first { it.personName == "علی" }.ownerPublicId)
 
         // رکوردهای قدیمی شناسهٔ معتبر و یکتا گرفته‌اند
         val mehdiUser = users.first { it.name == "مهدی" }
@@ -545,10 +545,10 @@ class LoanRepositoryIntegrityTest {
     fun nb34_mergeIdempotentAndLegacyFallbackMatching() = runBlocking {
         // دادهٔ «بکاپ»: علی با شناسهٔ یکتا + «علي» عربی‌نویس با شناسهٔ متفاوت +
         // دو وام (A با رکورد/قسط، C شراکتی با سهم رضا)
-        val userAli = UserProfile(id = 11L, publicId = "U-aaa111", name = "علی", isPrimary = true)
+        val userAli = UserProfile(id = 11L, publicId = "U-aaa234", name = "علی", isPrimary = true)
         val userAliArabic = UserProfile(id = 12L, publicId = "U-bbb222", name = "\u0639\u0644\u064A") // «علي» با ي عربی
         val loanA = Loan(
-            id = 21L, publicId = "L-aaa1111", title = "وام رستور",
+            id = 21L, publicId = "L-aaa2345", title = "وام رستور",
             dueDay = 10, monthlyAmount = 4_000_000L, totalMonths = 12, paidMonths = 2,
             startYear = 1405, startMonth = 4, endYear = 1406, endMonth = 4,
             myShareAmount = 4_000_000L
@@ -560,7 +560,7 @@ class LoanRepositoryIntegrityTest {
             hasPartners = true
         )
         val shareReza = DebtorShare(
-            id = 31L, publicId = "S-aaa111", ownerPublicId = "U-aaa111",
+            id = 31L, publicId = "S-aaa234", ownerPublicId = "U-aaa234",
             loanId = 23L, loanTitle = "وام جدید ادغام", personName = "رضا",
             shareAmount = 1_000_000L, dueDay = 5
         )
@@ -596,7 +596,7 @@ class LoanRepositoryIntegrityTest {
         val users1 = db.userProfileDao().getAllUsersOnce()
         assertEquals(1, users1.size)
         assertEquals("علی", users1.single().name)
-        assertEquals("U-aaa111", users1.single().publicId)
+        assertEquals("U-aaa234", users1.single().publicId)
         assertTrue("اینوارینت NB-4: بعد از merge دقیقاً یک کاربر مبنا", users1.single().isPrimary)
 
         val loans1 = repository.allLoans.first()
@@ -604,13 +604,13 @@ class LoanRepositoryIntegrityTest {
         assertEquals(1, repository.allShares.first().size)
 
         // اقساط واقعی وام تازه از خود بکاپ درج شده‌اند (نه بازسازی ترتیبی)
-        val localLoanAId = loans1.first { it.publicId == "L-aaa1111" }.id
+        val localLoanAId = loans1.first { it.publicId == "L-aaa2345" }.id
         assertEquals(
             2,
             db.loanInstallmentDao().getInstallmentsForLoanOnce(localLoanAId).size
         )
         // شمارنده‌ها با رکوردهای واقعی sync شده‌اند
-        assertEquals(2, repository.allLoans.first().first { it.publicId == "L-aaa1111" }.paidMonths)
+        assertEquals(2, repository.allLoans.first().first { it.publicId == "L-aaa2345" }.paidMonths)
 
         // ۲) merge دومِ همان فایل — idempotent: هیچ مورد جدیدی ساخته نمی‌شود و تعدادها ثابت می‌مانند
         val s2 = repository.mergeFromBackup(
@@ -655,7 +655,7 @@ class LoanRepositoryIntegrityTest {
         assertEquals(
             "وام ردشده نباید به‌روزرسانی شود",
             2,
-            repository.allLoans.first().first { it.publicId == "L-aaa1111" }.paidMonths
+            repository.allLoans.first().first { it.publicId == "L-aaa2345" }.paidMonths
         )
     }
 }
