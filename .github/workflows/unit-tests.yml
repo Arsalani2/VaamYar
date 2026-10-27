@@ -61,14 +61,14 @@ jobs:
             echo "حجم لاگ gradle: $(wc -l < gradle-test.log 2>/dev/null || echo missing) خط"
             echo ""
             echo "### خطاهای کامپایل/خلاصه‌ی Gradle:"
-            echo "```"
+            echo '```'
             grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed|OutOfMemory|disappeared|Daemon" gradle-test.log 2>&1 | head -60
-            echo "```"
+            echo '```'
             echo ""
             echo "### انتهای لاگ Gradle (tail 250):"
-            echo "```"
+            echo '```'
             tail -n 250 gradle-test.log 2>&1
-            echo "```"
+            echo '```'
           } > "$REPORT"
           python3 - <<'PY' > junit-failures.txt
           import glob, xml.etree.ElementTree as ET
