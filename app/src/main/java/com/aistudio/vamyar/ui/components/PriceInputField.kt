@@ -15,6 +15,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.vamyar.util.InputLimits
 import com.aistudio.vamyar.util.NumberFormatter
 
 /**
@@ -22,6 +23,10 @@ import com.aistudio.vamyar.util.NumberFormatter
  * Avoids any internal comma transformations that cause BiDi cursor jumping or flipped digits.
  * Digits are entered purely in LTR direction, with an instant live Persian words & formatted
  * currency display underneath.
+ *
+ * فیکس bug.md/NB-40: خطای بیرونی ([isError] + [errorText]) زیر همین فیلد و با قرمزشدن
+ * آن نمایش داده می‌شود تا هر خطا کنار فیلد خودش دیده شود (نه انتهای دیالوگ)؛ سقف
+ * ارقام هم از InputLimits خوانده می‌شود و رسیدن به سقف بازخورد صریح دارد (بند د).
  */
 @Composable
 fun PriceInputField(
@@ -32,11 +37,16 @@ fun PriceInputField(
     modifier: Modifier = Modifier,
     usePersianDigits: Boolean = true,
     compactThousands: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    // فیکس bug.md/NB-40: خطای زندهٔ صدا‌زننده (مثلاً «مبلغ قسط باید بزرگ‌تر از صفر باشد»)
+    isError: Boolean = false,
+    errorText: String? = null
 ) {
     val amountLong = rawDigitsValue.toLongOrNull() ?: 0L
 
     var hasInvalidSeparator by remember { mutableStateOf(false) }
+    // فیکس bug.md/NB-40 (بند د): رسیدن به سقف ارقام بی‌صدا کپ نمی‌شود — بازخورد صریح دارد
+    var hitMaxDigits by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier,
@@ -53,21 +63,22 @@ fun PriceInputField(
                 // Clean input: extract only numeric digits, convert Persian/Arabic digits to ASCII 0-9
                 val digitsOnly = input.filter { it.isDigit() }.map { c ->
                     when (c) {
-                        in '\u06F0'..'\u06F9' -> (c - 0x06F0 + 0x0030)
-                        in '\u0660'..'\u0669' -> (c - 0x0660 + 0x0030)
+                        in '۰'..'۹' -> (c - 0x06F0 + 0x0030)
+                        in '٠'..'٩' -> (c - 0x0660 + 0x0030)
                         else -> c
                     }
                 }.joinToString("")
 
-                // Cap at 15 digits
-                val capped = if (digitsOnly.length > 15) digitsOnly.take(15) else digitsOnly
+                // Cap at MAX_AMOUNT_DIGITS — فیکس bug.md/NB-40: سقف متمرکز در InputLimits
+                hitMaxDigits = digitsOnly.length > InputLimits.MAX_AMOUNT_DIGITS
+                val capped = if (hitMaxDigits) digitsOnly.take(InputLimits.MAX_AMOUNT_DIGITS) else digitsOnly
                 onRawDigitsChange(capped)
             },
             label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
             enabled = enabled,
-            isError = hasInvalidSeparator,
+            isError = hasInvalidSeparator || isError,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 textDirection = TextDirection.Ltr,
@@ -99,6 +110,26 @@ fun PriceInputField(
                 text = "جداکننده اعشار مجاز نیست؛ لطفاً مبلغ را کامل و به تومان وارد کنید.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
+
+        // فیکس bug.md/NB-40: خطای زندهٔ صدا‌زننده زیر همین فیلد (نه انتهای دیالوگ)
+        if (errorText != null) {
+            Text(
+                text = errorText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
+
+        // فیکس bug.md/NB-40 (بند د): بازخورد صریح رسیدن به سقف ارقام (به‌جای کپ بی‌صدا)
+        if (hitMaxDigits) {
+            Text(
+                text = "سقف مبلغ ${InputLimits.MAX_AMOUNT_DIGITS} رقم است؛ رقم‌های بیشتر نادیده گرفته می‌شوند.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp)
             )
         }
@@ -144,4 +175,3 @@ fun PriceInputField(
         }
     }
 }
-
