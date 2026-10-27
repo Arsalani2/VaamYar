@@ -31,7 +31,6 @@ fun ReceivablesScreen(
     usePersianDigits: Boolean = true,
     compactThousands: Boolean = false,
     onToggleSharePaid: (Long, Boolean) -> Unit,
-    onResetMonthlyStatus: () -> Unit,
     onAddShare: ((DebtorShare) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -156,20 +155,6 @@ fun ReceivablesScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                }
-            }
-        }
-
-        // Action Row
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onResetMonthlyStatus) {
-                    Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("شروع ماه جدید (صفر کردن واریزها)")
                 }
             }
         }

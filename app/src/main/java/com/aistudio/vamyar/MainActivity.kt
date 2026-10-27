@@ -319,8 +319,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         currentShamsiDate = currentShamsiDate,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
-                        onToggleSharePaid = { id, isPaid -> viewModel.toggleDebtorPaid(id, isPaid) },
-                        onResetMonthlyStatus = { viewModel.resetMonthlyDebtorStatus() }
+                        onToggleSharePaid = { id, isPaid -> viewModel.toggleDebtorPaid(id, isPaid) }
                     )
 
                     AppTab.SETTINGS -> SettingsScreen(
