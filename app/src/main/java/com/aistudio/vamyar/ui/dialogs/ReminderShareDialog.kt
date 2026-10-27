@@ -29,6 +29,10 @@ fun ReminderShareDialog(
     shares: List<DebtorShare>,
     currentShamsiDate: ShamsiDate,
     senderName: String = "",
+    // فیکس bug.md/NB-42: ارقام متنِ پیام آماده (مبلغ‌ها و روز موعد) از تنظیمات
+    // ارقام/فشرده‌سازی خود کاربر پیروی می‌کند — قبلاً همیشه فارسی‌رقم بود.
+    usePersianDigits: Boolean = true,
+    compactThousands: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -38,10 +42,10 @@ fun ReminderShareDialog(
     val totalAmount = remember(shares) { shares.sumOf { it.shareAmount } }
 
     val detailsText = shares.joinToString("\n") { share ->
-        "• ${share.loanTitle}: ${NumberFormatter.formatPrice(share.shareAmount)} (موعد روز ${NumberFormatter.toPersianDigits(share.dueDay)} ماه)"
+        "• ${share.loanTitle}: ${NumberFormatter.formatPrice(share.shareAmount, usePersian = usePersianDigits, compactThousands = compactThousands)} (موعد روز ${NumberFormatter.formatNumber(share.dueDay, usePersianDigits)} ماه)"
     }
 
-    val defaultMessage = remember(debtorName, totalAmount, detailsText, senderName, currentShamsiDate) {
+    val defaultMessage = remember(debtorName, totalAmount, detailsText, senderName, currentShamsiDate, usePersianDigits, compactThousands) {
         val signOff = if (senderName.isNotBlank()) "\n($senderName)" else ""
         """
 سلام ${debtorName} عزیز،
@@ -50,7 +54,7 @@ fun ReminderShareDialog(
 
 $detailsText
 
-جمع کل سهم این ماه: ${NumberFormatter.formatPrice(totalAmount)}
+جمع کل سهم این ماه: ${NumberFormatter.formatPrice(totalAmount, usePersian = usePersianDigits, compactThousands = compactThousands)}
 
 لطفاً در زمان مقرر به حساب واریز بفرمایید. ممنون از شما!$signOff
         """.trimIndent()
