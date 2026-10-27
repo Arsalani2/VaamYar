@@ -481,6 +481,8 @@ fun AddEditLoanDialog(
                         )
 
                         // Stable Price Input Field (بدون پرش کرسر و بدون خطا)
+                        // فیکس bug.md/NB-40: خطای «مبلغ قسط صفر» از انتهای دیالوگ
+                        // به زیر همین فیلد منتقل شد (isError + errorText زنده).
                         PriceInputField(
                             rawDigitsValue = monthlyAmountDigits,
                             onRawDigitsChange = { monthlyAmountDigits = it },
@@ -488,7 +490,11 @@ fun AddEditLoanDialog(
                             placeholder = "مثلاً: ۲,۸۲۲,۰۰۰",
                             usePersianDigits = usePersianDigits,
                             compactThousands = compactThousands,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            isError = rawMonthlyAmount <= 0L,
+                            errorText = if (rawMonthlyAmount <= 0L) {
+                                "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد."
+                            } else null
                         )
                     }
 
@@ -505,17 +511,11 @@ fun AddEditLoanDialog(
                                 onValueChange = { totalMonthsText = it.filter { c -> c.isDigit() } },
                                 modifier = Modifier.width(100.dp),
                                 singleLine = true,
+                                // فیکس bug.md/NB-40: خطای مدت زیر همان فیلد با isError —
+                                // نه به‌صورت متن جدا در پایین بخش
+                                isError = durationError != null,
+                                supportingText = { durationError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
-                        }
-
-                        // فیکس bug.md/NB-33: خطای صریح بازهٔ ۱..۱۲۰ با بازخورد زنده —
-                        // جایگزین clamp بی‌صدای P3-12؛ ذخیره تا اصلاح کاربر مسدود می‌ماند.
-                        durationError?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error
                             )
                         }
 
@@ -737,16 +737,6 @@ fun AddEditLoanDialog(
                     // 8. Color Picker — فیکس bug.md/NB-32: به داخل ردیف فیلد نام منتقل شد (بخش ۱)
                 }
 
-                // فیکس bug.md/NB-36: خطای عنوان به زیر خودِ فیلد (بالا) منتقل شد؛
-                // بلوک خطای «مبلغ قسط صفر» تا NB-40 همین‌جا می‌ماند.
-                if (rawMonthlyAmount <= 0L) {
-                    Text(
-                        text = "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
                 // Bottom Save & Cancel Buttons
                 Row(
                     modifier = Modifier
@@ -824,8 +814,34 @@ fun AddEditLoanDialog(
         var selectedUserName by remember { mutableStateOf(partnerCandidates.firstOrNull()?.name ?: "") }
         var partnerAmountDigits by remember { mutableStateOf("") }
         var partnerDesc by remember { mutableStateOf("") }
-        // فیکس bug.md/P1-8: پیام خطای اعتبارسنجی سهم شریک (به‌جای بی‌صدا بی‌اثر ماندن دکمه)
-        var partnerError by remember { mutableStateOf<String?>(null) }
+        // فیکس bug.md/NB-40 (بند ج): اعتبارسنجی سهم شریک «زنده» است — نه فقط هنگام ثبت.
+        // هر خطا زیر همان فیلدش با isError دیده می‌شود و دکمهٔ «ثبت سهم» تا اصلاح
+        // غیرفعال می‌ماند؛ دفاع نهایی همچنان در Repository است (OwnerlessShareException).
+        val partnerName = selectedUserName.trim()
+        val partnerAmount = partnerAmountDigits.toLongOrNull() ?: 0L
+        val partnerNameError: String? = when {
+            // اگر هنوز کاربری تعریف نشده، راهنمای «+ کاربر جدید» همان‌جا هست — خطای اضافه نده
+            partnerCandidates.isEmpty() -> null
+            partnerName.isBlank() ->
+                "نام شریک را انتخاب کنید."
+            // فیکس bug.md/NB-35 (اینوارینت #۱۱): شریک باید کاربر تعریف‌شده باشد
+            !InputLimits.isDefinedPartner(partnerName, partnerCandidates.map { it.name }) ->
+                "شریک باید از کاربران تعریف‌شده انتخاب شود؛ ابتدا با دکمهٔ «+ کاربر جدید» ثبتش کنید."
+            // فیکس bug.md/NB-21 — مقایسهٔ نام با namesMatch (نه equals):
+            // «علی» و «علي» (ي/ك عربی) و فاصله‌های زائد یکسان شمرده می‌شوند
+            primaryUserName != null && PersianNameNormalizer.namesMatch(partnerName, primaryUserName) ->
+                "«$partnerName» کاربر مبناست؛ سهم او به‌صورت خودکار از باقی‌مانده‌ی قسط محاسبه می‌شود و نمی‌تواند شریکِ همین وام ثبت شود."
+            sharesList.any { PersianNameNormalizer.namesMatch(it.personName.trim(), partnerName) } ->
+                "«$partnerName» قبلاً شریکِ همین وام ثبت شده است؛ برای تغییر مبلغ، سهم قبلی را حذف و دوباره ثبت کنید."
+            else -> null
+        }
+        val partnerAmountError: String? = when {
+            partnerAmount <= 0L ->
+                "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
+            partnerAmount + othersTotalShare > rawMonthlyAmount ->
+                "مجموع سهم شرکا (${NumberFormatter.formatPrice(partnerAmount + othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
+            else -> null
+        }
 
         AlertDialog(
             onDismissRequest = { showAddPartnerDialog = false },
@@ -872,6 +888,15 @@ fun AddEditLoanDialog(
                         )
                     }
 
+                    // فیکس bug.md/NB-40: خطای «انتخاب فرد» همان‌جا زیر فهرست شرکا
+                    partnerNameError?.let { err ->
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
                     PriceInputField(
                         rawDigitsValue = partnerAmountDigits,
                         onRawDigitsChange = { partnerAmountDigits = it },
@@ -879,7 +904,10 @@ fun AddEditLoanDialog(
                         placeholder = "مثلاً: ۸۰۰,۰۰۰",
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        // فیکس bug.md/NB-40: خطای مبلغ سهم زیر همین فیلد با isError
+                        isError = partnerAmountError != null,
+                        errorText = partnerAmountError
                     )
 
                     OutlinedTextField(
@@ -890,67 +918,38 @@ fun AddEditLoanDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    // فیکس bug.md/P1-8: نمایش دلیل رد شدنِ ثبت سهم به‌جای سکوت
-                    partnerError?.let { err ->
-                        Text(
-                            text = err,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
                 }
             },
             confirmButton = {
                 Button(
+                    // فیکس bug.md/NB-40: دکمهٔ ثبت تا رفع خطاهای زندهٔ بالا غیرفعال می‌ماند
+                    enabled = partnerCandidates.isNotEmpty() &&
+                        partnerNameError == null && partnerAmountError == null,
                     onClick = {
-                        val amount = partnerAmountDigits.toLongOrNull() ?: 0L
-                        val partnerName = selectedUserName.trim()
-                        // فیکس bug.md/P1-8 — اعتبارسنجی سه‌لایه:
-                        // (ج) کاربر مبنا نمی‌تواند شریکِ وام خودش شود (شمارش دوبرابر)،
-                        // (ب) یک نفر نمی‌تواند دو بار شریکِ همان وام شود،
-                        // (الف) مجموع سهم شرکا نمی‌تواند از مبلغ کل قسط ماهانه بیشتر شود
-                        //      (قبلاً سهم کاربر مبنا بی‌صدا صفر می‌شد).
-                        partnerError = when {
-                            partnerName.isBlank() ->
-                                "نام شریک را انتخاب کنید."
-                            // فیکس bug.md/NB-35 (اینوارینت #۱۱): شریک باید کاربر تعریف‌شده
-                            // باشد — با حذف فیلد آزاد، این چک دفاع نمایشیِ همان قاعده است.
-                            !InputLimits.isDefinedPartner(partnerName, partnerCandidates.map { it.name }) ->
-                                "شریک باید از کاربران تعریف‌شده انتخاب شود؛ ابتدا با دکمهٔ «+ کاربر جدید» ثبتش کنید."
-                            // فیکس bug.md/NB-21 — مقایسهٔ نام با namesMatch (نه equals):
-                            // «علی» و «علي» (ي/ك عربی) و فاصله‌های زائد یکسان شمرده می‌شوند
-                            primaryUserName != null && PersianNameNormalizer.namesMatch(partnerName, primaryUserName) ->
-                                "«$partnerName» کاربر مبناست؛ سهم او به‌صورت خودکار از باقی‌مانده‌ی قسط محاسبه می‌شود و نمی‌تواند شریکِ همین وام ثبت شود."
-                            sharesList.any { PersianNameNormalizer.namesMatch(it.personName.trim(), partnerName) } ->
-                                "«$partnerName» قبلاً شریکِ همین وام ثبت شده است؛ برای تغییر مبلغ، سهم قبلی را حذف و دوباره ثبت کنید."
-                            amount <= 0L ->
-                                "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
-                            amount + othersTotalShare > rawMonthlyAmount ->
-                                "مجموع سهم شرکا (${NumberFormatter.formatPrice(amount + othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
-                            else -> null
-                        }
-                        if (partnerError == null) {
-                            // فیکس bug.md/NB-35 (اینوارینت #۱۱): هویت سهم = publicId کاربرِ
-                            // انتخاب‌شده از فهرست (نه نام آزاد) تا پیوند سهم↔کاربر هویتی
-                            // باشد؛ خالی فقط حالت transient است و Repository با fallback
-                            // همان کاربر را resolve می‌کند (وگرنه کل ثبت را رد می‌کند).
-                            val partnerPublicId = partnerCandidates
-                                .firstOrNull { PersianNameNormalizer.namesMatch(it.name.trim(), partnerName) }
-                                ?.publicId?.takeIf { it.isNotBlank() } ?: ""
-                            sharesList.add(
-                                DebtorShare(
-                                    loanId = loanToEdit?.id ?: 0L,
-                                    loanTitle = title.ifBlank { "وام جدید" },
-                                    personName = partnerName,
-                                    shareAmount = amount,
-                                    dueDay = startDate.day,
-                                    shareDescription = partnerDesc.trim(),
-                                    ownerPublicId = partnerPublicId
-                                )
+                        // فیکس bug.md/P1-8 — اعتبارسنجی سه‌لایه حالا «زنده» بالای همین
+                        // دکمه ارزیابی می‌شود (NB-40) و اجازهٔ رسیدن به اینجا با دادهٔ
+                        // نامعتبر را نمی‌دهد؛ دفاع نهایی در Repository است
+                        // (OwnerlessShareException / DuplicateNameException).
+                        //
+                        // فیکس bug.md/NB-35 (اینوارینت #۱۱): هویت سهم = publicId کاربرِ
+                        // انتخاب‌شده از فهرست (نه نام آزاد) تا پیوند سهم↔کاربر هویتی
+                        // باشد؛ خالی فقط حالت transient است و Repository با fallback
+                        // همان کاربر را resolve می‌کند (وگرنه کل ثبت را رد می‌کند).
+                        val partnerPublicId = partnerCandidates
+                            .firstOrNull { PersianNameNormalizer.namesMatch(it.name.trim(), partnerName) }
+                            ?.publicId?.takeIf { it.isNotBlank() } ?: ""
+                        sharesList.add(
+                            DebtorShare(
+                                loanId = loanToEdit?.id ?: 0L,
+                                loanTitle = title.ifBlank { "وام جدید" },
+                                personName = partnerName,
+                                shareAmount = partnerAmount,
+                                dueDay = startDate.day,
+                                shareDescription = partnerDesc.trim(),
+                                ownerPublicId = partnerPublicId
                             )
-                            showAddPartnerDialog = false
-                        }
+                        )
+                        showAddPartnerDialog = false
                     }
                 ) {
                     Text("ثبت سهم")
@@ -981,4 +980,3 @@ fun AddEditLoanDialog(
         }
     }
 }
-
