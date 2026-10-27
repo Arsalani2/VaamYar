@@ -40,4 +40,21 @@ object InputLimits {
             "عنوان حداکثر می‌تواند $MAX_TITLE_LENGTH نویسه باشد."
         else -> null
     }
+
+    /**
+     * فیکس bug.md/NB-36 (اینوارینت #۱۲): یکتایی عنوان وام — تطبیق با کلید استاندارد
+     * (PersianNameNormalizer.matchKey) تا هم‌نویسه‌های عربی ي/ك، نیم‌فاصله و فاصله‌های
+     * زائد یکسان شمرده شوند. هنگام ویرایش وام، کلیدِ عنوانِ خودِ وام با [selfKey] از
+     * بررسی کنار گذاشته می‌شود. خالی‌بودن/طول مالتِ validateTitle است و اینجا خطا
+     * نمی‌دهد. null = معتبر؛ غیر null = پیام خطا زیر همان فیلد.
+     */
+    fun validateUniqueTitle(raw: String, existingTitles: List<String>, selfKey: String? = null): String? {
+        if (raw.isBlank()) return null
+        val key = PersianNameNormalizer.matchKey(raw)
+        val duplicate = existingTitles.any { existing ->
+            val existingKey = PersianNameNormalizer.matchKey(existing)
+            existingKey == key && existingKey != selfKey
+        }
+        return if (duplicate) "این نام وام قبلاً ثبت شده است؛ لطفاً نام دیگری انتخاب کنید." else null
+    }
 }

@@ -13,6 +13,7 @@ import com.aistudio.vamyar.util.LoanIconHelper
 import com.aistudio.vamyar.util.LiquidityLoanInput
 import com.aistudio.vamyar.util.LiquidityPaidRecord
 import com.aistudio.vamyar.util.NumberFormatter
+import com.aistudio.vamyar.util.PersianNameNormalizer
 import com.aistudio.vamyar.util.PublicId
 import com.aistudio.vamyar.util.ShamsiDate
 import com.aistudio.vamyar.util.ShamsiDateHelper
@@ -245,6 +246,28 @@ class PureLogicUnitTest {
         val longTitle = "عنوان وام بسیار طولانی".repeat(10)
         assertTrue(longTitle.trim().length > InputLimits.MAX_TITLE_LENGTH)
         assertNotNull(InputLimits.validateTitle(longTitle))
+    }
+
+    // ---------------------------------------------------------------- NB-36 (یکتایی عنوان وام)
+
+    @Test
+    fun nb36_validateUniqueTitle_matchesCanonicalAndExcludesSelf() {
+        val existing = listOf("بانک رسالت", "وام مسکن", "خرید خودرو")
+
+        // تکراری — حتی با فاصله‌های زائد (کلید استاندارد نام، الگوی NB-20)
+        assertNotNull(InputLimits.validateUniqueTitle("بانک رسالت", existing))
+        assertNotNull(InputLimits.validateUniqueTitle(" بانک  رسالت ", existing))
+        assertNotNull(InputLimits.validateUniqueTitle("وام مسکن", existing))
+
+        // عنوان آزاد — معتبر؛ خالی مالتِ validateTitle است و اینجا خطا نمی‌دهد
+        assertNull(InputLimits.validateUniqueTitle("وام طلایی", existing))
+        assertNull(InputLimits.validateUniqueTitle("", existing))
+
+        // هنگام ویرایش، عنوانِ خودِ وام تکراری نیست (selfKey کنار گذاشته می‌شود)
+        val selfKey = PersianNameNormalizer.matchKey("بانک رسالت")
+        assertNull(InputLimits.validateUniqueTitle("بانک رسالت", existing, selfKey = selfKey))
+        // اما هم‌نامی با وامِ دیگر همچنان تکراری است
+        assertNotNull(InputLimits.validateUniqueTitle("وام مسکن", existing, selfKey = selfKey))
     }
 
     // ---------------------------------------------------------------- PublicId (F6)

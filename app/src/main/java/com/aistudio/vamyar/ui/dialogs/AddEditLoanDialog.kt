@@ -54,6 +54,8 @@ fun AddEditLoanDialog(
     loanToEdit: Loan? = null,
     initialShares: List<DebtorShare> = emptyList(),
     allUsers: List<UserProfile> = emptyList(),
+    // فیکس bug.md/NB-36: عناوین وام‌های موجود برای چک زندهٔ «عنوان تکراری» (self = ویرایش‌شونده)
+    allLoanTitles: List<String> = emptyList(),
     currentShamsiDate: ShamsiDate,
     usePersianDigits: Boolean = true,
     compactThousands: Boolean = false,
@@ -123,7 +125,14 @@ fun AddEditLoanDialog(
     // تغییر نمی‌شود؛ مقدار خارج از بازه فقط با اصلاحِ خود کاربر ذخیره می‌شود (ذخیره مسدود).
     // coerceIn بالا فقط برای محاسبات نمایشی میانی است؛ مقدار ذخیره‌شده همان ورودی معتبر کاربر است.
     val durationError = InputLimits.validateDurationMonths(totalMonthsText)
+    // فیکس bug.md/NB-36: خطای زندهٔ عنوان = خالی/طول (NB-33) + تکراری‌بودن در وام‌های
+    // موجود با کلید استاندارد. هنگام ویرایش، عنوانِ خودِ وام از بررسی کنار گذاشته می‌شود.
     val titleError = InputLimits.validateTitle(title)
+        ?: InputLimits.validateUniqueTitle(
+            raw = title,
+            existingTitles = allLoanTitles,
+            selfKey = loanToEdit?.let { PersianNameNormalizer.matchKey(it.title) }
+        )
 
     // Auto-detected paid months from start date to current date
     val autoElapsed = remember(startDate.year, startDate.month, startDate.day, currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day, totalMonths) {
@@ -257,11 +266,15 @@ fun AddEditLoanDialog(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // فیکس bug.md/NB-36: خطای عنوان (خالی/طول/تکراری) زیر همان فیلد با
+                        // isError نمایش داده می‌شود (الگوی AddEditUserDialog/NB-20).
                         OutlinedTextField(
                             value = title,
                             onValueChange = { title = it },
                             label = { Text("نام بانک یا وام") },
                             placeholder = { Text("مثلاً: بانک رسالت") },
+                            isError = titleError != null,
+                            supportingText = { titleError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
@@ -697,14 +710,8 @@ fun AddEditLoanDialog(
                     // 8. Color Picker — فیکس bug.md/NB-32: به داخل ردیف فیلد نام منتقل شد (بخش ۱)
                 }
 
-                // فیکس bug.md/P3-12 و NB-33: خطاهای درون‌خطی برای مقادیر نامعتبر
-                titleError?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
+                // فیکس bug.md/NB-36: خطای عنوان به زیر خودِ فیلد (بالا) منتقل شد؛
+                // بلوک خطای «مبلغ قسط صفر» تا NB-40 همین‌جا می‌ماند.
                 if (rawMonthlyAmount <= 0L) {
                     Text(
                         text = "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد.",
@@ -931,6 +938,9 @@ fun AddEditLoanDialog(
     if (showCreateUserDialog) {
         AddEditUserDialog(
             userToEdit = null,
+            // فیکس bug.md/NB-36: چک یکتایی نام (NB-20) در دیالوگِ درونِ وام هم فعال است —
+            // پیش از این، این فراخوانی بدون existingUsers بود و چک تکراری دور زده می‌شد.
+            existingUsers = allUsers,
             onDismiss = { showCreateUserDialog = false },
             onSave = { newUser ->
                 onAddNewUser(newUser)

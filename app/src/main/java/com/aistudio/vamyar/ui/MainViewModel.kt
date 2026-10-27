@@ -3,6 +3,7 @@ package com.aistudio.vamyar.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.vamyar.BuildConfig
@@ -514,7 +515,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveUser(user: UserProfile) {
         viewModelScope.launch {
-            repository.saveUser(user)
+            try {
+                repository.saveUser(user)
+            } catch (e: Exception) {
+                // فیکس bug.md/NB-36: دفاع در عمق Repository — UI جلوی نام تکراری را زنده
+                // می‌گیرد و پیام زیر همان فیلد نشان می‌دهد؛ اگر مسیر دیگری رد شود، اینجا
+                // لاگ می‌شود تا بی‌صدا دادهٔ تکراری ساخته نشود.
+                Log.w("VamyarViewModel", "saveUser رد شد: ${e.message}")
+            }
         }
     }
 
@@ -602,7 +610,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveLoan(loan: Loan, shares: List<DebtorShare>) {
         viewModelScope.launch {
-            repository.saveLoanWithShares(loan, shares)
+            try {
+                repository.saveLoanWithShares(loan, shares)
+            } catch (e: Exception) {
+                // فیکس bug.md/NB-35/36: دفاع در عمق Repository (سهم بی‌مالک / نام و عنوان
+                // تکراری) — پیام کاربر در فیلد مربوطهٔ دیالوگ است؛ اینجا فقط لاگ می‌شود
+                // تا هیچ ردِ بی‌صدا دادهٔ نامعتبر نسازد.
+                Log.w("VamyarViewModel", "saveLoan رد شد: ${e.message}")
+            }
         }
     }
 
