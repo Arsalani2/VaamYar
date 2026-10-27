@@ -442,7 +442,9 @@ class LoanRepositoryIntegrityTest {
 
     @Test
     fun nb41_fullReset_recreatesSingleDefaultPrimaryUserAndClearsAllTables() = runBlocking {
-        // دادهٔ چند جدولی: کاربران + وام شراکتی با رکورد اقساط واقعی و تاریخچهٔ پرداخت
+        // دادهٔ چند جدولی: کاربر مبنا + شریک + وام شراکتی با رکورد اقساط واقعی و تاریخچهٔ پرداخت
+        // (کاربر مبنای اولیه باید وجود داشته باشد تا سناریوی NB-41 — حذف حتی کاربر مبنا — بازتولید شود)
+        db.userProfileDao().insertUser(UserProfile(name = "من", isPrimary = true))
         val loan = insertSharedLoan(paidMonths = 3)
         repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = ShamsiDate(1405, 8, 15))
         assertTrue(repository.allRecords.first().isNotEmpty())
