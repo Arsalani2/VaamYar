@@ -270,6 +270,22 @@ class PureLogicUnitTest {
         assertNotNull(InputLimits.validateUniqueTitle("وام مسکن", existing, selfKey = selfKey))
     }
 
+    // ---------------------------------------------------------------- NB-35 (شریک = کاربر تعریف‌شده)
+
+    @Test
+    fun nb35_isDefinedPartner_matchesCanonical() {
+        val defined = listOf("علی", "سارا رضایی", "محمود")
+        // عضو تعریف‌شده — حتی با فاصله‌های زائد و هم‌نویسهٔ عربی (ي/ك)
+        assertTrue(InputLimits.isDefinedPartner("علی", defined))
+        assertTrue(InputLimits.isDefinedPartner(" علي ", defined))
+        assertTrue(InputLimits.isDefinedPartner("سارا  رضایی", defined))
+        // نام الکی/غریبه → رد (شریک فقط از کاربران تعریف‌شده)
+        assertFalse(InputLimits.isDefinedPartner("غریبه", defined))
+        assertFalse(InputLimits.isDefinedPartner("", defined))
+        // فهرست خالی هم هیچ شریکی را قبول نمی‌کند
+        assertFalse(InputLimits.isDefinedPartner("علی", emptyList()))
+    }
+
     // ---------------------------------------------------------------- PublicId (F6)
 
     @Test

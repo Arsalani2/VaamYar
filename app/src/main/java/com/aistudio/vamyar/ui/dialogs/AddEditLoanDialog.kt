@@ -829,12 +829,16 @@ fun AddEditLoanDialog(
                         }
                     }
 
+                    // فیکس bug.md/NB-35 (اینوارینت #۱۱): فیلد آزاد «نام شریک» حذف شد —
+                    // شریک فقط از میان کاربران تعریف‌شده انتخاب می‌شود (چیپ‌ها یا
+                    // «+ کاربر جدید») تا سهمِ بی‌مالک (ownerPublicId == "") ممکن نباشد.
+                    // فهرست هم LazyRow شد تا با زیادشدن شرکا از دیالوگ بیرون نزند.
                     if (partnerCandidates.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            partnerCandidates.forEach { user ->
+                            items(partnerCandidates) { user ->
                                 val isSelected = selectedUserName == user.name
                                 FilterChip(
                                     selected = isSelected,
@@ -844,16 +848,13 @@ fun AddEditLoanDialog(
                                 )
                             }
                         }
+                    } else {
+                        Text(
+                            text = "هنوز کاربری غیر از کاربر مبنا تعریف نشده؛ با دکمهٔ «+ کاربر جدید» شریک را ثبت کنید.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-
-                    OutlinedTextField(
-                        value = selectedUserName,
-                        onValueChange = { selectedUserName = it },
-                        label = { Text("نام شریک") },
-                        placeholder = { Text("نام شخص...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
 
                     PriceInputField(
                         rawDigitsValue = partnerAmountDigits,
@@ -896,7 +897,11 @@ fun AddEditLoanDialog(
                         //      (قبلاً سهم کاربر مبنا بی‌صدا صفر می‌شد).
                         partnerError = when {
                             partnerName.isBlank() ->
-                                "نام شریک را وارد کنید."
+                                "نام شریک را انتخاب کنید."
+                            // فیکس bug.md/NB-35 (اینوارینت #۱۱): شریک باید کاربر تعریف‌شده
+                            // باشد — با حذف فیلد آزاد، این چک دفاع نمایشیِ همان قاعده است.
+                            !InputLimits.isDefinedPartner(partnerName, partnerCandidates.map { it.name }) ->
+                                "شریک باید از کاربران تعریف‌شده انتخاب شود؛ ابتدا با دکمهٔ «+ کاربر جدید» ثبتش کنید."
                             // فیکس bug.md/NB-21 — مقایسهٔ نام با namesMatch (نه equals):
                             // «علی» و «علي» (ي/ك عربی) و فاصله‌های زائد یکسان شمرده می‌شوند
                             primaryUserName != null && PersianNameNormalizer.namesMatch(partnerName, primaryUserName) ->
@@ -910,6 +915,13 @@ fun AddEditLoanDialog(
                             else -> null
                         }
                         if (partnerError == null) {
+                            // فیکس bug.md/NB-35 (اینوارینت #۱۱): هویت سهم = publicId کاربرِ
+                            // انتخاب‌شده از فهرست (نه نام آزاد) تا پیوند سهم↔کاربر هویتی
+                            // باشد؛ خالی فقط حالت transient است و Repository با fallback
+                            // همان کاربر را resolve می‌کند (وگرنه کل ثبت را رد می‌کند).
+                            val partnerPublicId = partnerCandidates
+                                .firstOrNull { PersianNameNormalizer.namesMatch(it.name.trim(), partnerName) }
+                                ?.publicId?.takeIf { it.isNotBlank() } ?: ""
                             sharesList.add(
                                 DebtorShare(
                                     loanId = loanToEdit?.id ?: 0L,
@@ -917,7 +929,8 @@ fun AddEditLoanDialog(
                                     personName = partnerName,
                                     shareAmount = amount,
                                     dueDay = startDate.day,
-                                    shareDescription = partnerDesc.trim()
+                                    shareDescription = partnerDesc.trim(),
+                                    ownerPublicId = partnerPublicId
                                 )
                             )
                             showAddPartnerDialog = false
@@ -933,20 +946,23 @@ fun AddEditLoanDialog(
                 }
             }
         )
-    }
 
-    if (showCreateUserDialog) {
-        AddEditUserDialog(
-            userToEdit = null,
-            // فیکس bug.md/NB-36: چک یکتایی نام (NB-20) در دیالوگِ درونِ وام هم فعال است —
-            // پیش از این، این فراخوانی بدون existingUsers بود و چک تکراری دور زده می‌شد.
-            existingUsers = allUsers,
-            onDismiss = { showCreateUserDialog = false },
-            onSave = { newUser ->
-                onAddNewUser(newUser)
-                showCreateUserDialog = false
-            }
-        )
+        // فیکس bug.md/NB-35: دیالوگ «کاربر جدید» به داخل دیالوگ شریک منتقل شد تا بعد
+        // از ثبت، همان کاربرِ جدید به‌عنوان شریک انتخاب شود (نه انتخاب دوباره).
+        if (showCreateUserDialog) {
+            AddEditUserDialog(
+                userToEdit = null,
+                // فیکس bug.md/NB-36: چک یکتایی نام (NB-20) در دیالوگِ درونِ وام هم فعال است —
+                // پیش از این، این فراخوانی بدون existingUsers بود و چک تکراری دور زده می‌شد.
+                existingUsers = allUsers,
+                onDismiss = { showCreateUserDialog = false },
+                onSave = { newUser ->
+                    onAddNewUser(newUser)
+                    selectedUserName = newUser.name.trim()
+                    showCreateUserDialog = false
+                }
+            )
+        }
     }
 }
 
