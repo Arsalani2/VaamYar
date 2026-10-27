@@ -303,7 +303,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onPayOnlyCurrentMonth = { viewModel.payOnlyCurrentMonth(it) },
                         onPayAllArrears = { viewModel.payAllArrearsAndCurrent(it) },
                         onDismissArrearsPrompt = { viewModel.dismissArrearsPrompt() },
-                        onSaveLoan = { loan, shares -> viewModel.saveLoan(loan, shares) },
+                        onSaveLoan = { loan, shares, paidYearMonths -> viewModel.saveLoan(loan, shares, paidYearMonths) },
                         onDeleteLoan = { viewModel.deleteLoan(it) },
                         onAddNewUser = { viewModel.saveUser(it) },
                         onTipAction = { tip ->
