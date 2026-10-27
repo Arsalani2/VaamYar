@@ -52,22 +52,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # خطاهای کامپایل Kotlin و خلاصه‌ی Gradle را به Annotation تبدیل می‌کند
-          if [ -f gradle-test.log ]; then
-            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed" gradle-test.log | head -40 \
-              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
-          fi
-          # گزارش کامل برای issue گزارش‌گیر (#3)
+          set +e
+          echo "::error::مرحلهٔ تست شکست خورد — جزئیات در کامنت issue #3"
           REPORT=ci-report.md
           {
             echo "## شکست تست CI — run [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) روی کامیت ${GITHUB_SHA:0:7}"
             echo ""
-            echo "### خطاها و خلاصه‌ی Gradle:"
+            echo "حجم لاگ gradle: $(wc -l < gradle-test.log 2>/dev/null || echo missing) خط"
+            echo ""
+            echo "### خطاهای کامپایل/خلاصه‌ی Gradle:"
             echo "```"
-            grep -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed" gradle-test.log | head -60 || echo "(چیزی match نشد)"
+            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed|OutOfMemory|disappeared|Daemon" gradle-test.log 2>&1 | head -60
+            echo "```"
+            echo ""
+            echo "### انتهای لاگ Gradle (tail 250):"
+            echo "```"
+            tail -n 250 gradle-test.log 2>&1
             echo "```"
           } > "$REPORT"
-          # تست‌های شکست‌خورده از گزارش‌های JUnit XML
           python3 - <<'PY' > junit-failures.txt
           import glob, xml.etree.ElementTree as ET
           n = 0
@@ -89,4 +91,16 @@ jobs:
             echo "### تست‌های شکست‌خورده (JUnit):" >> "$REPORT"
             cat junit-failures.txt >> "$REPORT"
           fi
-          gh issue comment 3 --repo "$GITHUB_REPOSITORY" --body-file "$REPORT"
+          gh issue comment 3 --repo "$GITHUB_REPOSITORY" --body-file "$REPORT" || echo "::warning::کامنت روی issue نشست"
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: |
+            gradle-test.log
+            app/build/reports/tests/**
+            app/build/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
