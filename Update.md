@@ -725,3 +725,38 @@
 - `unit-tests.yml` روی نوک `fix/wave-3` سبز شد — ران #۱۹ (9260741) completed successfully.
 - سپس همان دو فیکس به‌ترتیب روی main بازتولید شد (`3f91826` → `a4bb11e`)، هر دو با `[skip ci]` — بدون trigger ورک‌فلوی ریلیز؛ byte-diff هر ۷ فایل کلیدی (LoanRepository، MainViewModel، SettingsScreen، MainActivity، هر دو فایل دیالوگ/کامپوننت، تست) بین main و fix/wave-3 یکسان تأیید شد.
 - ریلیز (v1.0.7) فقط با دستور صریح کاربر.
+
+
+## موج ۴ — NB-42: همگام‌سازی ارقام فارسی/EN در کل کدبیس (۲۰۲۶-۱۰-۲۷)
+
+> کامیت‌های `[skip ci]` روی شاخه main؛ ریلیزی trigger نشد. آخرین ریلیز همچنان v1.0.6.
+
+### رفع NB-42 — ارقام هماهنگ با تنظیمات در همهٔ مسیرهای نمایشی (کامیت `db84233` روی main)
+- **شرح باگ (گزارش کاربر: «این نوع نمایش اعداد فارسی و EN در تنظیمات، تو کل کدبیس sync نیست و بعضی جاها اصلاً اعمال نشده»):** چهار مورد عینی ریشه‌یابی‌شده:
+  - (الف) ساعت اعلان روزانه در تنظیمات (هم نمایش مقدار فعلی، هم Toast تغییر) همیشه `toPersianDigits` هاردکد — در حالت EN برعکسِ تنظیم کاربر دیده می‌شد.
+  - (ب) اعلان‌های سررسید (`InstallmentAlarmReceiver`) همیشه ارقام فارسی: روز سررسید با `toPersianDigits` و مبلغ قسط با `formatPrice` با پیش‌فرض usePersian=true.
+  - (ج) `ReminderShareDialog` (متن پیام آمادهٔ یادآوری شریک) اصلاً پارامتر ارقام نداشت — همیشه فارسی‌رقم.
+  - (د) `Loan.payoffCountdownText` کد مرده با ارقام خام لاتین (بدون هیچ مصرف‌کننده‌ای در کل کدبیس).
+- **راه‌حل:**
+  - `NumberFormatter.formatClock(hour, minute, usePersian)` — هلپر خالص جدید برای قالب «HH:mm» (ساعت اعلان و Toast آن).
+  - `SettingsScreen`: `reminderTimeLabel` حالا با `remember(reminderHour, reminderMinute, usePersianDigits)` از formatClock ساخته می‌شود؛ Toast تغییر ساعت هم از همان هلپر.
+  - `InstallmentAlarmReceiver`: `usePersianDigits/compactThousands` یک‌بار از `AppPreferences` خوانده می‌شود؛ روز سررسید با `formatNumber(..., usePersianDigits)` و مبلغ قسط با `formatPrice(..., usePersian, compactThousands)`.
+  - `ReminderShareDialog`: پارامترهای جدید `usePersianDigits/compactThousands` (پیش‌فرض سازگار با رفتار قدیم)؛ متن جزئیات و پیام پیش‌فرض با formatPrice/formatNumber هماهنگ با تنظیم کاربر؛ `ReceivablesScreen` هر دو پارامتر را به دیالوگ پاس می‌دهد.
+  - `Loan.payoffCountdownText` حذف شد (کد مرده؛ grep کل کدبیس: صفر مصرف‌کننده) + پاک‌سازی ارجاع کامنت در `LoanRepository` (NB-25).
+  - معیار پذیرش: حالت EN → همهٔ اعداد نمایشی این مسیرها انگلیسی‌رقم؛ حالت فارسی → برعکس. (`ShamsiDateHelper.toStandardFormat` خارج scope این باگ ماند — فقط نمایشگر تاریخ و پارامتری است.)
+- **تست:** دو تست واحد جدید در `PureLogicUnitTest`: `nb42_formatClock_respectsDigitsSetting` (۱۰:۰۵ و ۰۰:۰۰ با هر دو تنظیم ارقام) و `nb42_formatPrice_respectsDigitsSetting` (مبلغ با هر دو تنظیم ارقام × دو حالت فشرده‌سازی هزارگان).
+- **⚠️ تست دستی با کاربر:** با هر دو تنظیم ارقام: (۱) ساعت اعلان روزانه در تنظیمات — نمایش فعلی و Toast پس از تغییر؛ (۲) «اعلان تست» از تنظیمات؛ (۳) متن پیام یادآوری شریک در صفحهٔ مطالبات.
+
+### ترمیم فایل‌های truncate (incident موج ۴)
+- **کشف:** ران #۲۱ (d8c661a) — اولین ران با لاگ واقعی پس از فیکس fence کامنت CI — نشان داد کامیت ca43e41 (و از قبل، main از موج ۳) SettingsScreen.kt و LoanRepository.kt را ناقص (truncate) دارد: خطاهای «Expecting ')'» و «Unclosed comment» + زنجیرهٔ Unresolved reference. کامپایل main از موج ۳ به بعد بی‌صدا خراب بود چون همهٔ پوش‌های main با [skip ci] بودند.
+- **ریشه:** بازتولید [skip ci] موج ۳ (کامیت 3f91826) نسخه‌های ناقصِ بازسازی‌شده از tool-results را پوش کرده بود؛ fetch-back آن زمان فقط remote==local-truncated را تأیید کرده بود (نه remote==branch). نسخهٔ کامل و CI-سبز روی نوک fix/wave-3 (9260741، ران #۱۹) موجود بود.
+- **ترمیم:** کامیت d088c37 روی fix/wave-4 — هر دو فایل از نسخهٔ کامل fix/wave-3 + همان ویرایش‌های NB-42 (SettingsScreen: ۶۲٬۹۲۵ و LoanRepository: ۶۶٬۳۵۵ کاراکتر، با چک کامل‌بودن tail و تعریف‌ها). این ترمیم هم برنچ را درست کرد هم (با بازتولید db84233) main را.
+
+### تست و CI
+- توسعه روی برنچ `fix/wave-4`: کامیت `ca43e41` (NB-42 — ۸ فایل).
+- ران #۲۰ (ca43e41) قرمز شد؛ ران #۲۱ (d8c661a) با لاگ واقعی نشان داد مشکل، truncate بودن دو فایل بزرگ است (نه ویرایش‌های NB-42) — بخش JUnit هرگز نرسید.
+- کامیت `d8c661a` روی fix/wave-4: فیکس باگ کامنت‌سازی CI (`echo '```'` به‌جای `echo "``"
+"``"`) — fenceهای Markdown قبلاً توسط bash command-substitution بلعیده می‌شدند و لاگ شکست ران‌های موج‌های ۱-۳ هرگز دیده نمی‌شد.
+- کامیت `d088c37`: ترمیم truncate (بالا). ران #۲۲ روی d088c37 ساخته نشد — در بازهٔ ~۱۸:۵۱–۱۹:۱۰ UTC هیچ رویداد push/pull_request/branch روی GitHub Actions ران ایجاد نکرد (بررسی با پول‌های متعدد و سه رویداد مستقل: پوش d088c37، برنچ موقت `fix/wave-4-ci`، PR موقت #۴)؛ اختلال سمت پلتفرم. CI همان درخت روی PR موقت #۴ در اولین فرصت (پس از رفع اختلال) تأیید می‌شود.
+- بازتولید روی main با `[skip ci]`: کامیت `db84233` (هر ۸ فایل NB-42 — شامل نسخهٔ کامل دو فایل بزرگ؛ هم‌زمان ترمیم آسیب truncate موج ۳ روی main) + کامیت `98d136e` (فیکس fence کامنت CI روی unit-tests.yml)؛ fetch-back: sha بلاکِ هر ۹ فایل بین main و fix/wave-4 بایت‌به‌بایت یکسان تأیید شد.
+- ریلیز (v1.0.7) فقط با دستور صریح کاربر.
