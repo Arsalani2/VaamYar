@@ -25,6 +25,13 @@ import java.io.File
  */
 class DuplicateNameException(message: String) : IllegalStateException(message)
 
+/**
+ * فیکس bug.md/NB-35 (اینوارینت #۱۱): سهمِ شریکِ بدون مالکِ تعریف‌شده قابل ثبت نیست —
+ * نام آزاد دیگر مجاز نیست؛ شریک باید کاربر تعریف‌شده باشد. resolveOwnerPublicId
+ * فقط fallback هویت است (پیوند سهمِ مشروع به کاربر هم‌نام)، نه مجوز نام آزاد.
+ */
+class OwnerlessShareException(message: String) : IllegalStateException(message)
+
 data class UserDeleteCheckResult(
     val canDelete: Boolean,
     val blockingLoanTitles: List<String> = emptyList()
@@ -844,15 +851,25 @@ class LoanRepository(
                 // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند شناسه و پیوند مالک می‌گیرند
                 val newLoanId = loanDao.insertLoan(loanWithId)
                 shares.forEach { share ->
+                    // فیکس bug.md/NB-35 (اینوارینت #۱۱): دفاع در عمق — سهمِ شریکِ جدید
+                    // باید مالکِ تعریف‌شده داشته باشد؛ ownerPublicId خالی فقط وقتی
+                    // پذیرفته می‌شود که کاربرِ هم‌نام در فهرست کاربران موجود باشد
+                    // (resolve fallback) تا سهمِ بی‌مالک هرگز ساخته نشود.
+                    val resolvedOwner = share.ownerPublicId.ifBlank {
+                        resolveOwnerPublicId(share.personName, usersForOwners)
+                    }
+                    if (resolvedOwner.isBlank()) {
+                        throw OwnerlessShareException(
+                            "شریک «${share.personName}» در فهرست کاربران تعریف نشده است؛ ابتدا از دکمهٔ «+ کاربر جدید» ثبتش کنید."
+                        )
+                    }
                     debtorShareDao.insertShare(
                         share.copy(
                             // فیکس bug.md/P3-1: نام شریک در شکل استاندارد ذخیره می‌شود
                             personName = PersianNameNormalizer.canonicalName(share.personName),
                             // فیکس bug.md/F6: شناسهٔ سهم + پیوند به publicId کاربرِ صاحبش
                             publicId = share.publicId.ifBlank { uniqueSharePublicId() },
-                            ownerPublicId = share.ownerPublicId.ifBlank {
-                                resolveOwnerPublicId(share.personName, usersForOwners)
-                            },
+                            ownerPublicId = resolvedOwner,
                             loanId = newLoanId,
                             loanTitle = loanWithId.title,
                             dueDay = loanWithId.dueDay
@@ -904,11 +921,20 @@ class LoanRepository(
                             lastPaidMonthName = matched.lastPaidMonthName
                         )
                     } else {
+                        // فیکس bug.md/NB-35 (اینوارینت #۱۱): سهمِ جدیدِ بدون تطبیق هم فقط
+                        // با مالکِ تعریف‌شده قابل ثبت است (سهم‌های matched قدیمی/legacy
+                        // عمداً permissive می‌مانند تا ویرایش وام‌های قدیمی نشکند).
+                        val resolvedOwner = newShare.ownerPublicId.ifBlank {
+                            resolveOwnerPublicId(newShare.personName, usersForOwners)
+                        }
+                        if (resolvedOwner.isBlank()) {
+                            throw OwnerlessShareException(
+                                "شریک «${newShare.personName}» در فهرست کاربران تعریف نشده است؛ ابتدا از دکمهٔ «+ کاربر جدید» ثبتش کنید."
+                            )
+                        }
                         newShare.copy(
                             publicId = uniqueSharePublicId(),
-                            ownerPublicId = newShare.ownerPublicId.ifBlank {
-                                resolveOwnerPublicId(newShare.personName, usersForOwners)
-                            }
+                            ownerPublicId = resolvedOwner
                         )
                     }
                     debtorShareDao.insertShare(

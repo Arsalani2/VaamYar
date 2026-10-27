@@ -7,6 +7,7 @@ import com.aistudio.vamyar.data.AppDatabase
 import com.aistudio.vamyar.data.CurrentMonthPayOutcome
 import com.aistudio.vamyar.data.DuplicateNameException
 import com.aistudio.vamyar.data.LoanRepository
+import com.aistudio.vamyar.data.OwnerlessShareException
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.model.Loan
 import com.aistudio.vamyar.model.LoanInstallment
@@ -65,6 +66,10 @@ class LoanRepositoryIntegrityTest {
     }
 
     private suspend fun insertSharedLoan(paidMonths: Int = 3): Loan {
+        // فیکس bug.md/NB-35: سهمِ شریکِ این فیکسچر باید مالکِ تعریف‌شده داشته باشد
+        // (دفاع OwnerlessShareException سهمِ بی‌کاربر را رد می‌کند) → کاربر «علی»
+        // با publicId ثابت از قبل درج می‌شود (بدون کاراکترهای مبهم 0/1/I/O/l/i).
+        db.userProfileDao().insertUser(UserProfile(name = "علی", publicId = "U-tst345"))
         // وام شراکتی: قسط ۴ میلیون، سهم من ۲ میلیون
         val id = repository.saveLoanWithShares(
             Loan(
@@ -694,5 +699,53 @@ class LoanRepositoryIntegrityTest {
         repository.saveLoanWithShares(loan.copy(monthlyAmount = 3_000_000L), emptyList())
         assertEquals(1, repository.allLoans.first().size)
         assertEquals(3_000_000L, repository.allLoans.first().first().monthlyAmount)
+    }
+
+    // ---------------------------------------------------------------- NB-35 (دفاع Repository: سهمِ بدون مالکِ تعریف‌شده)
+
+    @Test
+    fun nb35_newShareWithoutDefinedOwnerIsRejected() = runBlocking {
+        // ۱) سهمِ «غریبه» بدون کاربرِ تعریف‌شده → کل ثبت وام رد می‌شود
+        try {
+            repository.saveLoanWithShares(
+                Loan(title = "وام بدون مالک", dueDay = 10, monthlyAmount = 4_000_000L, totalMonths = 12),
+                listOf(
+                    DebtorShare(loanId = 0L, loanTitle = "", personName = "غریبه", shareAmount = 2_000_000L)
+                )
+            )
+            fail("سهم بدون مالکِ تعریف‌شده باید رد شود")
+        } catch (e: OwnerlessShareException) {
+            assertTrue(e.message!!.contains("غریبه"))
+        }
+        // تراکنش اتمیک است: وام هم نباید ذخیره شده باشد
+        assertEquals(0, repository.allLoans.first().size)
+
+        // ۲) مسیر مثبت resolve-fallback: کاربر «زهرا» موجود است؛ سهم بدون
+        //    ownerPublicId با نام او → پذیرفته و ownerPublicId در DB = publicId زهرا
+        db.userProfileDao().insertUser(UserProfile(name = "زهرا", publicId = "U-zhr723"))
+        val loanId = repository.saveLoanWithShares(
+            Loan(title = "وام با مالک", dueDay = 10, monthlyAmount = 4_000_000L, totalMonths = 12),
+            listOf(
+                DebtorShare(loanId = 0L, loanTitle = "", personName = "زهرا", shareAmount = 2_000_000L)
+            )
+        )
+        val savedShare = repository.allShares.first().first { it.loanId == loanId }
+        assertEquals("U-zhr723", savedShare.ownerPublicId)
+
+        // ۳) ویرایش همان وام با افزودن سهمِ جدیدِ بدون مالک → رد (شاخهٔ edit، فقط
+        //    سهمِ بدون تطبیق؛ سهم‌های matched قدیمی permissive می‌مانند)
+        val loan = repository.allLoans.first().first { it.id == loanId }
+        val shares = repository.allShares.first().filter { it.loanId == loanId }
+        try {
+            repository.saveLoanWithShares(
+                loan.copy(),
+                shares + DebtorShare(loanId = loanId, loanTitle = "", personName = "مجهول", shareAmount = 1_000_000L)
+            )
+            fail("سهمِ جدیدِ بدون مالک در ویرایش هم باید رد شود")
+        } catch (e: OwnerlessShareException) {
+            assertTrue(e.message!!.contains("مجهول"))
+        }
+        // rollback: دادهٔ قبلی دست‌نخورده مانده است
+        assertEquals(1, repository.allShares.first().filter { it.loanId == loanId }.size)
     }
 }

@@ -57,4 +57,14 @@ object InputLimits {
         }
         return if (duplicate) "این نام وام قبلاً ثبت شده است؛ لطفاً نام دیگری انتخاب کنید." else null
     }
+
+    /**
+     * فیکس bug.md/NB-35 (اینوارینت #۱۱): شریک فقط از میان کاربران تعریف‌شده قابل
+     * انتخاب است — نام آزاد/غریبه رد می‌شود. تطبیق با کلید استاندارد تا هم‌نویسهٔ
+     * عربی (ي/ك) و فاصله‌های زائد هم‌نام شمرده شوند.
+     */
+    fun isDefinedPartner(partnerName: String, definedUserNames: List<String>): Boolean =
+        definedUserNames.any {
+            PersianNameNormalizer.matchKey(it.trim()) == PersianNameNormalizer.matchKey(partnerName)
+        }
 }
