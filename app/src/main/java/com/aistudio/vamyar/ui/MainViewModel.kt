@@ -619,12 +619,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun resetMonthlyDebtorStatus() {
-        viewModelScope.launch {
-            repository.resetMonthlyDebtorStatus()
-        }
-    }
-
     // فیکس bug.md/NB-23: توابع مردهٔ clearAllDataAndStartFresh و resetToDefaults (بدون هیچ
     // فراخواننده‌ای در UI؛ دوباره‌کاریِ همین مسیر) حذف شدند — این تنها نقطهٔ ورود
     // «پاکسازی تمام وام‌ها» است و clearAllDataAndResetِ بدون فراخواننده هم از ریپو حذف شد.
