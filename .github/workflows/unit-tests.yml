@@ -1,7 +1,6 @@
 name: Unit Tests (no release)
 
-# فقط تست اجرا می‌کند؛ هیچ نسخه‌ای bump یا منتشر نمی‌شود و به main چیزی push نمی‌کند.
-# قبل از ریلیز حتماً این ورک‌فلو سبز باشد (هر push بدون [skip ci] به main ریلیز می‌سازد).
+# فقط تست اجرا می‌کند؛ هیچ نسخه‌ای bump یا منتشر نمی‌شود. جزئیات شکست به‌صورت کامنت روی issue #3 می‌آید.
 on:
   workflow_dispatch:
   pull_request:
@@ -14,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: unit-tests-${{ github.ref }}
@@ -49,14 +49,26 @@ jobs:
 
       - name: Summarize Test Failures
         if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # خطاهای کامپایل Kotlin و خلاصه‌ی Gradle را به Annotation تبدیل می‌کند
           if [ -f gradle-test.log ]; then
             grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed" gradle-test.log | head -40 \
               | while IFS= read -r line; do echo "::error::${line:0:900}"; done
           fi
+          # گزارش کامل برای issue گزارش‌گیر (#3)
+          REPORT=ci-report.md
+          {
+            echo "## شکست تست CI — run [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) روی کامیت ${GITHUB_SHA:0:7}"
+            echo ""
+            echo "### خطاها و خلاصه‌ی Gradle:"
+            echo "```"
+            grep -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed" gradle-test.log | head -60 || echo "(چیزی match نشد)"
+            echo "```"
+          } > "$REPORT"
           # تست‌های شکست‌خورده از گزارش‌های JUnit XML
-          python3 - <<'PY'
+          python3 - <<'PY' > junit-failures.txt
           import glob, xml.etree.ElementTree as ET
           n = 0
           for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
@@ -70,19 +82,11 @@ jobs:
                       if el is not None and n < 30:
                           n += 1
                           msg = (el.get('message') or '').replace(chr(10), ' ')[:600]
-                          cls = tc.get('classname') or ''
-                          name = tc.get('name') or ''
-                          print('::error title=Test failed::' + cls + '.' + name + ' -> ' + msg)
+                          print('- `' + (tc.get('classname') or '?') + '.' + (tc.get('name') or '?') + '` -> ' + msg)
           PY
-
-      - name: Upload Test Reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-reports
-          path: |
-            gradle-test.log
-            app/build/reports/tests/**
-            app/build/test-results/**
-          if-no-files-found: warn
-          retention-days: 14
+          if [ -s junit-failures.txt ]; then
+            echo "" >> "$REPORT"
+            echo "### تست‌های شکست‌خورده (JUnit):" >> "$REPORT"
+            cat junit-failures.txt >> "$REPORT"
+          fi
+          gh issue comment 3 --repo "$GITHUB_REPOSITORY" --body-file "$REPORT"
