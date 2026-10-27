@@ -18,6 +18,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * فیکس bug.md/NB-36 (اینوارینت #۱۲): نام کاربر/عنوان وام یکتا هستند — دفاع نهایی در
+ * Repository، مستقل از UI. فقط مسیر ثبت/ویرایش دستی؛ تطبیق و ادغام ایمپورت بکاپ
+ * (NB-34) استثنای مستند است و از DAO مستقیم می‌گذرد، نه از این مسیر.
+ */
+class DuplicateNameException(message: String) : IllegalStateException(message)
+
 data class UserDeleteCheckResult(
     val canDelete: Boolean,
     val blockingLoanTitles: List<String> = emptyList()
@@ -689,6 +696,18 @@ class LoanRepository(
         // فاصله‌های اضافه) و هم‌گام‌سازی تغییر نام در سهم‌ها با کلیدِ تطبیقِ استاندارد
         // انجام می‌شود تا سهم‌های شرکا هرگز از صاحبشان جدا نمانند.
         val canonicalUser = user.copy(name = PersianNameNormalizer.canonicalName(user.name))
+        // فیکس bug.md/NB-36: دفاع در عمق — یکتایی نام کاربر در خود Repository تضمین می‌شود؛
+        // UI (AddEditUserDialog و دیالوگ وام) همان چک را زنده انجام می‌دهد. هنگام ویرایش،
+        // خودِ کاربر (id یکسان) از بررسی کنار گذاشته می‌شود.
+        val usersSnapshot = userProfileDao.getAllUsersOnce()
+        val duplicateName = usersSnapshot.any {
+            it.id != canonicalUser.id && PersianNameNormalizer.namesMatch(it.name, canonicalUser.name)
+        }
+        if (duplicateName) {
+            throw DuplicateNameException(
+                "کاربری با نام «${canonicalUser.name}» از قبل وجود دارد؛ لطفاً نام دیگری انتخاب کنید."
+            )
+        }
         // فیکس bug.md/NB-23: دو شاخهٔ if/else با بدنهٔ یکسان ادغام شدند؛ تنها تفاوت واقعی —
         // پاک‌کردن پرچم‌های کاربر مبنای قبلی — فقط برای کاربرِ مبنا انجام می‌شود.
         database.withTransaction {
@@ -809,6 +828,18 @@ class LoanRepository(
                 else -> safeLoan.copy(publicId = uniqueLoanPublicId())
             }
             val usersForOwners = userProfileDao.getAllUsersOnce()
+            // فیکس bug.md/NB-36: دفاع در عمق — یکتایی عنوان وام با کلید استاندارد؛
+            // هنگام ویرایش، خودِ وام (id یکسان) از بررسی کنار گذاشته می‌شود.
+            val loansSnapshot = loanDao.getAllLoansOnce()
+            val duplicateTitle = loansSnapshot.any {
+                it.id != loanWithId.id &&
+                    PersianNameNormalizer.matchKey(it.title) == PersianNameNormalizer.matchKey(loanWithId.title)
+            }
+            if (duplicateTitle) {
+                throw DuplicateNameException(
+                    "وامی با نام «${loanWithId.title}» از قبل ثبت شده است؛ لطفاً نام دیگری انتخاب کنید."
+                )
+            }
             if (loanWithId.id == 0L) {
                 // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند شناسه و پیوند مالک می‌گیرند
                 val newLoanId = loanDao.insertLoan(loanWithId)

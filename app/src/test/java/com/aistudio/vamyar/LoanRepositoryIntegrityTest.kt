@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.aistudio.vamyar.data.AppDatabase
 import com.aistudio.vamyar.data.CurrentMonthPayOutcome
+import com.aistudio.vamyar.data.DuplicateNameException
 import com.aistudio.vamyar.data.LoanRepository
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.model.Loan
@@ -657,5 +658,41 @@ class LoanRepositoryIntegrityTest {
             2,
             repository.allLoans.first().first { it.publicId == "L-aaa2345" }.paidMonths
         )
+    }
+
+    // ---------------------------------------------------------------- NB-36 (دفاع Repository: یکتایی نام و عنوان)
+
+    @Test
+    fun nb36_repositoryRejectsDuplicateUserName() = runBlocking {
+        db.userProfileDao().insertUser(UserProfile(name = "علی", publicId = "U-tst345"))
+        try {
+            repository.saveUser(UserProfile(name = "علي")) // ي عربی — با کلید استاندارد یکسان است
+            fail("نام تکراری باید در Repository رد شود")
+        } catch (e: DuplicateNameException) {
+            assertTrue(e.message!!.contains("علی"))
+        }
+        // هیچ رکوردی نباید ساخته شده باشد و نام دیگر مشکلی ندارد
+        assertEquals(1, db.userProfileDao().getAllUsersOnce().size)
+        repository.saveUser(UserProfile(name = "رضا"))
+        assertEquals(2, db.userProfileDao().getAllUsersOnce().size)
+    }
+
+    @Test
+    fun nb36_repositoryRejectsDuplicateLoanTitle() = runBlocking {
+        insertLoanStartingTir(paidMonths = 0) // «وام تست اقساط واقعی»
+        try {
+            repository.saveLoanWithShares(
+                Loan(title = "وام تست اقساط واقعی", dueDay = 10, monthlyAmount = 2_000_000L, totalMonths = 12),
+                emptyList()
+            )
+            fail("عنوان تکراری باید در Repository رد شود")
+        } catch (e: DuplicateNameException) {
+            assertTrue(e.message!!.contains("وام تست اقساط واقعی"))
+        }
+        // ویرایشِ خودِ همان وام با همان عنوان نباید رد شود (self-exclusion)
+        val loan = repository.allLoans.first().first()
+        repository.saveLoanWithShares(loan.copy(monthlyAmount = 3_000_000L), emptyList())
+        assertEquals(1, repository.allLoans.first().size)
+        assertEquals(3_000_000L, repository.allLoans.first().first().monthlyAmount)
     }
 }

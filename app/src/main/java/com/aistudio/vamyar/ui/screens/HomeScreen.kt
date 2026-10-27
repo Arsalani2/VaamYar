@@ -322,6 +322,8 @@ fun HomeScreen(
             loanToEdit = null,
             initialShares = emptyList(),
             allUsers = allUsers,
+            // فیکس bug.md/NB-36: چک زندهٔ عنوان تکراری
+            allLoanTitles = loans.map { it.title },
             currentShamsiDate = currentShamsiDate,
             usePersianDigits = usePersianDigits,
             compactThousands = compactThousands,
@@ -342,6 +344,8 @@ fun HomeScreen(
             loanToEdit = loan,
             initialShares = existingShares,
             allUsers = allUsers,
+            // فیکس bug.md/NB-36: چک زندهٔ عنوان تکراری (خودِ وامِ در حال ویرایش مستثناست)
+            allLoanTitles = loans.map { it.title },
             currentShamsiDate = currentShamsiDate,
             usePersianDigits = usePersianDigits,
             compactThousands = compactThousands,
