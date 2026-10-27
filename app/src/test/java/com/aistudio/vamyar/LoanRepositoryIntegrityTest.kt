@@ -748,4 +748,79 @@ class LoanRepositoryIntegrityTest {
         // rollback: دادهٔ قبلی دست‌نخورده مانده است
         assertEquals(1, repository.allShares.first().filter { it.loanId == loanId }.size)
     }
+    // ---------------------------------------------------------------- NB-37 (موج ۲ — هم‌ارزی مدل اقساط در ویرایش)
+
+    @Test
+    fun nb37_reconcileMatchesRealRecordsAndSyncsCounters() = runBlocking {
+        val cur = ShamsiDate(1405, 8, 15) // آبان
+        // بازتولید سناریوی کاربر: ۳ قسط ترتیبی (تیر/مرداد/شهریور) → برداشتن همهٔ تیک‌ها
+        // → صفحهٔ اصلی همان لحظه صفر و پرچم «پرداخت ماه جاری» خاموش
+        val loan = insertLoanStartingTir(paidMonths = 3)
+        repository.saveLoanWithShares(currentLoan(loan.id), emptyList(), emptySet(), cur)
+        var records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertTrue(records.isEmpty())
+        assertEquals(0, currentLoan(loan.id).paidMonths)
+        assertFalse(currentLoan(loan.id).isCurrentMonthPaid)
+
+        // تیکِ تنها یک ماه میانی (مرداد) → فقط همان ماه رکورد می‌شود
+        repository.saveLoanWithShares(currentLoan(loan.id), emptyList(), setOf(1405 to 5), cur)
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(listOf(5), records.map { it.month })
+        assertEquals(1, currentLoan(loan.id).paidMonths)
+        assertFalse(currentLoan(loan.id).isCurrentMonthPaid)
+
+        // افزایش: مرداد + آبانِ ماهِ جاری → پرچم «پرداخت ماه جاری» هم روشن
+        repository.saveLoanWithShares(currentLoan(loan.id), emptyList(), setOf(1405 to 5, 1405 to 8), cur)
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).sortedBy { it.month }
+        assertEquals(listOf(5, 8), records.map { it.month })
+        assertEquals(2, currentLoan(loan.id).paidMonths)
+        assertTrue(currentLoan(loan.id).isCurrentMonthPaid)
+
+        // حفظ رکوردهای نامرتّب (مثل «فقط این ماه» وسط عقب‌ماندگی) + افزودن ماه جدید
+        repository.saveLoanWithShares(
+            currentLoan(loan.id), emptyList(),
+            setOf(1405 to 4, 1405 to 5, 1405 to 6, 1405 to 8), cur
+        )
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id).sortedBy { it.installmentNumber }
+        assertEquals(listOf(1, 2, 3, 5), records.map { it.installmentNumber }) // تیر/مرداد/شهریور/آبان
+    }
+
+    @Test
+    fun nb37_editWithoutTouchingMonthsLeavesRecordsUntouched() = runBlocking {
+        val cur = ShamsiDate(1405, 8, 15)
+        val loan = insertLoanStartingTir(paidMonths = 2) // تیر و مرداد
+        val before = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        // ویرایشِ فقط مبلغ (مجموعهٔ ماه‌ها همان‌طور که دیالوگِ جدید پاس می‌دهد)
+        val edited = currentLoan(loan.id).copy(monthlyAmount = 5_000_000L)
+        repository.saveLoanWithShares(
+            edited, emptyList(),
+            before.map { it.year to it.month }.toSet(), cur
+        )
+        val after = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        assertEquals(before.map { it.month }, after.map { it.month })
+        assertEquals(2, currentLoan(loan.id).paidMonths)
+        assertEquals(5_000_000L, currentLoan(loan.id).monthlyAmount)
+        // رکوردهای موجود دوباره نوشته نمی‌شوند (paidAt تغییر نمی‌کند)
+        assertEquals(before.map { it.paidAtTimestamp }, after.map { it.paidAtTimestamp })
+    }
+
+    @Test
+    fun nb37_durationReductionDropsOutOfRangeRecords() = runBlocking {
+        val cur = ShamsiDate(1405, 8, 15)
+        val loan = insertLoanStartingTir(paidMonths = 3) // تیر/مرداد/شهریور
+        // کاهش مدت به ۲ ماه؛ ماهِ خارج از بازه (شهریور) از هدف کنار گذاشته و حذف می‌شود
+        val edited = currentLoan(loan.id).copy(totalMonths = 2)
+        repository.saveLoanWithShares(
+            edited, emptyList(),
+            setOf(1405 to 4, 1405 to 5, 1405 to 6), cur
+        )
+        val records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        assertEquals(listOf(4, 5), records.map { it.month })
+        assertEquals(2, currentLoan(loan.id).paidMonths)
+        assertTrue(currentLoan(loan.id).isCompleted)
+    }
+
 }

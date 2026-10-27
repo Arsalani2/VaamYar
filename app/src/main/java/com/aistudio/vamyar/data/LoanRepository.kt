@@ -810,7 +810,11 @@ class LoanRepository(
      */
     suspend fun saveLoanWithShares(
         loan: Loan,
-        shares: List<DebtorShare>
+        shares: List<DebtorShare>,
+        // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) هدفِ اقساط از دیالوگ ویرایش — null یعنی
+        // فراخوانی قدیمی (بدون دیالوگِ رکورد-محور): رفتار قبلی حفظ می‌شود.
+        targetPaidYearMonths: Set<Pair<Int, Int>>? = null,
+        currentDate: ShamsiDate? = null
     ): Long = withContext(Dispatchers.IO) {
         // ذخیره‌ی وام + شرکا یک تراکنش اتمیک است (حذف و درج دوباره‌ی سهم‌ها نباید وسط کار قطع شود)
         database.withTransaction {
@@ -847,6 +851,9 @@ class LoanRepository(
                     "وامی با نام «${loanWithId.title}» از قبل ثبت شده است؛ لطفاً نام دیگری انتخاب کنید."
                 )
             }
+            // فیکس bug.md/NB-37: تاریخِ هم‌ارزسازی رکوردها — فراخوانی‌های قدیمیِ بدون
+            // تاریخ از ساعت سیستم استفاده می‌کنند (مثل پرداخت‌های عادی).
+            val effectiveDate = currentDate ?: ShamsiDateHelper.getSystemShamsiDate()
             if (loanWithId.id == 0L) {
                 // وام جدید: سهم‌ها همان‌طور که از دیالوگ آماده‌اند شناسه و پیوند مالک می‌گیرند
                 val newLoanId = loanDao.insertLoan(loanWithId)
@@ -878,13 +885,21 @@ class LoanRepository(
                 }
                 // فیکس bug.md/F1+NB-31: وامِ جدید با paidMonths > 0 (ثبت وامِ نیمه‌پرداخت‌شده)
                 // هم باید رکورد اقساطِ هم‌ارز داشته باشد تا شمارنده و رکوردها سازگار بمانند.
-                seedSequentialInstallmentRecords(
-                    loanId = newLoanId,
-                    startYear = loanWithId.startYear,
-                    startMonth = loanWithId.startMonth,
-                    paidMonths = safePaidMonths,
-                    monthlyAmount = loanWithId.monthlyAmount
-                )
+                if (targetPaidYearMonths != null) {
+                    // فیکس bug.md/NB-37: وام جدید هم همان مجموعهٔ (سال، ماه) واقعیِ
+                    // تیک‌خوردهٔ دیالوگ را رکورد می‌گیرد (نه seed ترتیبی) — منبع واحد.
+                    reconcileInstallments(loanWithId.copy(id = newLoanId), targetPaidYearMonths, effectiveDate)
+                } else {
+                    // فیکس bug.md/F1+NB-31: وامِ جدید با paidMonths > 0 (ثبت وامِ نیمه‌پرداخت‌شده)
+                    // هم باید رکورد اقساطِ هم‌ارز داشته باشد تا شمارنده و رکوردها سازگار بمانند.
+                    seedSequentialInstallmentRecords(
+                        loanId = newLoanId,
+                        startYear = loanWithId.startYear,
+                        startMonth = loanWithId.startMonth,
+                        paidMonths = safePaidMonths,
+                        monthlyAmount = loanWithId.monthlyAmount
+                    )
+                }
                 newLoanId
             } else {
                 loanDao.updateLoan(loanWithId)
@@ -894,6 +909,12 @@ class LoanRepository(
                 // فیکس bug.md/F1+NB-31: هم‌ارزِ همان قاعده برای رکوردهای اقساط واقعی —
                 // کاهش مدت وام در ویرایش، رکوردهای بی‌مرجع را پاک می‌کند.
                 loanInstallmentDao.deleteInstallmentsAboveNumber(loanWithId.id, loanWithId.totalMonths)
+                // فیکس bug.md/NB-37: رکوردهای اقساط با مجموعهٔ (سال، ماه) هدفِ دیالوگ هم‌ارز
+                // می‌شوند و شمارنده‌ها از روی رکوردها sync — ویرایش و صفحهٔ اصلی دیگر
+                // هرگز واگرا نمی‌شوند (ادامهٔ مستقیم درس NB-31).
+                if (targetPaidYearMonths != null) {
+                    reconcileInstallments(loanWithId, targetPaidYearMonths, effectiveDate)
+                }
                 // فیکس bug.md/F6: تطبیق شرکای پابرجا اول با publicId است (هویتی) و برای
                 // سهم‌های بدون شناسه با کلید استاندارد نام (P3-1)؛ در هر دو حالت شناسهٔ
                 // سهمِ قدیمی حفظ می‌شود تا edit هرگز هویت را نبُرد.
@@ -1081,6 +1102,39 @@ class LoanRepository(
     private suspend fun removeInstallmentRecord(loan: Loan, number: Int, year: Int, month: Int) {
         loanInstallmentDao.deleteByLoanAndMonth(loan.id, year, month)
         paymentRecordDao.deleteRecordsForInstallment(loan.id, number)
+    }
+
+    /**
+     * فیکس bug.md/NB-37: هم‌ارزسازی رکوردهای واقعی اقساط با مجموعهٔ (سال، ماه) هدف —
+     * درج ماه‌های جدید (شمارهٔ قسط از نگاشتِ ماه شروع وام؛ paidAt = اکنون)، حذف
+     * ماه‌های اضافه (با آینهٔ تاریخچه‌شان — الگوی removeInstallmentRecord) و سپس
+     * syncLoanCountersFromRecords تا شمارنده و پرچم ماه جاری تصویرِ همگامِ رکوردها
+     * بمانند. ماه‌های خارج از بازهٔ ۱..totalMonths (تغییر تاریخ شروع/کاهش مدت)
+     * از هدف کنار گذاشته و حذف می‌شوند — رفتارِ قبلیِ کاهش مدت حفظ شده است.
+     * PaymentRecord ها فقط طبق همان قاعدهٔ آینه حرکت می‌کنند؛ رکوردهای موجود
+     * دوباره نوشته نمی‌شوند (تاریخچهٔ پرداختِ ثبت‌شده دست‌نخورده می‌ماند).
+     */
+    private suspend fun reconcileInstallments(
+        loan: Loan,
+        targetYearMonths: Set<Pair<Int, Int>>,
+        currentDate: ShamsiDate
+    ) {
+        val target = targetYearMonths.mapNotNull { (y, m) ->
+            val n = ShamsiDateHelper.installmentNumberForMonth(loan.startYear, loan.startMonth, y, m)
+            if (n != null && n in 1..loan.totalMonths) y to m else null
+        }.toSet()
+        val existing = loanInstallmentDao.getInstallmentsForLoanOnce(loan.id)
+        // درج ماه‌های هدفِ بدون رکورد (با تاریخ واقعیِ اکنون — مثل پرداخت عادی)
+        target.filter { (y, m) -> existing.none { it.year == y && it.month == m } }.forEach { (y, m) ->
+            val n = ShamsiDateHelper.installmentNumberForMonth(loan.startYear, loan.startMonth, y, m)
+                ?: return@forEach
+            insertInstallmentRecord(loan, n, y, m, currentDate)
+        }
+        // حذف رکوردهایی که در مجموعهٔ هدف نیستند (با آینهٔ تاریخچه)
+        existing.filter { (it.year to it.month) !in target }.forEach {
+            removeInstallmentRecord(loan, it.installmentNumber, it.year, it.month)
+        }
+        syncLoanCountersFromRecords(loan, currentDate)
     }
 
     /**
