@@ -102,8 +102,8 @@ object LoanIconHelper {
             if (!iconsDir.exists()) {
                 iconsDir.mkdirs()
             }
-            val fileName = "loan_icon_${System.currentTimeMillis()}.png"
-            val destFile = File(iconsDir, fileName)
+            // فیکس bug.md/NB-38: نام‌گذاری برخوردناپذیر (timestamp به‌تنهایی کافی نیست)
+            val destFile = uniqueIconFile(iconsDir)
 
             // مرحله اول: فقط استخراج ابعاد تصویر
             val boundsOptions = BitmapFactory.Options().apply {
@@ -160,13 +160,30 @@ object LoanIconHelper {
             if (!iconsDir.exists()) {
                 iconsDir.mkdirs()
             }
-            val destFile = File(iconsDir, "loan_icon_${System.currentTimeMillis()}.png")
+            // فیکس bug.md/NB-38: نام‌گذاری برخوردناپذیر — حلقهٔ ایمپورت بکاپ چند آیکون را
+            // پشت‌سرهم در همان میلی‌ثانیه می‌نویسد؛ timestamp تنها باعث overwrite می‌شد.
+            val destFile = uniqueIconFile(iconsDir)
             FileOutputStream(destFile).use { out -> out.write(bytes) }
             destFile.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
+    }
+
+    /**
+     * فیکس bug.md/NB-38 (اینوارینت #۱۳): نام فایل آیکون باید برخوردناپذیر باشد —
+     * timestamp میلی‌ثانیه به‌تنهایی کافی نیست؛ حلقهٔ ایمپورت بکاپ چند آیکون را در همان
+     * میلی‌ثانیه می‌نویسد → برخورد نام فایل → overwrite → قاطی‌شدن آیکون وام‌ها.
+     * پسوند یکتای nanoTime + حلقهٔ تضمینِ File.exists (حداکثر ۵ تلاش تا نام آزاد)
+     * و در نهایت UUID قطعی‌سازی می‌کند.
+     */
+    private fun uniqueIconFile(iconsDir: File): File {
+        repeat(5) {
+            val candidate = File(iconsDir, "loan_icon_${System.currentTimeMillis()}_${System.nanoTime()}.png")
+            if (!candidate.exists()) return candidate
+        }
+        return File(iconsDir, "loan_icon_${java.util.UUID.randomUUID()}.png")
     }
 
     fun deleteCustomIconFile(filePath: String?) {

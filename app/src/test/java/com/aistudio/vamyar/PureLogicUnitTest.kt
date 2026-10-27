@@ -475,6 +475,35 @@ class PureLogicUnitTest {
         assertFalse(savedFile.exists())
     }
 
+    // ---------------------------------------------------------------- NB-38 (نام‌گذاری برخوردناپذیر آیکون)
+
+    @Test
+    fun nb38_fiftyIconsBackToBackGetDistinctFiles() {
+        // سناریوی کاربر: حلقهٔ ایمپورت بکاپ چند آیکون را پشت‌سرهم در همان میلی‌ثانیه
+        // می‌نویسد — پیش از فیکس، دو آیکونِ همان میلی‌ثانیه نام فایل یکسان می‌گرفتند
+        // و فایل دومی روی اولی overwrite می‌شد (همه یک عکس / عکس‌های قاطی).
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val savedPaths = (1..50).map { index ->
+            val iconBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, index.toByte())
+            val path = LoanIconHelper.saveCustomIconBytes(context, iconBytes)
+            assertNotNull(path)
+            path!!
+        }
+        // ۵۰ فایل متمایز
+        assertEquals(50, savedPaths.toSet().size)
+        // …با محتوای درست (هر آیکون بایت اختصاصی خودش)
+        savedPaths.forEachIndexed { index, path ->
+            val file = java.io.File(path)
+            assertTrue(file.exists())
+            assertTrue(
+                "محتوای فایل ${index + 1}ام باید بایت اختصاصی خودش باشد",
+                file.readBytes().contentEquals(byteArrayOf(0x89.toByte(), 0x50, 0x4E, (index + 1).toByte()))
+            )
+        }
+        // پاک‌سازی فایل‌های تست
+        savedPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
+    }
+
     // ---------------------------------------------------------------- F1+NB-31 (نگاشت قسط ↔ ماه شمسی)
 
     @Test
