@@ -672,3 +672,26 @@
 - `unit-tests.yml` روی `fix/wave-1` سبز شد — ران‌های #۱۳ و #۱۴ completed successfully (ران‌های #۱۱/#۱۲ فقط به‌خاطر ران جدیدتر cancelled شدند).
 - سپس همان ۴ فیکس به‌ترتیب روی main بازتولید شد (`f7de2cc` → `f2f1766` → `e741988` → `a725bda`)، همه با `[skip ci]` — بدون trigger ورک‌فلوی ریلیز؛ byte-diff فایل‌های کلیدی (LoanRepository، AddEditLoanDialog، هر دو فایل تست) بین main و fix/wave-1 یکسان تأیید شد.
 - ریلیز (v1.0.7) فقط با دستور صریح کاربر.
+
+## موج ۲ — NB-37: هم‌ارزی مدل اقساط در ویرایش وام (۲۰۲۶-۱۰-۲۷)
+
+> ساختاری‌ترین فیکس نقشهٔ راه نسخهٔ ۵ — گزارش کاربر: «تو ویرایش همهٔ پرداخت ماه‌ها را برداشتم و ذخیره کردم، ولی صفحهٔ اصلی همگام نشد.»
+
+### رفع NB-37 — هستهٔ Repository (کامیت `7f166dc` روی main)
+- امضای `saveLoanWithShares` پارامترهای جدید گرفت: `targetPaidYearMonths: Set<Pair<Int, Int>>?` (مجموعهٔ (سال، ماه) هدف از دیالوگ) و `currentDate: ShamsiDate?` (تاریخ مؤثر اپ).
+- تابع خصوصی `reconcileInstallments` — هم‌ارزسازِ رکوردهای `LoanInstallment` با مجموعهٔ هدف: فیلتر هدف به بازهٔ ۱..totalMonths (با `installmentNumberForMonth`)، درج ماه‌های جدید (`insertInstallmentRecord`)، حذف رکوردهای خارج از هدف (`removeInstallmentRecord`)، سپس `syncLoanCountersFromRecords` — شمارندهٔ `paidMonths` و پرچم ماه جاری همیشه از روی همان رکوردها.
+- شاخهٔ ویرایش: `reconcileInstallments` بعد از `deleteInstallmentsAboveNumber` (کاهش مدت همچنان رکوردهای خارج از بازه را می‌ریزد)؛ شاخهٔ وام جدید: اگر target داده شده باشد هم‌ارزی، وگرنه seed ترتیبی قبلی. `effectiveDate` قبل از شاخه‌بندی حل می‌شود.
+- تست‌های Room: `nb37_reconcileMatchesRealRecordsAndSyncsCounters` (بازتولید کامل سناریوی کاربر: برداشتن همهٔ تیک‌ها → رکوردها صفر و پرچم ماه جاری خاموش؛ تیک تک‌ماهیِ میانی؛ حفظ رکوردهای نامرتّب) / `nb37_editWithoutTouchingMonthsLeavesRecordsUntouched` (ویرایشِ فقط مبلغ — رکوردها و `paidAt` دست‌نخورده) / `nb37_durationReductionDropsOutOfRangeRecords` (کاهش مدت → حذف رکوردِ خارج از بازه + `isCompleted`).
+
+### رفع NB-37 — دیالوگ ویرایش رکورد-محور (کامیت `69c101f` روی main)
+- `AddEditLoanDialog` پارامتر `initialInstallments` گرفت — `HomeScreen` رکوردهای واقعی وام را فیلتر و به دیالوگ ویرایش پاس می‌کند؛ `onSave` حالا `(Loan, List<DebtorShare>, Set<Pair<Int, Int>>)` است و `MainViewModel.saveLoan` مجموعه + تاریخ مؤثر اپ را به `saveLoanWithShares` می‌رساند.
+- تیک‌ها مجموعهٔ (سال، ماه) واقعی‌اند (`paidYearMonths`)؛ لمس هر نود همان ماه را toggle می‌کند؛ `InstallmentNodesView` با `paidYearMonths`/`overdueYearMonths`/`currentYearMonth` مثل `LoanItemCard` رنگ می‌گیرد.
+- چیپ quick-sync → «ثبت همهٔ N قسط رسیدهٔ پرداخت‌نشده» (معادل `payArrearsAndCurrentMonth` داخل دیالوگ)؛ شمارندهٔ نمایشی فقط تیک‌های داخل ۱..totalMonths را می‌شمارد.
+- هشدار P1-9 از دیالوگ حذف شد — با نودهای (سال، ماه) «پرداخت‌شده > کل» در دیالوگ ممکن نیست؛ دفاع P1-9 در Repository می‌ماند.
+
+### تست و CI
+- توسعه روی برنچ `fix/wave-2`: کامیت A `16992df` (Repository + تست) → کامیت B `c1ec9b2` (۴ فایل UI).
+- `unit-tests.yml` روی `fix/wave-2` سبز شد — ران‌های #۱۵ و #۱۶ completed successfully.
+- سپس همان دو فیکس به‌ترتیب روی main بازتولید شد (`7f166dc` → `69c101f`)، هر دو با `[skip ci]` — بدون trigger ورک‌فلوی ریلیز؛ byte-diff فایل‌های کلیدی (LoanRepository، LoanRepositoryIntegrityTest، AddEditLoanDialog، HomeScreen) بین main و fix/wave-2 یکسان تأیید شد.
+- ریلیز (v1.0.7) فقط با دستور صریح کاربر.
+
