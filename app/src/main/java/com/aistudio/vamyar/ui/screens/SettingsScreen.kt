@@ -68,6 +68,9 @@ fun SettingsScreen(
     onSyncDateWithSystem: () -> Unit,
     onSetCustomDate: (ShamsiDate) -> Unit,
     onClearAllLoans: () -> Unit,
+    // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها شامل کاربران
+    // پاک و کاربر مبنا پیش‌فرض ساخته می‌شود؛ با دیالوگ تأیید صریح.
+    onFullReset: () -> Unit = {},
     onTestNotification: () -> Unit,
     // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان سررسید از تنظیمات تغییر می‌کند؛
     // پس از ثبت ساعت جدید، آلارم روزانه با همان ساعت از نو زمان‌بندی می‌شود.
@@ -89,6 +92,8 @@ fun SettingsScreen(
     var showAddUserDialog by remember { mutableStateOf(false) }
 
     var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
+    // فیکس bug.md/NB-41: دیالوگ تأیید «بازنشانی کامل برنامه» (شامل کاربران)
+    var showFullResetConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه (TimePicker متریال ۳)
@@ -732,6 +737,21 @@ fun SettingsScreen(
                                     Text("پاکسازی تمام وام‌ها (شروع خام برنامه)")
                                 }
 
+                                // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — برخلاف
+                                // پاکسازی وام‌ها، همهٔ داده‌ها شامل کاربران پاک می‌شود و
+                                // برنامه خودش یک کاربر مبنا پیش‌فرض می‌سازد؛ اجرا فقط
+                                // پس از دیالوگ تأیید صریح (اینوارینت #۹).
+                                OutlinedButton(
+                                    onClick = { showFullResetConfirmDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("بازنشانی کامل برنامه (همهٔ داده‌ها + کاربران)")
+                                }
+
                                 HorizontalDivider()
 
                                 Button(
@@ -963,6 +983,38 @@ fun SettingsScreen(
         )
     }
 
+    // Modal: فیکس bug.md/NB-41 — تأیید «بازنشانی کامل برنامه» (همهٔ داده‌ها + کاربران)
+    if (showFullResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showFullResetConfirmDialog = false },
+            title = { Text("بازنشانی کامل برنامه") },
+            text = {
+                Text(
+                    "همهٔ وام‌ها، سهم‌های شرکا، تاریخچهٔ پرداخت‌ها و همهٔ کاربران (حتی کاربر مبنا) " +
+                        "برای همیشه پاک می‌شوند و برنامه یک کاربر مبنا پیش‌فرض می‌سازد. " +
+                        "این عملیات فقط با فایل پشتیبان قابل بازگشت است. ادامه می‌دهید؟"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onFullReset()
+                        showFullResetConfirmDialog = false
+                        Toast.makeText(context, "برنامه کامل بازنشانی شد و کاربر مبنا ساخته شد", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("بله، بازنشانی کامل شود")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFullResetConfirmDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
     // فیکس bug.md/NB-34+NB-29: دیالوگ پیش‌نمایش + انتخاب حالت ایمپورت —
     // پیش از تأییدِ صریح کاربر هیچ تغییری در داده انجام نمی‌شود.
     pendingImport?.let { (importJson, preview) ->
@@ -1011,59 +1063,3 @@ fun SettingsScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !importInProgress) { selectedImportMode = mode }
-                        ) {
-                            RadioButton(
-                                selected = selectedImportMode == mode,
-                                onClick = null,
-                                enabled = !importInProgress
-                            )
-                            Text(mode.titleFa, fontSize = 13.sp)
-                        }
-                    }
-                    if (selectedImportMode == ImportMode.REPLACE_ALL) {
-                        Text(
-                            "⚠️ جایگزینی کامل، تمام داده‌های فعلی را پاک می‌کند.",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    enabled = !importInProgress,
-                    onClick = {
-                        importInProgress = true
-                        coroutineScope.launch {
-                            val result = onImportBackup(importJson, selectedImportMode)
-                            importInProgress = false
-                            if (result.isSuccess) {
-                                Toast.makeText(context, result.getOrNull() ?: "ایمپورت با موفقیت انجام شد", Toast.LENGTH_LONG).show()
-                                pendingImport = null
-                            } else {
-                                Toast.makeText(context, "خطا در ایمپورت پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    },
-                    colors = if (selectedImportMode == ImportMode.REPLACE_ALL) {
-                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.buttonColors()
-                    }
-                ) {
-                    Text("شروع ایمپورت")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !importInProgress,
-                    onClick = { pendingImport = null }
-                ) {
-                    Text("انصراف")
-                }
-            }
-        )
-    }
-}

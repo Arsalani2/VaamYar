@@ -438,6 +438,43 @@ class LoanRepositoryIntegrityTest {
         )
     }
 
+    // ---------------------------------------------------------------- NB-41
+
+    @Test
+    fun nb41_fullReset_recreatesSingleDefaultPrimaryUserAndClearsAllTables() = runBlocking {
+        // دادهٔ چند جدولی: کاربر مبنا + شریک + وام شراکتی با رکورد اقساط واقعی و تاریخچهٔ پرداخت
+        // (کاربر مبنای اولیه باید وجود داشته باشد تا سناریوی NB-41 — حذف حتی کاربر مبنا — بازتولید شود)
+        db.userProfileDao().insertUser(UserProfile(name = "من", isPrimary = true))
+        val loan = insertSharedLoan(paidMonths = 3)
+        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = ShamsiDate(1405, 8, 15))
+        assertTrue(repository.allRecords.first().isNotEmpty())
+        assertTrue(repository.allInstallments.first().isNotEmpty())
+        assertTrue(db.userProfileDao().getAllUsersOnce().size >= 2)
+
+        // بازنشانی کامل (NB-41) — همهٔ جداول + کاربران پاک و کاربر مبنا «من» ساخته می‌شود
+        repository.clearAllDataAndCreateDefaultBaseUser()
+
+        val users = db.userProfileDao().getAllUsersOnce()
+        assertEquals(1, users.size)
+        assertTrue("بعد از بازنشانی کامل دقیقاً یک کاربر مبنا وجود دارد", users.first().isPrimary)
+        assertEquals("من", users.first().name)
+        assertTrue("کاربر مبنا شناسهٔ عمومی معتبر دارد (F6)", PublicId.isValidUserId(users.first().publicId))
+        assertTrue(repository.allLoans.first().isEmpty())
+        assertTrue(repository.allShares.first().isEmpty())
+        assertTrue(repository.allRecords.first().isEmpty())
+        assertTrue(repository.allInstallments.first().isEmpty())
+
+        // گزینهٔ قبلی («فقط پاکسازی تمام وام‌ها») همچنان کاربران را نگه می‌دارد
+        repository.saveUser(UserProfile(name = "رضا", publicId = "U-tst567"))
+        insertSharedLoan(paidMonths = 1)
+        repository.clearAllLoansAndReset()
+        assertTrue(repository.allLoans.first().isEmpty())
+        assertTrue(
+            "«پاکسازی تمام وام‌ها» برخلاف بازنشانی کامل، کاربران را نگه می‌دارد",
+            db.userProfileDao().getAllUsersOnce().size >= 2
+        )
+    }
+
     // ---------------------------------------------------------------- F6 (شناسهٔ یکتای عمومی)
 
     @Test
