@@ -177,6 +177,9 @@ fun ReceivablesScreen(
             currentShamsiDate = currentShamsiDate,
             shares = person.shares,
             senderName = activeUserName,
+            // فیکس bug.md/NB-42: ارقام متن پیام یادآوری از تنظیمات کاربر (ReceivablesScreen)
+            usePersianDigits = usePersianDigits,
+            compactThousands = compactThousands,
             onDismiss = { personToRemind = null }
         )
     }

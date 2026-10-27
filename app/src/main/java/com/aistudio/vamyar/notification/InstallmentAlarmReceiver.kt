@@ -45,7 +45,12 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                 // نادیده می‌گرفت؛ اکنون از همان «تاریخ مؤثر» اپ (getEffectiveShamsiDate از فیکس P1-6)
                 // استفاده می‌کند تا اعلان‌های «امروز/فردا» دقیقاً هماهنگ با منطق داخلی اپ باشد
                 // (رِسِت ماهانهٔ P1-6 از قبل مؤثر بود؛ این اعلان‌ها هم مؤثر شدند).
-                val currentShamsi = ShamsiDateHelper.getEffectiveShamsiDate(AppPreferences(context))
+                // فیکس bug.md/NB-42: ارقام اعلان‌ها (روز سررسید و مبلغ قسط) از تنظیمِ
+                // «ارقام فارسی/EN» کاربر پیروی می‌کند — قبلاً همیشه فارسی‌رقم بود.
+                val prefs = AppPreferences(context)
+                val usePersianDigits = prefs.usePersianDigits
+                val compactThousands = prefs.compactThousands
+                val currentShamsi = ShamsiDateHelper.getEffectiveShamsiDate(prefs)
                 val today = currentShamsi.day
 
                 // فیکس bug.md/P2-2: «فردا» با تقویم شمسیِ واقعی محاسبه می‌شود، نه today+1 ساده.
@@ -105,15 +110,15 @@ class InstallmentAlarmReceiver : BroadcastReceiver() {
                     }
                     NotificationHelper.showNotification(
                         context = context,
-                        title = "سررسید قسط امروز (${NumberFormatter.toPersianDigits(today)} ${currentShamsi.monthName})",
-                        message = "امروز موعد پرداخت $titles به مبلغ ${NumberFormatter.formatPrice(totalAmount)} است.",
+                        title = "سررسید قسط امروز (${NumberFormatter.formatNumber(today, usePersianDigits)} ${currentShamsi.monthName})",
+                        message = "امروز موعد پرداخت $titles به مبلغ ${NumberFormatter.formatPrice(totalAmount, usePersian = usePersianDigits, compactThousands = compactThousands)} است.",
                         id = 1002
                     )
                 } else if (dueTomorrow.isNotEmpty()) {
                     val titles = dueTomorrow.joinToString("، ") { it.title }
                     NotificationHelper.showNotification(
                         context = context,
-                        title = "یادآوری: سررسید فردا (${NumberFormatter.toPersianDigits(tomorrowDay)} $tomorrowMonthName) ⏰",
+                        title = "یادآوری: سررسید فردا (${NumberFormatter.formatNumber(tomorrowDay, usePersianDigits)} $tomorrowMonthName) ⏰",
                         message = "فردا موعد پرداخت $titles فرا می‌رسد.",
                         id = 1003
                     )

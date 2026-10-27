@@ -31,6 +31,15 @@ object NumberFormatter {
         return if (usePersian) toPersianDigits(str) else str
     }
 
+    /**
+     * فیکس bug.md/NB-42: قالب «HH:mm» (مثل ساعت اعلان روزانهٔ تنظیمات و Toast آن)
+     * از تنظیم ارقامِ خود کاربر پیروی می‌کند — نه همیشهٔ ارقام فارسی.
+     */
+    fun formatClock(hour: Int, minute: Int, usePersian: Boolean): String {
+        val clock = "%02d:%02d".format(hour, minute)
+        return if (usePersian) toPersianDigits(clock) else clock
+    }
+
     fun formatWithCommas(amount: Long, usePersian: Boolean = false): String {
         if (amount == 0L) return "0"
         val symbols = DecimalFormatSymbols(Locale.US)

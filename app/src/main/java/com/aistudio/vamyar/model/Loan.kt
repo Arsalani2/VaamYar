@@ -66,8 +66,8 @@ data class Loan(
     val endMonthName: String
         get() = ShamsiDateHelper.getMonthName(endMonth)
 
-    val payoffCountdownText: String
-        get() = if (isCompleted) "تسویه شده" else "$remainingMonths ماه مانده تا تسویه ($endMonthName $endYear)"
+    // فیکس bug.md/NB-42: payoffCountdownText حذف شد — مصرف‌کننده‌ای نداشت (کد مرده)
+    // و ارقام خام لاتین داشت که با تنظیم ارقام کاربر هم‌ارز نبود.
 }
 
 /**

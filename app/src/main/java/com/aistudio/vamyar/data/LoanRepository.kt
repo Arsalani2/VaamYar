@@ -129,7 +129,7 @@ class LoanRepository(
             // 2. Only seed 3 attractive guide loans if the loan database is completely empty
             if (loanDao.getCount() == 0) {
                 // فیکس bug.md/NB-25: پایان هر وام seed با همان calculateEndDate محاسبه می‌شود
-                // که payoffCountdownText و بقیهٔ اپ استفاده می‌کنند. ثابت‌های دستیِ قبلی یک
+                // که بقیهٔ اپ استفاده می‌کنند. ثابت‌های دستیِ قبلی یک
                 // ماه جلوتر بودند (قسط اول = ماه شروع؛ قسط آخر = ماه شروع + مدت − ۱) و
                 // «پایان وام» را در کارت‌ها غلط نشان می‌دادند.
                 val end1 = ShamsiDateHelper.calculateEndDate(1403, 4, 24)

@@ -98,8 +98,10 @@ fun SettingsScreen(
 
     // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه (TimePicker متریال ۳)
     var showReminderTimePicker by remember { mutableStateOf(false) }
-    val reminderTimeLabel = remember(reminderHour, reminderMinute) {
-        NumberFormatter.toPersianDigits("%02d:%02d".format(reminderHour, reminderMinute))
+    // فیکس bug.md/NB-42: ساعت اعلان هم از تنظیم ارقام کاربر پیروی می‌کند
+    // (قبلاً همیشهٔ toPersianDigits هاردکد بود و در حالت EN برعکس تنظیم دیده می‌شد).
+    val reminderTimeLabel = remember(reminderHour, reminderMinute, usePersianDigits) {
+        NumberFormatter.formatClock(reminderHour, reminderMinute, usePersianDigits)
     }
 
     // فیکس bug.md/NB-34+NB-29: وضعیت پیش‌نمایش ایمپورت — فایل انتخاب‌شده + دادهٔ
@@ -854,9 +856,10 @@ fun SettingsScreen(
                         val m = timePickerState.minute
                         showReminderTimePicker = false
                         onReminderTimeChange(h, m)
+                        // فیکس bug.md/NB-42: Toast تغییر ساعت هم از تنظیم ارقام کاربر پیروی می‌کند
                         Toast.makeText(
                             context,
-                            "ساعت اعلان روزانه به ${NumberFormatter.toPersianDigits("%02d:%02d".format(h, m))} تغییر یافت",
+                            "ساعت اعلان روزانه به ${NumberFormatter.formatClock(h, m, usePersianDigits)} تغییر یافت",
                             Toast.LENGTH_SHORT
                         ).show()
                     }

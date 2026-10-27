@@ -72,6 +72,24 @@ class PureLogicUnitTest {
         assertNull(NumberFormatter.parseIntStrict("-5"))
     }
 
+    /** فیکس bug.md/NB-42: قالب ساعت (ساعت اعلان روزانهٔ تنظیمات) از تنظیم ارقام کاربر پیروی می‌کند. */
+    @Test
+    fun nb42_formatClock_respectsDigitsSetting() {
+        assertEquals("۱۰:۰۵", NumberFormatter.formatClock(10, 5, usePersian = true))
+        assertEquals("10:05", NumberFormatter.formatClock(10, 5, usePersian = false))
+        assertEquals("۰۰:۰۰", NumberFormatter.formatClock(0, 0, usePersian = true))
+        assertEquals("23:59", NumberFormatter.formatClock(23, 59, usePersian = false))
+    }
+
+    /** فیکس bug.md/NB-42: مبلغ قسط در اعلان/یادآوری هم با هر دو تنظیم ارقام درست قالب می‌شود. */
+    @Test
+    fun nb42_formatPrice_respectsDigitsSetting() {
+        assertEquals("۲,۵۰۰ تومان", NumberFormatter.formatPrice(2_500L, usePersian = true, compactThousands = false))
+        assertEquals("2,500 تومان", NumberFormatter.formatPrice(2_500L, usePersian = false, compactThousands = false))
+        assertEquals("۲,۰۰۰ هزار ت", NumberFormatter.formatPrice(2_000_000L, usePersian = true, compactThousands = true))
+        assertEquals("2,000 هزار ت", NumberFormatter.formatPrice(2_000_000L, usePersian = false, compactThousands = true))
+    }
+
     // ---------------------------------------------------------------- LoanShareCalculator (P3-2)
 
     @Test
