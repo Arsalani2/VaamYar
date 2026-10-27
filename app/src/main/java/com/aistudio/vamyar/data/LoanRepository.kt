@@ -1057,3 +1057,255 @@ class LoanRepository(
 
     /**
      * بازسازی رکوردهای اقساط یک وام به شکل ترتیبی از ماه شروع — هم‌ارزِ دادهٔ قدیمیِ
+     * شمارندهٔ paidMonths (مهاجرت/seed/restore بکاپ‌های قدیمی). تاریخ واقعی پرداخت
+     * نامعلوم است (timestamp=0، تاریخ خالی) و از این پس پرداخت‌های جدید ماهِ جاریِ
+     * تقویم را با تاریخ واقعی ثبت می‌کنند.
+     */
+    private suspend fun seedSequentialInstallmentRecords(
+        loanId: Long,
+        startYear: Int,
+        startMonth: Int,
+        paidMonths: Int,
+        monthlyAmount: Long
+    ) {
+        for (k in 1..paidMonths.coerceAtLeast(0)) {
+            val m = ShamsiDateHelper.installmentMonth(startYear, startMonth, k)
+            loanInstallmentDao.insertInstallment(
+                LoanInstallment(
+                    loanId = loanId,
+                    installmentNumber = k,
+                    year = m.year,
+                    month = m.month,
+                    amount = monthlyAmount
+                )
+            )
+        }
+    }
+
+    /** تعداد قسط‌هایی که سررسیدشان رسیده یا گذشته است (ماه جاری هم اگر روزِ سررسید رسیده باشد) */
+    private fun payableInstallmentNumbers(loan: Loan, currentDate: ShamsiDate): Int =
+        ShamsiDateHelper.calculateElapsedInstallments(
+            loan.startYear, loan.startMonth, loan.dueDay,
+            currentDate.year, currentDate.month, currentDate.day,
+            loan.totalMonths
+        )
+
+    /**
+     * ماه‌های سررسیدگذشتهٔ بدون رکورد — به‌جز خودِ ماه جاری (ماه جاری «عقب‌مانده»
+     * نیست؛ پرداختش انتخابِ کاربر است). این همان عقب‌ماندگی‌هایی است که NB-31 و NB-16
+     * باید به کاربر نشان دهند.
+     */
+    private fun findArrearsMonths(
+        loan: Loan,
+        currentDate: ShamsiDate,
+        existing: List<LoanInstallment>
+    ): List<ArrearsMonth> {
+        val paidNumbers = existing.map { it.installmentNumber }.toSet()
+        val curNumber = ShamsiDateHelper.installmentNumberForMonth(
+            loan.startYear, loan.startMonth, currentDate.year, currentDate.month
+        )
+        val payable = payableInstallmentNumbers(loan, currentDate)
+        return (1..payable).filter { it !in paidNumbers && it != curNumber }.map { k ->
+            val m = ShamsiDateHelper.installmentMonth(loan.startYear, loan.startMonth, k)
+            ArrearsMonth(installmentNumber = k, year = m.year, month = m.month)
+        }
+    }
+
+    /** درج رکورد قسط واقعی + آینهٔ آن در تاریخچهٔ payment_records (منبع واحد مبلغ — P1-3) */
+    private suspend fun insertInstallmentRecord(
+        loan: Loan,
+        number: Int,
+        year: Int,
+        month: Int,
+        currentDate: ShamsiDate
+    ) {
+        loanInstallmentDao.insertInstallment(
+            LoanInstallment(
+                loanId = loan.id,
+                installmentNumber = number,
+                year = year,
+                month = month,
+                amount = loan.monthlyAmount,
+                paidAtTimestamp = System.currentTimeMillis(),
+                paidDateShamsi = currentDate.formatted()
+            )
+        )
+        upsertInstallmentRecord(loan, number, currentDate.formatted())
+    }
+
+    /** پس‌گرفتن یک قسط واقعی + حذف آینهٔ آن از تاریخچه */
+    private suspend fun removeInstallmentRecord(loan: Loan, number: Int, year: Int, month: Int) {
+        loanInstallmentDao.deleteByLoanAndMonth(loan.id, year, month)
+        paymentRecordDao.deleteRecordsForInstallment(loan.id, number)
+    }
+
+    /**
+     * فیکس bug.md/NB-37: هم‌ارزسازی رکوردهای واقعی اقساط با مجموعهٔ (سال، ماه) هدف —
+     * درج ماه‌های جدید (شمارهٔ قسط از نگاشتِ ماه شروع وام؛ paidAt = اکنون)، حذف
+     * ماه‌های اضافه (با آینهٔ تاریخچه‌شان — الگوی removeInstallmentRecord) و سپس
+     * syncLoanCountersFromRecords تا شمارنده و پرچم ماه جاری تصویرِ همگامِ رکوردها
+     * بمانند. ماه‌های خارج از بازهٔ ۱..totalMonths (تغییر تاریخ شروع/کاهش مدت)
+     * از هدف کنار گذاشته و حذف می‌شوند — رفتارِ قبلیِ کاهش مدت حفظ شده است.
+     * PaymentRecord ها فقط طبق همان قاعدهٔ آینه حرکت می‌کنند؛ رکوردهای موجود
+     * دوباره نوشته نمی‌شوند (تاریخچهٔ پرداختِ ثبت‌شده دست‌نخورده می‌ماند).
+     */
+    private suspend fun reconcileInstallments(
+        loan: Loan,
+        targetYearMonths: Set<Pair<Int, Int>>,
+        currentDate: ShamsiDate
+    ) {
+        val target = targetYearMonths.mapNotNull { (y, m) ->
+            val n = ShamsiDateHelper.installmentNumberForMonth(loan.startYear, loan.startMonth, y, m)
+            if (n != null && n in 1..loan.totalMonths) y to m else null
+        }.toSet()
+        val existing = loanInstallmentDao.getInstallmentsForLoanOnce(loan.id)
+        // درج ماه‌های هدفِ بدون رکورد (با تاریخ واقعیِ اکنون — مثل پرداخت عادی)
+        target.filter { (y, m) -> existing.none { it.year == y && it.month == m } }.forEach { (y, m) ->
+            val n = ShamsiDateHelper.installmentNumberForMonth(loan.startYear, loan.startMonth, y, m)
+                ?: return@forEach
+            insertInstallmentRecord(loan, n, y, m, currentDate)
+        }
+        // حذف رکوردهایی که در مجموعهٔ هدف نیستند (با آینهٔ تاریخچه)
+        existing.filter { (it.year to it.month) !in target }.forEach {
+            removeInstallmentRecord(loan, it.installmentNumber, it.year, it.month)
+        }
+        syncLoanCountersFromRecords(loan, currentDate)
+    }
+
+    /**
+     * فیکس bug.md/F1+NB-31: paidMonths و isCurrentMonthPaid دیگر «وضعیت مستقل»
+     * نیستند — تصویرِ همگامِ رکوردهای واقعی اقساط‌اند؛ هر تغییر رکوردها باید با
+     * همین تابع جمع‌بندی شود تا شمارنده و رکوردها هرگز ناسازگار نمانند.
+     */
+    private suspend fun syncLoanCountersFromRecords(loan: Loan, currentDate: ShamsiDate) {
+        val records = loanInstallmentDao.getInstallmentsForLoanOnce(loan.id)
+        val paid = records.size
+        val completed = paid >= loan.totalMonths
+        val currentPaid = completed ||
+            records.any { it.year == currentDate.year && it.month == currentDate.month }
+        loanDao.updateLoan(
+            loan.copy(paidMonths = paid, isCurrentMonthPaid = currentPaid)
+        )
+    }
+
+    /**
+     * فیکس bug.md/F1+NB-31: ضربه به «پرداخت این ماه» — به ماهِ جاریِ واقعیِ تقویم وصل است:
+     * - ماه جاری پرداخت شده → پس گرفته می‌شود (رفتار toggle قبلی حفظ شد؛ P1-3 برقرار:
+     *   رکورد تاریخچه حذف می‌شود، دوبار ضربهٔ سریع با نسخهٔ کهنهٔ UI رکورد تکراری نمی‌سازد).
+     * - عقب‌ماندگی نیست → قسط ماه جاری مستقیم ثبت می‌شود (بند ۵ تصمیم کاربر).
+     * - عقب‌ماندگی هست → NeedsArrearsChoice تا UI دیالوگ «فقط این ماه / همهٔ عقب‌مانده‌ها»
+     *   را نشان دهد (بند ۵ تصمیم کاربر — هر ماه سؤال نپرسد).
+     */
+    suspend fun payCurrentMonthSmart(loan: Loan, currentDate: ShamsiDate): CurrentMonthPayOutcome =
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                val current = loanDao.getLoanByIdOnce(loan.id)
+                    ?: return@withTransaction CurrentMonthPayOutcome.Noop
+                // وام تسویه‌شده تیک ماه جاری را تغییر نمی‌دهد و رکورد شبحی نمی‌سازد
+                if (current.isCompleted && current.isCurrentMonthPaid) {
+                    return@withTransaction CurrentMonthPayOutcome.Noop
+                }
+                val existing = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                if (existing.any { it.year == currentDate.year && it.month == currentDate.month }) {
+                    // برداشتن تیک ماه جاری — قسط واقعی همان ماه پس گرفته می‌شود
+                    val number = ShamsiDateHelper.installmentNumberForMonth(
+                        current.startYear, current.startMonth, currentDate.year, currentDate.month
+                    ) ?: return@withTransaction CurrentMonthPayOutcome.Noop
+                    removeInstallmentRecord(current, number, currentDate.year, currentDate.month)
+                    syncLoanCountersFromRecords(current, currentDate)
+                    CurrentMonthPayOutcome.Unpaid
+                } else {
+                    val number = ShamsiDateHelper.installmentNumberForMonth(
+                        current.startYear, current.startMonth, currentDate.year, currentDate.month
+                    )
+                    if (number == null || number > current.totalMonths) {
+                        // ماه جاری خارج از بازهٔ وام است (بعد از قسط آخر)
+                        return@withTransaction CurrentMonthPayOutcome.Noop
+                    }
+                    val arrears = findArrearsMonths(current, currentDate, existing)
+                    if (arrears.isEmpty()) {
+                        insertInstallmentRecord(current, number, currentDate.year, currentDate.month, currentDate)
+                        syncLoanCountersFromRecords(current, currentDate)
+                        CurrentMonthPayOutcome.PaidDirect
+                    } else {
+                        CurrentMonthPayOutcome.NeedsArrearsChoice(arrears)
+                    }
+                }
+            }
+        }
+
+    /** گزینهٔ «فقط این ماه» از دیالوگ عقب‌ماندگی — ثبت مستقیم ماه جاری بدون پرداخت عقب‌مانده‌ها */
+    suspend fun payInstallmentMonth(loan: Loan, year: Int, month: Int, currentDate: ShamsiDate) =
+        withContext(Dispatchers.IO) {
+            database.withTransaction<Unit> {
+                val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+                val number = ShamsiDateHelper.installmentNumberForMonth(
+                    current.startYear, current.startMonth, year, month
+                ) ?: return@withTransaction
+                if (number > current.totalMonths) return@withTransaction
+                val already = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                    .any { it.year == year && it.month == month }
+                if (!already) {
+                    insertInstallmentRecord(current, number, year, month, currentDate)
+                    syncLoanCountersFromRecords(current, currentDate)
+                }
+            }
+        }
+
+    /** گزینهٔ «همهٔ عقب‌مانده‌ها تا الان» از دیالوگ — همهٔ ماه‌های عقب‌افتاده + ماه جاری */
+    suspend fun payArrearsAndCurrentMonth(loan: Loan, currentDate: ShamsiDate) =
+        withContext(Dispatchers.IO) {
+            database.withTransaction<Unit> {
+                val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+                val existing = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                findArrearsMonths(current, currentDate, existing).forEach { ar ->
+                    insertInstallmentRecord(current, ar.installmentNumber, ar.year, ar.month, currentDate)
+                }
+                val curNumber = ShamsiDateHelper.installmentNumberForMonth(
+                    current.startYear, current.startMonth, currentDate.year, currentDate.month
+                )
+                val currentMissing = existing.none {
+                    it.year == currentDate.year && it.month == currentDate.month
+                }
+                if (curNumber != null && curNumber <= current.totalMonths && currentMissing) {
+                    insertInstallmentRecord(current, curNumber, currentDate.year, currentDate.month, currentDate)
+                }
+                syncLoanCountersFromRecords(current, currentDate)
+            }
+        }
+
+    /**
+     * افزایش/کاهش دستی (دکمه‌های +/−) — طبق بند ۶ متد فیکس NB-31 همچنان ترتیبی کار
+     * می‌کنند اما روی رکوردهای واقعی: «+» اولین ماهِ بدون رکورد را می‌پردازد و «−»
+     * آخرین رکورد را پس می‌گیرد. فیکس‌های P1-3/NB-3 (حذف آینهٔ تاریخچه، بدون تکراری،
+     * پرچم ماه جاری همگام) به‌طور خودکار از syncLoanCountersFromRecords برقرارند.
+     */
+    suspend fun recordInstallmentPayment(
+        loan: Loan,
+        isIncrement: Boolean,
+        currentDate: ShamsiDate
+    ) = withContext(Dispatchers.IO) {
+        database.withTransaction<Unit> {
+            val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            val existing = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                .sortedBy { it.installmentNumber }
+            if (isIncrement) {
+                val paidNumbers = existing.map { it.installmentNumber }.toSet()
+                val next = (1..current.totalMonths).firstOrNull { it !in paidNumbers }
+                if (next != null) {
+                    val m = ShamsiDateHelper.installmentMonth(current.startYear, current.startMonth, next)
+                    insertInstallmentRecord(current, next, m.year, m.month, currentDate)
+                }
+            } else {
+                existing.lastOrNull()?.let { last ->
+                    removeInstallmentRecord(current, last.installmentNumber, last.year, last.month)
+                }
+            }
+            syncLoanCountersFromRecords(current, currentDate)
+        }
+    }
+
+    suspend fun updateDebtorPaidStatus(shareId: Long, isPaid: Boolean, monthName: String) = withContext(Dispatchers.IO) {
+        debtorShareDao.updatePaidStatus(shareId, isPaid, monthName)
+    }
+}

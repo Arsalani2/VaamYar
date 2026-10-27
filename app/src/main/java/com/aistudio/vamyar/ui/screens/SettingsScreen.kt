@@ -1066,3 +1066,59 @@ fun SettingsScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !importInProgress) { selectedImportMode = mode }
+                        ) {
+                            RadioButton(
+                                selected = selectedImportMode == mode,
+                                onClick = null,
+                                enabled = !importInProgress
+                            )
+                            Text(mode.titleFa, fontSize = 13.sp)
+                        }
+                    }
+                    if (selectedImportMode == ImportMode.REPLACE_ALL) {
+                        Text(
+                            "⚠️ جایگزینی کامل، تمام داده‌های فعلی را پاک می‌کند.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = !importInProgress,
+                    onClick = {
+                        importInProgress = true
+                        coroutineScope.launch {
+                            val result = onImportBackup(importJson, selectedImportMode)
+                            importInProgress = false
+                            if (result.isSuccess) {
+                                Toast.makeText(context, result.getOrNull() ?: "ایمپورت با موفقیت انجام شد", Toast.LENGTH_LONG).show()
+                                pendingImport = null
+                            } else {
+                                Toast.makeText(context, "خطا در ایمپورت پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = if (selectedImportMode == ImportMode.REPLACE_ALL) {
+                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    }
+                ) {
+                    Text("شروع ایمپورت")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !importInProgress,
+                    onClick = { pendingImport = null }
+                ) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+}
