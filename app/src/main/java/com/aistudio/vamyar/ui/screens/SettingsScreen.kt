@@ -68,6 +68,9 @@ fun SettingsScreen(
     onSyncDateWithSystem: () -> Unit,
     onSetCustomDate: (ShamsiDate) -> Unit,
     onClearAllLoans: () -> Unit,
+    // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها شامل کاربران
+    // پاک و کاربر مبنا پیش‌فرض ساخته می‌شود؛ با دیالوگ تأیید صریح.
+    onFullReset: () -> Unit = {},
     onTestNotification: () -> Unit,
     // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان سررسید از تنظیمات تغییر می‌کند؛
     // پس از ثبت ساعت جدید، آلارم روزانه با همان ساعت از نو زمان‌بندی می‌شود.
@@ -89,6 +92,8 @@ fun SettingsScreen(
     var showAddUserDialog by remember { mutableStateOf(false) }
 
     var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
+    // فیکس bug.md/NB-41: دیالوگ تأیید «بازنشانی کامل برنامه» (شامل کاربران)
+    var showFullResetConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه (TimePicker متریال ۳)
@@ -732,6 +737,21 @@ fun SettingsScreen(
                                     Text("پاکسازی تمام وام‌ها (شروع خام برنامه)")
                                 }
 
+                                // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — برخلاف
+                                // پاکسازی وام‌ها، همهٔ داده‌ها شامل کاربران پاک می‌شود و
+                                // برنامه خودش یک کاربر مبنا پیش‌فرض می‌سازد؛ اجرا فقط
+                                // پس از دیالوگ تأیید صریح (اینوارینت #۹).
+                                OutlinedButton(
+                                    onClick = { showFullResetConfirmDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("بازنشانی کامل برنامه (همهٔ داده‌ها + کاربران)")
+                                }
+
                                 HorizontalDivider()
 
                                 Button(
@@ -957,6 +977,38 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearLoansConfirmDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Modal: فیکس bug.md/NB-41 — تأیید «بازنشانی کامل برنامه» (همهٔ داده‌ها + کاربران)
+    if (showFullResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showFullResetConfirmDialog = false },
+            title = { Text("بازنشانی کامل برنامه") },
+            text = {
+                Text(
+                    "همهٔ وام‌ها، سهم‌های شرکا، تاریخچهٔ پرداخت‌ها و همهٔ کاربران (حتی کاربر مبنا) " +
+                        "برای همیشه پاک می‌شوند و برنامه یک کاربر مبنا پیش‌فرض می‌سازد. " +
+                        "این عملیات فقط با فایل پشتیبان قابل بازگشت است. ادامه می‌دهید؟"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onFullReset()
+                        showFullResetConfirmDialog = false
+                        Toast.makeText(context, "برنامه کامل بازنشانی شد و کاربر مبنا ساخته شد", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("بله، بازنشانی کامل شود")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFullResetConfirmDialog = false }) {
                     Text("انصراف")
                 }
             }

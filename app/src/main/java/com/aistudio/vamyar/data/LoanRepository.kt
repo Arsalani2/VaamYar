@@ -242,6 +242,41 @@ class LoanRepository(
     }
 
     /**
+     * فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — برخلاف clearAllLoansAndReset که
+     * کاربران را عمداً نگه می‌دارد، این عملیات واقعاً همه‌چیز را پاک می‌کند:
+     * وام‌ها، سهم‌های شرکا، رکوردهای تاریخچهٔ پرداخت، اقساط واقعی و همهٔ
+     * کاربران (حتی کاربر مبنا)؛ سپس در همان تراکنش اتمیک یک کاربر مبنا
+     * پیش‌فرض («من») می‌سازد تا اینوارینت NB-4 (دقیقاً یک کاربر مبنا) حتی
+     * بلافاصله بعد از بازنشانی هم برقرار بماند. پرچم initialDataSeeded
+     * دست‌نخورده می‌ماند تا وام‌های دمو برنگردند (قاعدهٔ P3-10) و آیکون‌های
+     * سفارشی یتیم پس از commit موفق طبق الگوی NB-19 از دیسک پاک می‌شوند
+     * (اینوارینت #۹ — هر مسیر «حذف همه/بازنشانی» همهٔ اجزای هم‌زیرساختی را پاک می‌کند).
+     */
+    suspend fun clearAllDataAndCreateDefaultBaseUser() = withContext(Dispatchers.IO) {
+        val orphanIconPaths = loanDao.getLoansWithCustomIcon().mapNotNull { it.customIconPath }
+        database.withTransaction {
+            paymentRecordDao.clearAllRecords()
+            loanDao.clearAllLoans()
+            debtorShareDao.clearAllShares()
+            loanInstallmentDao.clearAllInstallments()
+            userProfileDao.clearAllUsers()
+            userProfileDao.insertUser(
+                UserProfile(
+                    id = 0L,
+                    name = "من",
+                    isPrimary = true,
+                    avatarColorHex = 0xFF10B981L,
+                    notes = "کاربر مبنا",
+                    // فیکس bug.md/F6: کاربر مبنای تازه هم شناسهٔ عمومی یکتا می‌گیرد
+                    publicId = uniqueUserPublicId()
+                )
+            )
+        }
+        orphanIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
+        appPreferences.initialDataSeeded = true
+    }
+
+    /**
      * فیکس bug.md/P1-4:
      * پاک‌سازی چهار جدول و درج داده‌های پشتیبان قبلاً بدون تراکنش انجام می‌شد؛ کشته شدن اپ یا
      * استثنا وسط کار = دیتابیس نصفه (مثلاً وام‌ها پاک و سهم‌ها درج‌نشده). اکنون کل عملیات یک

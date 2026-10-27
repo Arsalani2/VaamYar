@@ -340,6 +340,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onSyncDateWithSystem = { viewModel.syncDateWithSystem() },
                         onSetCustomDate = { viewModel.setCustomShamsiDate(it) },
                         onClearAllLoans = { viewModel.clearAllLoansAndStartFresh() },
+                        // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها
+                        // شامل کاربران پاک و کاربر مبنا پیش‌فرض ساخته می‌شود.
+                        onFullReset = { viewModel.fullResetAllDataAndRecreateBaseUser() },
                         onTestNotification = { viewModel.sendTestNotification(context) },
                         // فیکس bug.md/NB-24: ساعت اعلان روزانه از تنظیمات تغییر
                         // می‌کند و پس از ثبت، آلارم با ساعت جدید از نو زمان‌بندی می‌شود.

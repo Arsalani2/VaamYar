@@ -645,6 +645,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها شامل کاربران پاک
+    // می‌شود و برنامه در همان تراکنش یک کاربر مبنا پیش‌فرض («من») می‌سازد؛
+    // دکمهٔ جدا از «پاکسازی تمام وام‌ها» در تنظیمات (مدیریت داده‌ها و بازنشانی).
+    fun fullResetAllDataAndRecreateBaseUser() {
+        viewModelScope.launch {
+            repository.clearAllDataAndCreateDefaultBaseUser()
+        }
+    }
+
     fun exportBackupJson(): String {
         val currentLoans = allLoans.value
         val currentShares = allShares.value
