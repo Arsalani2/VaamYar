@@ -16,7 +16,8 @@ data class Loan(
     val dueDay: Int,
     val monthlyAmount: Long,
     val totalMonths: Int,
-    val paidMonths: Int,
+    // مقدار پیش‌فرض صفر برای سازگاری با ساخت‌های قدیمی (بکاپ/تست‌هایی که این فیلد را نمی‌دهند)
+    val paidMonths: Int = 0,
     val startYear: Int = 1403,
     val startMonth: Int = 7, // مهر
     val endYear: Int = 1404,
@@ -88,4 +89,3 @@ object LoanShareCalculator {
         }
     }
 }
-
