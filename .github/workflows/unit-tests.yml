@@ -64,15 +64,25 @@ jobs:
                   root = ET.parse(f).getroot()
               except Exception:
                   continue
+              for tc in root.iter('testcase'):
+                  for kind in ('failure', 'error'):
+                      el = tc.find(kind)
+                      if el is not None and n < 30:
+                          n += 1
+                          msg = (el.get('message') or '').replace(chr(10), ' ')[:600]
+                          cls = tc.get('classname') or ''
+                          name = tc.get('name') or ''
+                          print('::error title=Test failed::' + cls + '.' + name + ' -> ' + msg)
           PY
+
       - name: Upload Test Reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
-        path: |
-          gradle-test.log
-          app/build/reports/tests/**
-          app/build/test-results/**
+          path: |
+            gradle-test.log
+            app/build/reports/tests/**
+            app/build/test-results/**
           if-no-files-found: warn
           retention-days: 14
