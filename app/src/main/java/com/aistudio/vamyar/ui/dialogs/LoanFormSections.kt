@@ -47,7 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -1017,7 +1016,7 @@ internal fun LoanFormBottomBar(
                 onClick = onCancel,
                 shape = RoundedCornerShape(LoanFormDimensions.ButtonRadius),
                 border = BorderStroke(1.dp, LoanFormColors.Outline),
-                colors = OutlinedButtonDefaults.outlinedButtonColors(
+                colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = LoanFormColors.Primary
                 ),
                 modifier = Modifier

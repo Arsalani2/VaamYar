@@ -100,7 +100,7 @@ fun PriceInputField(
                 val capped = if (hitMaxDigits) digitsOnly.take(InputLimits.MAX_AMOUNT_DIGITS) else digitsOnly
                 onRawDigitsChange(capped)
             },
-            label = if (labelAbove) null else { Text(label) },
+            label = if (labelAbove) null else ({ Text(label) }),
             placeholder = { Text(placeholder) },
             singleLine = true,
             enabled = enabled,
