@@ -4,42 +4,45 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.model.Loan
 import com.aistudio.vamyar.model.LoanInstallment
 import com.aistudio.vamyar.model.UserProfile
-import com.aistudio.vamyar.ui.components.InstallmentNodesView
 import com.aistudio.vamyar.ui.components.PriceInputField
+import com.aistudio.vamyar.ui.theme.LoanFormColors
+import com.aistudio.vamyar.ui.theme.LoanFormDimensions
 import com.aistudio.vamyar.util.InputLimits
-import com.aistudio.vamyar.util.LoanIconDisplay
 import com.aistudio.vamyar.util.LoanIconHelper
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.PersianNameNormalizer
@@ -49,7 +52,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * فرم تمام‌صفحهٔ افزودن/ویرایش وام — بازطراحی AddLoanScreen مطابق Design
+ * Specification (۲۰۲۶-۱۰-۲۸):
+ *
+ * ساختار: هدر ثابت (LoanFormTopBar) → یک اسکرول عمودی اصلی شامل کارت‌های
+ * LoanIdentityCard / PaymentScheduleCard / RepaymentSummaryCard /
+ * MonthlyInstallmentCalendarCard / LoanPartnersCard → نوار اقدامات ثابت
+ * (LoanFormBottomBar). کل state واقعی در همین تابع است و همهٔ کارت‌ها به
+ * همان state متصل‌اند (هیچ دادهٔ ساختگی/ثابتی در UI نیست).
+ *
+ * امضای عمومی تابع و همهٔ قابلیت‌های موجود (آیکون/رنگ اختصاصی، تقویم شمسی
+ * اقساط با رکوردهای واقعی LoanInstallment، شرکا و سهم‌بندی، اعتبارسنجی‌های
+ * زندهٔ NB-33/36/40 و منطق ذخیرهٔ F1/NB-37) دقیقاً حفظ شده‌اند؛ فقط لایهٔ
+ * ظاهری بازطراحی شده است.
+ */
 @Composable
 fun AddEditLoanDialog(
     loanToEdit: Loan? = null,
@@ -91,7 +108,7 @@ fun AddEditLoanDialog(
                     LoanIconHelper.saveCustomIconImage(context, uri)
                 }
                 if (saved != null) {
-                    // If there was an older custom image, clean it up
+                    // If there was an older custom image, clean this up
                     val older = customIconPath
                     if (older != null && older != saved) {
                         withContext(Dispatchers.IO) { LoanIconHelper.deleteCustomIconFile(older) }
@@ -153,8 +170,8 @@ fun AddEditLoanDialog(
 
     // فیکس bug.md/P1-5: «قسط رسیده» با «قسط پرداخت‌شده» یکی نیست — autoElapsed فقط
     // نمایشِ سررسیدرسیده‌هاست؛ تیک‌ها تنها با تأیید صریح کاربر (چیپ ثبتِ رسیده‌ها
-    // یا لمس دایره‌ها) تغییر می‌کنند.
-    // فیکس bug.md/NB-37: تیک‌های دیالوگ مجموعهٔ (سال، ماه) واقعی از رکوردهای
+    // یا لمس ماه‌ها) تغییر می‌کنند.
+    // فیکس bug.md/NB-37: تیک‌های فرم مجموعهٔ (سال، ماه) واقعی از رکوردهای
     // LoanInstallment هستند (مثل LoanItemCard) — نه شمارندهٔ ترتیبی؛ وام جدید از صفر.
     var paidYearMonths by remember {
         mutableStateOf(initialInstallments.map { it.year to it.month }.toSet())
@@ -185,7 +202,7 @@ fun AddEditLoanDialog(
     val sharesExceedMonthly = hasPartners && othersTotalShare > rawMonthlyAmount
     val primaryUserName = allUsers.firstOrNull { it.isPrimary }?.name?.trim()
 
-    // فیکس bug.md/NB-37: ماه‌های سررسیدگذشتهٔ بدون تیک (نود عقب‌افتاده) — همان
+    // فیکس bug.md/NB-37: ماه‌های سررسیدگذشتهٔ بدون تیک (ماه‌های عقب‌افتاده) — همان
     // منطق LoanItemCard؛ ماهِ جاریِ تقویم «عقب‌افتاده» نیست (رسیدگی جداگانه).
     val overdueYearMonths = remember(totalMonths, startDate.year, startDate.month, currentShamsiDate.year, currentShamsiDate.month, paidYearMonths) {
         val curTotal = currentShamsiDate.year * 12 + (currentShamsiDate.month - 1)
@@ -205,7 +222,7 @@ fun AddEditLoanDialog(
         }.toSet()
     }
     // فیکس bug.md/NB-37: شمارندهٔ نمایشی فقط تیک‌های داخل بازهٔ ۱..totalMonths است؛
-    // «پرداخت‌شده > کل» در دیالوگ ممکن نیست (نودها تا totalMonths رندر می‌شوند)
+    // «پرداخت‌شده > کل» در فرم ممکن نیست (ماه‌ها تا totalMonths رندر می‌شوند)
     // و دفاعِ نهایی P1-9 در Repository می‌ماند.
     val paidInRangeCount = paidYearMonths.count { (y, m) ->
         val n = ShamsiDateHelper.installmentNumberForMonth(startDate.year, startDate.month, y, m)
@@ -226,567 +243,190 @@ fun AddEditLoanDialog(
         0xFF7B1FA2L  // Purple
     )
 
+    // دادهٔ تقویم ماه‌های شمسی — از همان منابع واقعی (رکوردها + سررسید + ماه جاری)؛
+    // هیچ وضعیتی به چرخهٔ Recomposition وابسته نیست (کلید‌های پایدار).
+    val currentYearMonthKey = currentShamsiDate.year to currentShamsiDate.month
+    val monthChips = remember(totalMonths, startDate.year, startDate.month, paidYearMonths, overdueYearMonths, currentYearMonthKey) {
+        (1..totalMonths).map { k ->
+            val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, k)
+            val key = m.year to m.month
+            val status = when {
+                key in paidYearMonths -> LoanMonthStatus.PAID
+                key in overdueYearMonths -> LoanMonthStatus.OVERDUE
+                key == currentYearMonthKey -> LoanMonthStatus.CURRENT
+                else -> LoanMonthStatus.UPCOMING
+            }
+            LoanMonthChipData(
+                installmentNumber = k,
+                year = m.year,
+                month = m.month,
+                monthName = m.monthName,
+                status = status
+            )
+        }
+    }
+
+    val totalInstallmentsAmount = rawMonthlyAmount * totalMonths
+
+    // ─── فرم تمام‌صفحه: هدر ثابت + اسکرول عمودی اصلی + نوار اقدامات ثابت ───
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.94f),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = LoanFormColors.ScreenBackground
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(18.dp)
+                    // Insets سیستم (نوار وضعیت/ناوبری/کیبورد) یک‌بار و به‌صورت
+                    // idempotent اعمال می‌شود — اگر پنجره خودش inset را اعمال کرده
+                    // باشد، این padding صفر می‌شود و دوباره اعمال نمی‌گردد.
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
             ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        LoanIconDisplay(
-                            iconName = selectedIconName,
-                            iconShape = selectedIconShape,
-                            customIconPath = customIconPath,
-                            tintColor = Color(selectedColor),
-                            size = 40.dp,
-                            iconSize = 22.dp
-                        )
-                        Column {
-                            Text(
-                                text = if (loanToEdit == null) "ثبت وام جدید" else "ویرایش وام و سهم‌ها",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "مشخصات قسط، تاریخ شمسی، آیکون و سهم شرکا",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "بستن")
-                    }
-                }
+                // ۱) هدر ثابت
+                LoanFormTopBar(
+                    title = if (loanToEdit == null) "افزودن وام" else "ویرایش وام",
+                    subtitle = "مشخصات و برنامه بازپرداخت",
+                    iconName = selectedIconName,
+                    iconShape = selectedIconShape,
+                    customIconPath = customIconPath,
+                    tintColor = Color(selectedColor),
+                    onClose = onDismiss
+                )
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
+                // ۲) محتوای اسکرول عمودی اصلی — تمام کارت‌ها؛ آخرین بخش (شرکا)
+                // با فاصله ۱۶dp از نوار پایین قابل مشاهده است.
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = LoanFormDimensions.ScreenHorizontalPadding)
+                        .padding(top = LoanFormDimensions.SectionSpacing, bottom = LoanFormDimensions.ScrollBottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(LoanFormDimensions.SectionSpacing)
                 ) {
-                    // 1. Title + Color Picker — فیکس bug.md/NB-32:
-                    // فیلد نام (وزن‌دار به‌جای تمام‌عرض) و انتخاب رنگ وام (بخش ۸ قدیمی)
-                    // در یک ردیف فشرده ادغام شدند تا ارتفاع دیالوگ کوتاه‌تر شود.
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // فیکس bug.md/NB-36: خطای عنوان (خالی/طول/تکراری) زیر همان فیلد با
-                        // isError نمایش داده می‌شود (الگوی AddEditUserDialog/NB-20).
-                        OutlinedTextField(
-                            value = title,
-                            onValueChange = { title = it },
-                            label = { Text("نام بانک یا وام") },
-                            placeholder = { Text("مثلاً: بانک رسالت") },
-                            isError = titleError != null,
-                            supportingText = { titleError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "رنگ",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    // ۲.۱ مشخصات و ظاهر وام
+                    LoanIdentityCard(
+                        title = title,
+                        onTitleChange = { title = it },
+                        titleError = titleError,
+                        colorOptions = colorOptions,
+                        selectedColor = selectedColor,
+                        onColorSelected = { selectedColor = it },
+                        selectedIconName = selectedIconName,
+                        onIconSelected = { selectedIconName = it },
+                        selectedIconShape = selectedIconShape,
+                        onShapeChange = { selectedIconShape = it },
+                        customIconPath = customIconPath,
+                        onPickCustomImage = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                colorOptions.forEach { colorVal ->
-                                    val isSelected = selectedColor == colorVal
-                                    Box(
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(colorVal))
-                                            .clickable { selectedColor = colorVal },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. Icon, Shape & Gallery Image Section
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = "نماد و ظاهر وام (آیکون و فرم نمایش):",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            // Shape selector
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                FilterChip(
-                                    selected = selectedIconShape == "ROUNDED_SQUARE",
-                                    onClick = { selectedIconShape = "ROUNDED_SQUARE" },
-                                    label = { Text("مربع دور گرد مینیمال") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.CropSquare, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    },
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-
-                                FilterChip(
-                                    selected = selectedIconShape == "CIRCLE",
-                                    onClick = { selectedIconShape = "CIRCLE" },
-                                    label = { Text("دایره مینیمال") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Circle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    },
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            }
-
-                            // Preset Vector Icons
-                            Text("انتخاب از آیکون‌های پیش‌فرض:", style = MaterialTheme.typography.labelSmall)
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(LoanIconHelper.PRESET_ICONS) { item ->
-                                    val isSelected = selectedIconName == item.id && customIconPath == null
-                                    Surface(
-                                        shape = if (selectedIconShape == "CIRCLE") CircleShape else RoundedCornerShape(10.dp),
-                                        color = if (isSelected) Color(selectedColor).copy(alpha = 0.22f) else MaterialTheme.colorScheme.surface,
-                                        border = if (isSelected) BorderStroke(1.5.dp, Color(selectedColor)) else null,
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .clickable {
-                                                selectedIconName = item.id
-                                                customIconPath = null // Clear custom image if preset selected
-                                            }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = item.icon,
-                                                contentDescription = item.titleFa,
-                                                tint = if (isSelected) Color(selectedColor) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Custom Gallery / Logo Picker
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        photoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (customIconPath != null) "تغییر تصویر از گالری" else "انتخاب لوگو/عکس از گالری",
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-
-                                if (customIconPath != null) {
-                                    TextButton(
-                                        onClick = {
-                                            LoanIconHelper.deleteCustomIconFile(customIconPath)
-                                            customIconPath = null
-                                        }
-                                    ) {
-                                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("حذف تصویر", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 3+4. تاریخ شروع + مبلغ قسط — فیکس bug.md/NB-32:
-                    // هر دو فیلد به‌جای دو ردیف تمام‌عرض، در یک ردیف با وزن مساوی قرار گرفتند.
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = startDate.toStandardFormat(usePersianDigits = usePersianDigits),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("تاریخ شروع وام") },
-                            supportingText = {
-                                Text("سررسید هر ماه: ${NumberFormatter.formatNumber(startDate.day, usePersianDigits)}ام")
-                            },
-                            trailingIcon = {
-                                IconButton(onClick = { showCalendarPicker = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.CalendarMonth,
-                                        contentDescription = "انتخاب تاریخ",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { showCalendarPicker = true }
-                        )
-
-                        // Stable Price Input Field (بدون پرش کرسر و بدون خطا)
-                        // فیکس bug.md/NB-40: خطای «مبلغ قسط صفر» از انتهای دیالوگ
-                        // به زیر همین فیلد منتقل شد (isError + errorText زنده).
-                        PriceInputField(
-                            rawDigitsValue = monthlyAmountDigits,
-                            onRawDigitsChange = { monthlyAmountDigits = it },
-                            label = "مبلغ قسط ماهانه (تومان)",
-                            placeholder = "مثلاً: ۲,۸۲۲,۰۰۰",
-                            usePersianDigits = usePersianDigits,
-                            compactThousands = compactThousands,
-                            modifier = Modifier.weight(1f),
-                            isError = rawMonthlyAmount <= 0L,
-                            errorText = if (rawMonthlyAmount <= 0L) {
-                                "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد."
-                            } else null
-                        )
-                    }
-
-                    // 5. Total Installment Count (Quick Chips + Input)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("تعداد کل اقساط (ماه):", style = MaterialTheme.typography.bodySmall)
-                            OutlinedTextField(
-                                value = totalMonthsText,
-                                onValueChange = { totalMonthsText = it.filter { c -> c.isDigit() } },
-                                modifier = Modifier.width(100.dp),
-                                singleLine = true,
-                                // فیکس bug.md/NB-40: خطای مدت زیر همان فیلد با isError —
-                                // نه به‌صورت متن جدا در پایین بخش
-                                isError = durationError != null,
-                                supportingText = { durationError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
-                        }
-
-                        // Quick chips for common loan durations
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            listOf(6, 10, 12, 24, 36).forEach { duration ->
-                                val isSelected = totalMonths == duration
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { totalMonthsText = duration.toString() },
-                                    label = { Text("${NumberFormatter.formatNumber(duration, usePersianDigits)} ماهه") },
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // 6. Interactive Installment Circles & Auto-Detection
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "اقساط پرداخت‌شده (ثبت‌شده توسط شما):",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "اقساط رسیده تا امروز: ${NumberFormatter.formatNumber(autoElapsed, usePersianDigits)} قسط (${currentShamsiDate.monthName} ${currentShamsiDate.year}) — صرفاً محاسبهٔ سررسید؛ پرداخت‌شده‌ها را جداگانه ثبت کنید",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Text(
-                                        text = "${NumberFormatter.formatNumber(paidInRangeCount, usePersianDigits)} از ${NumberFormatter.formatNumber(totalMonths, usePersianDigits)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-
-                            // فیکس bug.md/NB-37: چیپ quick-sync = «ثبت همهٔ ماه‌های
-                            // رسیدهٔ پرداخت‌نشده» — روی مجموعهٔ (سال، ماه) واقعی.
-                            if (unpaidArrivedMonths.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(
-                                        onClick = { paidYearMonths = paidYearMonths + unpaidArrivedMonths },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Icon(Icons.Default.AutoMode, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("ثبت همهٔ ${NumberFormatter.formatNumber(unpaidArrivedMonths.size, usePersianDigits)} قسط رسیدهٔ پرداخت‌نشده", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            }
-
-                            // Interactive Nodes View inside dialog
-                            InstallmentNodesView(
-                                totalMonths = totalMonths,
-                                paidMonths = paidInRangeCount,
-                                startYear = startDate.year,
-                                startMonth = startDate.month,
-                                accentColor = Color(selectedColor),
-                                usePersianDigits = usePersianDigits,
-                                // فیکس bug.md/NB-37: نودها از رکوردهای واقعی (سال، ماه)
-                                // رنگ می‌گیرند — مثل LoanItemCard؛ لمس نود toggle همان ماه است.
-                                paidYearMonths = paidYearMonths,
-                                overdueYearMonths = overdueYearMonths,
-                                currentYearMonth = currentShamsiDate.year to currentShamsiDate.month,
-                                onNodeClick = { clickedInstallment ->
-                                    val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, clickedInstallment)
-                                    val key = m.year to m.month
-                                    paidYearMonths = if (key in paidYearMonths) paidYearMonths - key else paidYearMonths + key
-                                }
-                            )
-
-                            Text(
-                                text = "💡 با لمس هر دایره ماه، می‌توانید وضعیت پرداخت اقساط را کم یا زیاد کنید.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            )
-
-                            // فیکس bug.md/NB-37: هشدار P1-9 حذف شد — تیک‌ها (سال، ماه)
-                            // واقعی‌اند و نودها فقط تا totalMonths رندر می‌شوند؛
-                            // «پرداخت‌شده > کل» در دیالوگ ممکن نیست.
-                        }
-                    }
-
-                    // 7. Partners Management (بدون پرانتزهای اضافه)
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "شراکت در قسط",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "افزودن سهم دوستان یا خانواده",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                FilledTonalButton(
-                                    onClick = { showAddPartnerDialog = true },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(30.dp)
-                                ) {
-                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("+ افزودن شریک", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-
-                            if (sharesList.isEmpty()) {
-                                Text(
-                                    text = "این وام بدون شریک است و کل قسط متعلق به کاربر مبنا است.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else {
-                                sharesList.forEachIndexed { index, share ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = "${share.personName}: ${NumberFormatter.formatPrice(share.shareAmount, usePersianDigits, compactThousands)}",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            if (share.shareDescription.isNotBlank()) {
-                                                Text(share.shareDescription, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
-
-                                        IconButton(onClick = { sharesList.removeAt(index) }, modifier = Modifier.size(28.dp)) {
-                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider()
-
-                            // Baseline Share Indicator (بدون پرانتزهای اضافی)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("سهم کاربر مبنا:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                Text(
-                                    text = NumberFormatter.formatPrice(calculatedMyShare, usePersianDigits, compactThousands),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            // فیکس bug.md/P1-8(الف): سهم صفرِ بی‌صدا دیگر ممکن نیست —
-                            // اگر مجموع سهم شرکا از مبلغ قسط بیشتر شده (مثلاً با کم‌کردن مبلغ قسط)،
-                            // ذخیره‌ی وام مسدود و دلیلش نمایش داده می‌شود.
-                            if (sharesExceedMonthly) {
-                                Text(
-                                    text = "⚠️ مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر است؛ مبلغ قسط را افزایش دهید یا سهم شرکا را کم/حذف کنید.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-
-                    // 8. Color Picker — فیکس bug.md/NB-32: به داخل ردیف فیلد نام منتقل شد (بخش ۱)
-                }
-
-                // Bottom Save & Cancel Buttons
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text("انصراف")
-                    }
-
-                    Button(
-                        // فیکس bug.md/P1-8/P1-9 و P3-12 و NB-33: ذخیره برای عنوان/مدت نامعتبر یا قسط صفر مسدود است
-                        enabled = !sharesExceedMonthly && titleError == null && durationError == null && rawMonthlyAmount > 0L,
-                        onClick = {
-                            // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) واقعی مستقیم به
-                            // Repository می‌رود تا رکوردها هم‌ارز و شمارنده‌ها از روی
-                            // همان رکوردها sync شوند (دفاع P1-9 در Repository می‌ماند).
-                            val loan = (loanToEdit ?: Loan(
-                                title = title.ifBlank { "وام جدید" },
-                                dueDay = startDate.day,
-                                monthlyAmount = rawMonthlyAmount,
-                                totalMonths = totalMonths,
-                                paidMonths = paidInRangeCount
-                            )).copy(
-                                title = title.ifBlank { "وام جدید" },
-                                dueDay = startDate.day,
-                                monthlyAmount = rawMonthlyAmount,
-                                totalMonths = totalMonths,
-                                paidMonths = paidInRangeCount,
-                                isCurrentMonthPaid = (currentShamsiDate.year to currentShamsiDate.month) in paidYearMonths,
-                                startYear = startDate.year,
-                                startMonth = startDate.month,
-                                endYear = endDate.year,
-                                endMonth = endDate.month,
-                                myShareAmount = calculatedMyShare,
-                                hasPartners = hasPartners,
-                                colorHex = selectedColor,
-                                iconName = selectedIconName,
-                                iconShape = selectedIconShape,
-                                customIconPath = customIconPath
-                            )
-
-                            onSave(loan, sharesList, paidYearMonths)
                         },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("ذخیره وام")
-                    }
+                        onRemoveCustomImage = {
+                            LoanIconHelper.deleteCustomIconFile(customIconPath)
+                            customIconPath = null
+                        }
+                    )
+
+                    // ۲.۲ مبلغ قسط و زمان‌بندی
+                    PaymentScheduleCard(
+                        monthlyAmountDigits = monthlyAmountDigits,
+                        onMonthlyAmountChange = { monthlyAmountDigits = it },
+                        amountErrorText = if (rawMonthlyAmount <= 0L) {
+                            "مبلغ قسط ماهانه باید بزرگ‌تر از صفر باشد."
+                        } else null,
+                        startDateText = startDate.toStandardFormat(usePersianDigits = usePersianDigits),
+                        onPickStartDate = { showCalendarPicker = true },
+                        dueDayHint = "سررسید هر ماه: ${NumberFormatter.formatNumber(startDate.day, usePersianDigits)}ام",
+                        totalMonthsText = totalMonthsText,
+                        onTotalMonthsChange = { totalMonthsText = it.filter { c -> c.isDigit() } },
+                        durationError = durationError,
+                        quickDurationOptions = listOf(6, 10, 12, 24, 36),
+                        selectedDuration = totalMonths,
+                        onQuickDurationSelected = { duration -> totalMonthsText = duration.toString() },
+                        usePersianDigits = usePersianDigits,
+                        compactThousands = compactThousands
+                    )
+
+                    // ۲.۳ خلاصه مالی — کاملاً از state واقعی فرم محاسبه می‌شود
+                    RepaymentSummaryCard(
+                        perInstallmentAmount = rawMonthlyAmount,
+                        monthsCount = totalMonths,
+                        totalAmount = totalInstallmentsAmount,
+                        usePersianDigits = usePersianDigits,
+                        compactThousands = compactThousands
+                    )
+
+                    // ۲.۴ تقویم ماه‌های شمسی و وضعیت پرداخت اقساط
+                    MonthlyInstallmentCalendarCard(
+                        monthChips = monthChips,
+                        paidCount = paidInRangeCount,
+                        totalMonths = totalMonths,
+                        arrivedCount = autoElapsed,
+                        currentMonthLabel = "${currentShamsiDate.monthName} ${NumberFormatter.formatNumber(currentShamsiDate.year, usePersianDigits)}",
+                        unpaidArrivedCount = unpaidArrivedMonths.size,
+                        onQuickSyncArrived = { paidYearMonths = paidYearMonths + unpaidArrivedMonths },
+                        onToggleMonth = { clickedInstallment ->
+                            val m = ShamsiDateHelper.installmentMonth(startDate.year, startDate.month, clickedInstallment)
+                            val key = m.year to m.month
+                            paidYearMonths = if (key in paidYearMonths) paidYearMonths - key else paidYearMonths + key
+                        },
+                        usePersianDigits = usePersianDigits
+                    )
+
+                    // ۲.۵ شرکا و سهم‌بندی (پس از تقویم، همراه فرم اسکرول می‌شود)
+                    LoanPartnersCard(
+                        shares = sharesList,
+                        onRemoveShare = { index -> sharesList.removeAt(index) },
+                        onAddPartner = { showAddPartnerDialog = true },
+                        myShareAmount = calculatedMyShare,
+                        othersTotalShare = othersTotalShare,
+                        monthlyAmount = rawMonthlyAmount,
+                        sharesExceedMonthly = sharesExceedMonthly,
+                        usePersianDigits = usePersianDigits,
+                        compactThousands = compactThousands
+                    )
                 }
+
+                // ۳) نوار اقدامات ثابت پایین — خارج از محتوای اسکرولی؛ فعال بودن
+                // ذخیره به اعتبارسنجی واقعی فرم وابسته است.
+                LoanFormBottomBar(
+                    onCancel = onDismiss,
+                    saveEnabled = !sharesExceedMonthly && titleError == null && durationError == null && rawMonthlyAmount > 0L,
+                    onSave = {
+                        // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) واقعی مستقیم به
+                        // Repository می‌رود تا رکوردها هم‌ارز و شمارنده‌ها از روی
+                        // همان رکوردها sync شوند (دفاع P1-9 در Repository می‌ماند).
+                        val loan = (loanToEdit ?: Loan(
+                            title = title.ifBlank { "وام جدید" },
+                            dueDay = startDate.day,
+                            monthlyAmount = rawMonthlyAmount,
+                            totalMonths = totalMonths,
+                            paidMonths = paidInRangeCount
+                        )).copy(
+                            title = title.ifBlank { "وام جدید" },
+                            dueDay = startDate.day,
+                            monthlyAmount = rawMonthlyAmount,
+                            totalMonths = totalMonths,
+                            paidMonths = paidInRangeCount,
+                            isCurrentMonthPaid = (currentShamsiDate.year to currentShamsiDate.month) in paidYearMonths,
+                            startYear = startDate.year,
+                            startMonth = startDate.month,
+                            endYear = endDate.year,
+                            endMonth = endDate.month,
+                            myShareAmount = calculatedMyShare,
+                            hasPartners = hasPartners,
+                            colorHex = selectedColor,
+                            iconName = selectedIconName,
+                            iconShape = selectedIconShape,
+                            customIconPath = customIconPath
+                        )
+
+                        onSave(loan, sharesList, paidYearMonths)
+                    }
+                )
             }
         }
     }
@@ -839,7 +479,7 @@ fun AddEditLoanDialog(
             partnerAmount <= 0L ->
                 "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
             partnerAmount + othersTotalShare > rawMonthlyAmount ->
-                "مجموع سهم شرکا (${NumberFormatter.formatPrice(partnerAmount + othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
+                "مجموع سهم شرکا (${NumberFormatter.formatPrice(partnerAmount + othersTotalShare, usePersian = usePersianDigits, compactThousands = compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersian = usePersianDigits, compactThousands = compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
             else -> null
         }
 
