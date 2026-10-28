@@ -9,12 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.util.InputLimits
@@ -42,15 +40,7 @@ fun PriceInputField(
     enabled: Boolean = true,
     // فیکس bug.md/NB-40: خطای زندهٔ صدا‌زننده (مثلاً «مبلغ قسط باید بزرگ‌تر از صفر باشد»)
     isError: Boolean = false,
-    errorText: String? = null,
-    // بازطراحی فرم وام (LoanForm Design Tokens): برچسب مستقل بالای فیلد +
-    // ارتفاع/حاشیهٔ توکنی. پیش‌فرض‌ها رفتار فعلی بقیهٔ صدا‌زننده‌ها را
-    // دقیقاً حفظ می‌کنند (بدون labelAbove فیلد همان شکل شناور قبلی است).
-    labelAbove: Boolean = false,
-    fieldHeight: Dp? = null,
-    unfocusedBorderColor: Color? = null,
-    focusedBorderColor: Color? = null,
-    labelStyle: TextStyle? = null
+    errorText: String? = null
 ) {
     val amountLong = rawDigitsValue.toLongOrNull() ?: 0L
 
@@ -58,26 +48,10 @@ fun PriceInputField(
     // فیکس bug.md/NB-40 (بند د): رسیدن به سقف ارقام بی‌صدا کپ نمی‌شود — بازخورد صریح دارد
     var hitMaxDigits by remember { mutableStateOf(false) }
 
-    val fieldColors = if (unfocusedBorderColor != null || focusedBorderColor != null) {
-        OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = focusedBorderColor ?: MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = unfocusedBorderColor ?: MaterialTheme.colorScheme.outline
-        )
-    } else {
-        OutlinedTextFieldDefaults.colors()
-    }
-
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        if (labelAbove) {
-            Text(
-                text = label,
-                style = labelStyle ?: MaterialTheme.typography.labelMedium,
-                color = (labelStyle?.color ?: MaterialTheme.colorScheme.onSurfaceVariant)
-            )
-        }
         OutlinedTextField(
             value = rawDigitsValue,
             onValueChange = { input ->
@@ -100,7 +74,7 @@ fun PriceInputField(
                 val capped = if (hitMaxDigits) digitsOnly.take(InputLimits.MAX_AMOUNT_DIGITS) else digitsOnly
                 onRawDigitsChange(capped)
             },
-            label = if (labelAbove) null else ({ Text(label) }),
+            label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
             enabled = enabled,
@@ -110,7 +84,6 @@ fun PriceInputField(
                 textDirection = TextDirection.Ltr,
                 fontWeight = FontWeight.Bold
             ),
-            colors = fieldColors,
             trailingIcon = {
                 if (rawDigitsValue.isNotEmpty()) {
                     IconButton(
@@ -129,9 +102,7 @@ fun PriceInputField(
                 }
             },
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .let { m -> if (fieldHeight != null) m.height(fieldHeight) else m }
+            modifier = Modifier.fillMaxWidth()
         )
 
         if (hasInvalidSeparator) {
