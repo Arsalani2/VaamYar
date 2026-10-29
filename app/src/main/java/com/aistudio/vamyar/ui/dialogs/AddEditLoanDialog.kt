@@ -13,9 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -587,7 +584,7 @@ fun AddEditLoanDialog(
         val partnerAmountError: String? = when {
             partnerAmount <= 0L -> "مبلغ سهم شریک باید بزرگ‌تر از صفر باشد."
             partnerAmount + othersTotalShare > rawMonthlyAmount ->
-                "مجموع سهم شرکا (${NumberFormatter.formatPrice(partnerAmount + othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
+                "مجموع سهم شرکا (${NumberFormatter.formatPrice(partnerAmount + othersTotalShare, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) بیشتر می‌شود؛ سهم کاربر مبنا نمی‌تواند منفی باشد."
             else -> null
         }
 
@@ -1491,7 +1488,7 @@ private fun StepThreeConfirmationContent(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = NumberFormatter.formatPrice(calculatedMyShare, usePersianDigits, compactThousands),
+                                        text = NumberFormatter.formatPrice(calculatedMyShare, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
@@ -1530,7 +1527,7 @@ private fun StepThreeConfirmationContent(
                                     ) {
                                         Column {
                                             Text(
-                                                text = "${share.personName}: ${NumberFormatter.formatPrice(share.shareAmount, usePersianDigits, compactThousands)}",
+                                                text = "${share.personName}: ${NumberFormatter.formatPrice(share.shareAmount, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = FontWeight.SemiBold
                                             )
@@ -1562,7 +1559,7 @@ private fun StepThreeConfirmationContent(
 
                     if (sharesExceedMonthly) {
                         Text(
-                            text = "⚠️ مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, usePersianDigits, compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, usePersianDigits, compactThousands)}) بیشتر است.",
+                            text = "⚠️ مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) بیشتر است.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error
                         )
