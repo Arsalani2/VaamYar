@@ -7,23 +7,28 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -31,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Calendar
 import com.aistudio.vamyar.data.UserDeleteCheckResult
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.ui.ImportMode
@@ -44,8 +50,8 @@ import com.aistudio.vamyar.util.ShamsiDate
 
 enum class SettingsCategory(val titleFa: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     USERS("کاربران", Icons.Default.People),
-    DATE_SYNC("تاریخ شمسی", Icons.Default.CalendarMonth),
-    APPEARANCE("ظاهر و تم", Icons.Default.Palette),
+    DATE_SYNC("تقویم", Icons.Default.CalendarMonth),
+    APPEARANCE("ظاهر", Icons.Default.Palette),
     DATA_MANAGEMENT("داده‌ها", Icons.Default.Storage)
 }
 
@@ -68,19 +74,12 @@ fun SettingsScreen(
     onSyncDateWithSystem: () -> Unit,
     onSetCustomDate: (ShamsiDate) -> Unit,
     onClearAllLoans: () -> Unit,
-    // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها شامل کاربران
-    // پاک و کاربر مبنا پیش‌فرض ساخته می‌شود؛ با دیالوگ تأیید صریح.
     onFullReset: () -> Unit = {},
     onTestNotification: () -> Unit,
-    // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان سررسید از تنظیمات تغییر می‌کند؛
-    // پس از ثبت ساعت جدید، آلارم روزانه با همان ساعت از نو زمان‌بندی می‌شود.
     reminderHour: Int = 10,
     reminderMinute: Int = 0,
     onReminderTimeChange: (Int, Int) -> Unit = { _, _ -> },
     onExportBackup: () -> String = { "" },
-    // فیکس bug.md/NB-34+NB-29: قبل از اجرای ایمپورت، پیش‌نمایش (شمارش‌ها + فهرست
-    // جدید/تکراری) به کاربر نشان داده می‌شود؛ خودِ ایمپورت فقط پس از انتخاب
-    // صریح حالت (جایگزینی کامل / ادغام) و تأیید اجرا می‌شود.
     onPreviewImport: suspend (String) -> Result<ImportPreview> = { Result.failure(IllegalStateException("پیش‌نمایش پشتیبانی نمی‌شود")) },
     onImportBackup: suspend (String, ImportMode) -> Result<String> = { _, _ -> Result.success("") },
     modifier: Modifier = Modifier
@@ -92,31 +91,26 @@ fun SettingsScreen(
     var showAddUserDialog by remember { mutableStateOf(false) }
 
     var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
-    // فیکس bug.md/NB-41: دیالوگ تأیید «بازنشانی کامل برنامه» (شامل کاربران)
     var showFullResetConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
-
-    // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه (TimePicker متریال ۳)
     var showReminderTimePicker by remember { mutableStateOf(false) }
-    // فیکس bug.md/NB-42: ساعت اعلان هم از تنظیم ارقام کاربر پیروی می‌کند
-    // (قبلاً همیشهٔ toPersianDigits هاردکد بود و در حالت EN برعکس تنظیم دیده می‌شد).
+
     val reminderTimeLabel = remember(reminderHour, reminderMinute, usePersianDigits) {
         NumberFormatter.formatClock(reminderHour, reminderMinute, usePersianDigits)
     }
 
-    // فیکس bug.md/NB-34+NB-29: وضعیت پیش‌نمایش ایمپورت — فایل انتخاب‌شده + دادهٔ
-    // پیش‌نمایش؛ تا وقتی این null نیست دیالوگِ تأیید/انتخاب حالت باز است و هیچ
-    // تغییری در داده رخ نداده است (لغو در هر مرحله بدون تغییر).
     var pendingImport by remember { mutableStateOf<Pair<String, ImportPreview>?>(null) }
     var selectedImportMode by remember { mutableStateOf(ImportMode.REPLACE_ALL) }
     var importInProgress by remember { mutableStateOf(false) }
 
-    // Safe Deletion state
     val coroutineScope = rememberCoroutineScope()
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
     var userConfirmDeleteDialog by remember { mutableStateOf<UserProfile?>(null) }
 
-    // فیکس bug.md/NB-7: اجرای export و import فایل روی Dispatchers.IO به جای Main thread
+    val brandViolet = Color(0xFF6C27DF)
+    val brandIndigo = Color(0xFF4F46E5)
+
+    // Document Launchers for Backup Export & Import
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
@@ -137,8 +131,6 @@ fun SettingsScreen(
         }
     }
 
-    // فیکس bug.md/NB-34+NB-29: انتخاب فایل فقط «پیش‌نمایش» می‌سازد؛ خودِ ایمپورت
-    // در دیالوگ تأیید (پایین همین فایل) پس از انتخاب صریح حالت اجرا می‌شود.
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -173,22 +165,50 @@ fun SettingsScreen(
             .fillMaxSize()
             .padding(top = 8.dp)
     ) {
-        // Horizontal Segmented Category Navigation Bar
-        SingleChoiceSegmentedButtonRow(
+        // Top 4 Segmented Navigation Tabs matching Stitch Prototypes
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
-            SettingsCategory.values().forEachIndexed { index, category ->
-                SegmentedButton(
-                    selected = selectedCategory == category,
-                    onClick = { selectedCategory = category },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = SettingsCategory.values().size),
-                    icon = {
-                        Icon(imageVector = category.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Row(
+                modifier = Modifier.padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingsCategory.values().forEach { category ->
+                    val isSelected = selectedCategory == category
+                    Surface(
+                        onClick = { selectedCategory = category },
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isSelected) brandViolet.copy(alpha = 0.12f) else Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("settings_tab_${category.name}")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = category.icon,
+                                contentDescription = category.titleFa,
+                                tint = if (isSelected) brandViolet else Color(0xFF64748B),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = category.titleFa,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) brandViolet else Color(0xFF64748B)
+                            )
+                        }
                     }
-                ) {
-                    Text(category.titleFa, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -198,391 +218,562 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(top = 10.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             when (selectedCategory) {
-                // CATEGORY 1: USERS & PRIMARY BASELINE
+                // ==========================================
+                // 1. USERS & BENCHMARK MANAGEMENT (کاربران)
+                // ==========================================
                 SettingsCategory.USERS -> {
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_users_management"),
+                            shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
+                                // Header: Title + Add User Button
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Text(
-                                            text = "مدیریت کاربران و کاربر مبنا",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(3.dp)
+                                                .height(20.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(brandViolet)
                                         )
                                         Text(
-                                            text = "کاربر مبنا حسابی است که مبالغ از دیدگاه او سنجیده می‌شوند",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = "مدیریت کاربران",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
                                         )
                                     }
 
-                                    FilledTonalButton(
+                                    Surface(
                                         onClick = { showAddUserDialog = true },
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        shape = RoundedCornerShape(8.dp)
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = brandViolet.copy(alpha = 0.08f),
+                                        border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.2f))
                                     ) {
-                                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("+ کاربر جدید", style = MaterialTheme.typography.labelSmall)
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = null,
+                                                tint = brandViolet,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = "کاربر جدید",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = brandViolet
+                                            )
+                                        }
                                     }
                                 }
 
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                HorizontalDivider(color = Color(0xFFF1F5F9))
 
                                 // Users List
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     users.forEach { user ->
-                                        val isPrimary = user.isPrimary
+                                        UserManagementItemCard(
+                                            user = user,
+                                            canDelete = users.size > 1 && !user.isPrimary,
+                                            onSetPrimary = {
+                                                onSetPrimaryUser(user.id)
+                                                Toast.makeText(context, "${user.name} به عنوان کاربر مبنا تنظیم شد", Toast.LENGTH_SHORT).show()
+                                            },
+                                            onEdit = { userToEdit = user },
+                                            onDelete = {
+                                                coroutineScope.launch {
+                                                    val check = onCheckDeleteUser(user.id)
+                                                    if (!check.canDelete) {
+                                                        userBlockedDeletionDialog = Pair(user.name, check.blockingLoanTitles)
+                                                    } else {
+                                                        userConfirmDeleteDialog = user
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+
+                                // Subtle Informative Note at bottom
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = brandViolet,
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .padding(top = 2.dp)
+                                    )
+                                    Text(
+                                        text = "کاربر مبنا حسابی است که مبالغ کل، سهم‌ها و گزارش‌ها از دیدگاه او محاسبه و سنجیده می‌شوند.",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF64748B),
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ==========================================
+                // 2. CALENDAR & DATE SYNC (تقویم شمسی)
+                // ==========================================
+                SettingsCategory.DATE_SYNC -> {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_date_sync"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Title with Icon Box
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(brandViolet.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "همگام‌سازی تاریخ",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = "مبنای سررسیدهای روزانه، روزشمار و تشخیص اقساط",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+
+                                // Active Date Box (Soft Gradient Container)
+                                val dayOfWeek = remember(currentShamsiDate) {
+                                    getShamsiDayOfWeek(currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day)
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color(0xFFFAF9FD),
+                                    border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "تاریخ برنامه:",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF64748B)
+                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(20.dp),
+                                                color = brandViolet.copy(alpha = 0.12f),
+                                                border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.25f))
+                                            ) {
+                                                Text(
+                                                    text = dayOfWeek,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = brandViolet,
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Text(
+                                            text = currentShamsiDate.formatted(usePersianDigits = usePersianDigits),
+                                            fontSize = 28.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = brandViolet,
+                                            letterSpacing = (-0.5).sp
+                                        )
+
                                         Surface(
-                                            shape = RoundedCornerShape(14.dp),
-                                            color = if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            onClick = { showDatePickerDialog = true },
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                    .padding(vertical = 10.dp),
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                                    modifier = Modifier.weight(1f)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(38.dp)
-                                                            .clip(CircleShape)
-                                                            .background(Color(user.avatarColorHex)),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = user.name.take(1),
-                                                            style = MaterialTheme.typography.titleMedium,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Color.White
-                                                        )
-                                                    }
-
-                                                    Column {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = user.name,
-                                                                style = MaterialTheme.typography.titleSmall,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                            if (isPrimary) {
-                                                                Surface(
-                                                                    shape = RoundedCornerShape(6.dp),
-                                                                    color = MaterialTheme.colorScheme.primary
-                                                                ) {
-                                                                    Text(
-                                                                        text = "کاربر مبنا",
-                                                                        style = MaterialTheme.typography.labelSmall,
-                                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                        if (user.notes.isNotBlank()) {
-                                                            Text(
-                                                                text = user.notes,
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    if (!isPrimary) {
-                                                        OutlinedButton(
-                                                            onClick = {
-                                                                onSetPrimaryUser(user.id)
-                                                                Toast.makeText(context, "${user.name} به عنوان کاربر مبنا تنظیم شد", Toast.LENGTH_SHORT).show()
-                                                            },
-                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                                            shape = RoundedCornerShape(8.dp)
-                                                        ) {
-                                                            Text("مبنا قرار دادن", style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    }
-
-                                                    IconButton(
-                                                        onClick = { userToEdit = user },
-                                                        modifier = Modifier.size(32.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Edit, contentDescription = "ویرایش", modifier = Modifier.size(16.dp))
-                                                    }
-
-                                                    if (users.size > 1 && !isPrimary) {
-                                                        IconButton(
-                                                            onClick = {
-                                                                coroutineScope.launch {
-                                                                    val check = onCheckDeleteUser(user.id)
-                                                                    if (!check.canDelete) {
-                                                                        userBlockedDeletionDialog = Pair(user.name, check.blockingLoanTitles)
-                                                                    } else {
-                                                                        userConfirmDeleteDialog = user
-                                                                    }
-                                                                }
-                                                            },
-                                                            modifier = Modifier.size(32.dp)
-                                                        ) {
-                                                            Icon(
-                                                                Icons.Default.Delete,
-                                                                contentDescription = "حذف",
-                                                                tint = MaterialTheme.colorScheme.error,
-                                                                modifier = Modifier.size(16.dp)
-                                                            )
-                                                        }
-                                                    }
-                                                }
+                                                Icon(
+                                                    imageVector = Icons.Default.EditCalendar,
+                                                    contentDescription = null,
+                                                    tint = brandViolet,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "تغییر دستی تاریخ",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF0F172A)
+                                                )
                                             }
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
 
-                // CATEGORY 2: DATE SYNC & SHAMSI CALENDAR
-                SettingsCategory.DATE_SYNC -> {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Column {
-                                        Text(
-                                            text = "تنظیم و همگام‌سازی تاریخ شمسی",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "مبنای سررسیدهای روزانه، روزشمار و تشخیص اقساط پرداخت‌شده",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
+                                // Quick Sync Gradient Action Button
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text("تاریخ فعال برنامه:", style = MaterialTheme.typography.bodySmall)
-                                            Text(
-                                                text = currentShamsiDate.formatted(usePersianDigits = usePersianDigits),
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-
-                                        FilledTonalButton(
-                                            onClick = { showDatePickerDialog = true },
-                                            shape = RoundedCornerShape(10.dp)
-                                        ) {
-                                            Icon(Icons.Default.EditCalendar, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("تغییر دستی تاریخ")
-                                        }
-                                    }
-                                }
-
-                                Button(
                                     onClick = {
                                         onSyncDateWithSystem()
                                         Toast.makeText(context, "تاریخ برنامه با ساعت سیستم همگام شد", Toast.LENGTH_SHORT).show()
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.Transparent,
+                                    shadowElevation = 4.dp,
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("همگام‌سازی با تاریخ امروز دستگاه (سینک ساعت)")
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(brandViolet, brandIndigo)
+                                                )
+                                            )
+                                            .padding(vertical = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Sync,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = "همگام‌سازی با تاریخ دستگاه",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // CATEGORY 3: APPEARANCE & FONTS
+                // ==========================================
+                // 3. APPEARANCE, THEME & NUMERALS (ظاهر و تم)
+                // ==========================================
                 SettingsCategory.APPEARANCE -> {
-                    // Persian / English digits & 3 zeros less
+                    // Card 1: Numbers & Currency
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_numbers_format"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
                                 Text(
-                                    text = "فرمت اعداد و مبالغ",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    text = "اعداد و مبالغ",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
                                 )
 
+                                // Row 1: Persian vs EN Digits Switcher
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("نوع نمایش اعداد:", style = MaterialTheme.typography.bodyMedium)
-                                    SingleChoiceSegmentedButtonRow {
-                                        SegmentedButton(
-                                            selected = usePersianDigits,
-                                            onClick = { onDigitsChange(true) },
-                                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                                    Text(
+                                        text = "نوع نمایش اعداد:",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF0F172A)
+                                    )
+
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0xFFF1F5F9),
+                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(3.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                                         ) {
-                                            Text("فارسی", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                        SegmentedButton(
-                                            selected = !usePersianDigits,
-                                            onClick = { onDigitsChange(false) },
-                                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                                        ) {
-                                            Text("EN", style = MaterialTheme.typography.labelSmall)
+                                            Surface(
+                                                onClick = { onDigitsChange(true) },
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = if (usePersianDigits) brandViolet.copy(alpha = 0.15f) else Color.Transparent,
+                                                shadowElevation = if (usePersianDigits) 1.dp else 0.dp
+                                            ) {
+                                                Text(
+                                                    text = "فارسی",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (usePersianDigits) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (usePersianDigits) brandViolet else Color(0xFF64748B),
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                                )
+                                            }
+
+                                            Surface(
+                                                onClick = { onDigitsChange(false) },
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = if (!usePersianDigits) brandViolet.copy(alpha = 0.15f) else Color.Transparent,
+                                                shadowElevation = if (!usePersianDigits) 1.dp else 0.dp
+                                            ) {
+                                                Text(
+                                                    text = "EN",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (!usePersianDigits) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (!usePersianDigits) brandViolet else Color(0xFF64748B),
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
 
-                                HorizontalDivider()
+                                HorizontalDivider(color = Color(0xFFF1F5F9))
 
+                                // Row 2: 3 Zeros Less Switch
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Text("حالت سه صفر کمتر (هزار تومان)", style = MaterialTheme.typography.bodyMedium)
-                                        Text("نمایش مبالغ به صورت خلاصه‌شده (مثلاً ۸۹۰ هزار ت)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = "حالت سه صفر کمتر",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = "نمایش مبالغ به صورت خلاصه‌شده (مثلاً ۲۵۰ هزار ت)",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
                                     }
-                                    Switch(checked = compactThousands, onCheckedChange = onCompactThousandsChange)
+                                    Switch(
+                                        checked = compactThousands,
+                                        onCheckedChange = onCompactThousandsChange,
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = brandViolet
+                                        )
+                                    )
                                 }
                             }
                         }
                     }
 
-                    // Theme Mode & Color Presets (Default follows system)
+                    // Card 2: Theme Mode (System, Light, Dark)
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_theme_mode"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                Text("پوسته و رنگ‌بندی", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "حالت نمایش",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     AppThemeMode.values().forEach { mode ->
-                                        FilterChip(
-                                            selected = currentThemeMode == mode,
+                                        val isSelected = currentThemeMode == mode
+                                        Surface(
                                             onClick = { onThemeModeChange(mode) },
-                                            label = { Text(mode.titleFa) },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = if (isSelected) brandViolet.copy(alpha = 0.12f) else Color(0xFFF8FAFC),
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (isSelected) brandViolet.copy(alpha = 0.35f) else Color(0xFFE2E8F0)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = mode.titleFa,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) brandViolet else Color(0xFF64748B),
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.padding(vertical = 10.dp)
+                                            )
+                                        }
                                     }
                                 }
+                            }
+                        }
+                    }
 
-                                HorizontalDivider()
+                    // Card 3: Color Schemes & Presets
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_theme_presets"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Text(
+                                    text = "پوسته و رنگ‌بندی",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
 
-                                ThemePreset.values().forEach { preset ->
-                                    val isSelected = currentThemePreset == preset
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { onThemePresetChange(preset) },
-                                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ThemePreset.values().forEach { preset ->
+                                        val isSelected = currentThemePreset == preset
+                                        Surface(
+                                            onClick = { onThemePresetChange(preset) },
+                                            shape = RoundedCornerShape(16.dp),
+                                            color = if (isSelected) preset.previewColor.copy(alpha = 0.08f) else Color.Transparent,
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (isSelected) preset.previewColor.copy(alpha = 0.35f) else Color.Transparent
+                                            ),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(20.dp)
-                                                        .clip(CircleShape)
-                                                        .background(preset.previewColor)
-                                                )
-                                                Text(preset.titleFa, style = MaterialTheme.typography.bodyMedium)
-                                            }
-                                            if (isSelected) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(24.dp)
+                                                            .clip(CircleShape)
+                                                            .background(preset.previewColor)
+                                                            .border(2.dp, Color.White, CircleShape)
+                                                    )
+                                                    Text(
+                                                        text = preset.titleFa,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                        color = if (isSelected) Color(0xFF0F172A) else Color(0xFF475569)
+                                                    )
+                                                }
+
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = preset.previewColor,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -592,213 +783,434 @@ fun SettingsScreen(
                     }
                 }
 
-                // CATEGORY 4: DATA MANAGEMENT, BACKUP & RESET
+                // ==========================================
+                // 4. DATA, BACKUP & NOTIFICATIONS (داده‌ها)
+                // ==========================================
                 SettingsCategory.DATA_MANAGEMENT -> {
-                    // Backup & Restore Card
+                    // Card 1: Backup & Restore
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_backup_restore"),
+                            shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Column {
-                                        Text("پشتیبان‌گیری و بازگردانی اطلاعات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            "خروجی استاندارد JSON با هش اعتبارسنجی SHA-256 جهت امنیت و سازگاری دائم",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                Text(
-                                    text = "می‌توانید از کل اطلاعات برنامه (وام‌ها، کاربران، سهم‌های شراکت، سوابق اقساط و تنظیمات) فایل پشتیبان تهیه کنید و در هر زمان به راحتی آن را بازیابی نمایید.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 20.sp
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            val timestamp = System.currentTimeMillis()
-                                            createDocumentLauncher.launch("VaamYar_Backup_${timestamp}.json")
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("ذخیره پشتیبان", style = MaterialTheme.typography.labelSmall)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            // فیکس bug.md/NB-15: اشتراک‌گذاری «فایل» واقعی به‌جای متن خام —
-                                            // JSON در cacheDir/backup نوشته می‌شود و با EXTRA_STREAM (Uri امنِ
-                                            // FileProvider + FLAG_GRANT_READ_URI_PERMISSION) ارسال می‌شود تا
-                                            // پیام‌رسان‌ها آن را به‌عنوان فایل پیوست قبول کنند.
-                                            coroutineScope.launch {
-                                                try {
-                                                    val shareUri = withContext(Dispatchers.IO) {
-                                                        val backupDir = File(context.cacheDir, "backup").apply { mkdirs() }
-                                                        // فایل‌های قدیمیِ این مسیرِ موقت پاک شوند (cacheDir هم خودش قابل پاک‌شدن است)
-                                                        backupDir.listFiles()?.forEach { it.delete() }
-                                                        val backupFile = File(backupDir, "VaamYar_Backup_${System.currentTimeMillis()}.json")
-                                                        backupFile.writeText(onExportBackup(), Charsets.UTF_8)
-                                                        FileProvider.getUriForFile(
-                                                            context,
-                                                            "${context.packageName}.fileprovider",
-                                                            backupFile
-                                                        )
-                                                    }
-                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = "application/json"
-                                                        putExtra(Intent.EXTRA_STREAM, shareUri)
-                                                        putExtra(Intent.EXTRA_SUBJECT, "فایل پشتیبان وام‌یار")
-                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                    }
-                                                    context.startActivity(Intent.createChooser(shareIntent, "ارسال و اشتراک فایل پشتیبان"))
-                                                } catch (e: Exception) {
-                                                    Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("اشتراک‌گذاری", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-
-                                HorizontalDivider()
-
-                                OutlinedButton(
-                                    onClick = {
-                                        openDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("بازگردانی اطلاعات از فایل پشتیبان (ایمپورت)")
-                                }
-                            }
-                        }
-                    }
-
-                    // Reset & Notifications Card
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text("مدیریت داده‌ها و بازنشانی", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-
-                                Text(
-                                    text = "برای شروع کاملاً خام جهت ثبت وام‌های واقعی جدید، می‌توانید تمام وام‌های ثبت‌شده را پاکسازی فرمایید.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                OutlinedButton(
-                                    onClick = { showClearLoansConfirmDialog = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("پاکسازی تمام وام‌ها (شروع خام برنامه)")
-                                }
-
-                                // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — برخلاف
-                                // پاکسازی وام‌ها، همهٔ داده‌ها شامل کاربران پاک می‌شود و
-                                // برنامه خودش یک کاربر مبنا پیش‌فرض می‌سازد؛ اجرا فقط
-                                // پس از دیالوگ تأیید صریح (اینوارینت #۹).
-                                OutlinedButton(
-                                    onClick = { showFullResetConfirmDialog = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("بازنشانی کامل برنامه (همهٔ داده‌ها + کاربران)")
-                                }
-
-                                HorizontalDivider()
-
-                                Button(
-                                    onClick = {
-                                        onTestNotification()
-                                        Toast.makeText(context, "اعلان آزمایشی ارسال شد", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.NotificationAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("ارسال اعلان آزمایشی سررسید")
-                                }
-
-                                HorizontalDivider()
-
-                                // فیکس bug.md/NB-24: ساعت چکِ روزانهٔ اعلان‌ها از
-                                // تنظیمات قابل تغییر است (پیش‌فرض ۱۰:۰۰)؛ تغییر ساعت،
-                                // آلارم را همان‌جا با ساعت جدید از نو زمان‌بندی می‌کند.
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(
-                                            "ساعت اعلان روزانهٔ سررسید",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold
+                                            text = "پشتیبان‌گیری",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
                                         )
                                         Text(
-                                            text = "چکِ روزانهٔ اقساط هر روز ساعت $reminderTimeLabel انجام می‌شود.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = "خروجی استاندارد JSON همراه با هش SHA-256",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    OutlinedButton(
-                                        onClick = { showReminderTimePicker = true },
-                                        shape = RoundedCornerShape(12.dp)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(brandViolet.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.CloudDownload,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color(0xFFF8FAFC),
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "شامل: وام‌ها، طرفین حساب، اقساط و تنظیمات کلی",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF64748B),
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+
+                                // Action 1: Save Backup (Gradient Button)
+                                Surface(
+                                    onClick = {
+                                        val timestamp = System.currentTimeMillis()
+                                        createDocumentLauncher.launch("VaamYar_Backup_${timestamp}.json")
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.Transparent,
+                                    shadowElevation = 3.dp,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(brandViolet, brandIndigo)
+                                                )
+                                            )
+                                            .padding(vertical = 13.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Save,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = "ذخیره پشتیبان",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Action 2: Restore Data
+                                Surface(
+                                    onClick = {
+                                        openDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FileOpen,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(reminderTimeLabel)
+                                        Text(
+                                            text = "بازگردانی اطلاعات",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = brandViolet
+                                        )
+                                    }
+                                }
+
+                                // Action 3: Share Backup
+                                Surface(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            try {
+                                                val shareUri = withContext(Dispatchers.IO) {
+                                                    val backupDir = File(context.cacheDir, "backup").apply { mkdirs() }
+                                                    backupDir.listFiles()?.forEach { it.delete() }
+                                                    val backupFile = File(backupDir, "VaamYar_Backup_${System.currentTimeMillis()}.json")
+                                                    backupFile.writeText(onExportBackup(), Charsets.UTF_8)
+                                                    FileProvider.getUriForFile(
+                                                        context,
+                                                        "${context.packageName}.fileprovider",
+                                                        backupFile
+                                                    )
+                                                }
+                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "application/json"
+                                                    putExtra(Intent.EXTRA_STREAM, shareUri)
+                                                    putExtra(Intent.EXTRA_SUBJECT, "فایل پشتیبان وام‌یار")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(Intent.createChooser(shareIntent, "ارسال و اشتراک فایل پشتیبان"))
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "خطا در اشتراک‌گذاری: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFFF8FAFC),
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = null,
+                                            tint = Color(0xFF64748B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "اشتراک‌گذاری فایل پشتیبان",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF334155)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 2: Data Management & Reset
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_reset_management"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "مدیریت داده‌ها و بازنشانی",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFFF1F5F9)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Tune,
+                                            contentDescription = null,
+                                            tint = Color(0xFF64748B),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // Soft Rose Clean Button for Clear Loans
+                                Surface(
+                                    onClick = { showClearLoansConfirmDialog = true },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFFFFF1F2),
+                                    border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = null,
+                                            tint = Color(0xFFE11D48),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "پاکسازی وام‌ها (شروع خام برنامه)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFE11D48)
+                                        )
+                                    }
+                                }
+
+                                // Full Reset Button
+                                Surface(
+                                    onClick = { showFullResetConfirmDialog = true },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.White,
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.RestartAlt,
+                                            contentDescription = null,
+                                            tint = Color(0xFF64748B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "بازنشانی کامل (شامل کاربران)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF334155)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 3: Notifications & Daily Reminder Time
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_notifications"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "اعلان‌ها",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(brandViolet.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Notifications,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    onClick = {
+                                        onTestNotification()
+                                        Toast.makeText(context, "اعلان آزمایشی سررسید با موفقیت ارسال شد 🔔", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = brandViolet,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.NotificationAdd,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "ارسال اعلان آزمایشی",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "ساعت اعلان روزانه سررسید",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A)
+                                    )
+
+                                    Surface(
+                                        onClick = { showReminderTimePicker = true },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = brandViolet.copy(alpha = 0.08f),
+                                        border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.25f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Schedule,
+                                                contentDescription = null,
+                                                tint = brandViolet,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = reminderTimeLabel,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = brandViolet
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -823,9 +1235,7 @@ fun SettingsScreen(
         )
     }
 
-    // فیکس bug.md/NB-24: دیالوگ انتخاب ساعت اعلان روزانه — TimePicker متریال ۳
-    // با مقدار اولیهٔ ذخیره‌شده؛ انصراف هیچ تغییری نمی‌کند (فقط پس از «ثبت»
-    // onReminderTimeChange اجرا و آلارم از نو زمان‌بندی می‌شود).
+    // Modal: Reminder Time Picker Dialog
     if (showReminderTimePicker) {
         val timePickerState = rememberTimePickerState(
             initialHour = reminderHour.coerceIn(0, 23),
@@ -845,7 +1255,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     TimePicker(state = timePickerState)
                 }
             },
@@ -856,7 +1266,6 @@ fun SettingsScreen(
                         val m = timePickerState.minute
                         showReminderTimePicker = false
                         onReminderTimeChange(h, m)
-                        // فیکس bug.md/NB-42: Toast تغییر ساعت هم از تنظیم ارقام کاربر پیروی می‌کند
                         Toast.makeText(
                             context,
                             "ساعت اعلان روزانه به ${NumberFormatter.formatClock(h, m, usePersianDigits)} تغییر یافت",
@@ -875,7 +1284,7 @@ fun SettingsScreen(
         )
     }
 
-    // Modal: Blocked User Deletion Alert (if user has active shares in loans)
+    // Modal: Blocked User Deletion Alert
     userBlockedDeletionDialog?.let { (personName, loanTitles) ->
         AlertDialog(
             onDismissRequest = { userBlockedDeletionDialog = null },
@@ -889,7 +1298,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("کاربر «$personName» در وام‌های زیر دارای سهم فعال است:")
                     loanTitles.forEach { title ->
-                        Text("• $title", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("• $title", fontWeight = FontWeight.Bold, color = brandViolet)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -986,7 +1395,7 @@ fun SettingsScreen(
         )
     }
 
-    // Modal: فیکس bug.md/NB-41 — تأیید «بازنشانی کامل برنامه» (همهٔ داده‌ها + کاربران)
+    // Modal: Confirm Full Reset
     if (showFullResetConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showFullResetConfirmDialog = false },
@@ -1018,8 +1427,7 @@ fun SettingsScreen(
         )
     }
 
-    // فیکس bug.md/NB-34+NB-29: دیالوگ پیش‌نمایش + انتخاب حالت ایمپورت —
-    // پیش از تأییدِ صریح کاربر هیچ تغییری در داده انجام نمی‌شود.
+    // Modal: Import Preview Dialog
     pendingImport?.let { (importJson, preview) ->
         AlertDialog(
             onDismissRequest = {
@@ -1054,7 +1462,7 @@ fun SettingsScreen(
 
                     if (preview.legacyMatch) {
                         Text(
-                            "⚠️ برخی موارد تکراری با «کلید جایگزین» (نام کانونی / عنوان+مبلغ+ماه شروع) شناخته شده‌اند نه با شناسهٔ یکتای بکاپ؛ در ادغام، این موارد به‌جای درج دوباره به‌روزرسانی/رد می‌شوند.",
+                            "⚠️ برخی موارد تکراری با «کلید جایگزین» شناخته شده‌اند نه با شناسهٔ یکتای بکاپ؛ در ادغام، این موارد به‌جای درج دوباره به‌روزرسانی/رد می‌شوند.",
                             color = MaterialTheme.colorScheme.error,
                             fontSize = 12.sp
                         )
@@ -1120,5 +1528,271 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun UserManagementItemCard(
+    user: UserProfile,
+    canDelete: Boolean,
+    onSetPrimary: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val brandViolet = Color(0xFF6C27DF)
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (user.isPrimary) brandViolet.copy(alpha = 0.05f) else Color(0xFFFAF9FD),
+        border = BorderStroke(
+            1.dp,
+            if (user.isPrimary) brandViolet.copy(alpha = 0.25f) else Color(0xFFE2E8F0)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Line 1: Avatar, Name & Accordion Arrow
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(user.avatarColorHex)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = user.name.take(1),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        if (user.isPrimary) {
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981))
+                                    .border(1.5.dp, Color.White, CircleShape)
+                                    .align(Alignment.BottomStart)
+                            )
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = user.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (user.isPrimary) "حساب پیش‌فرض سیستم" else if (user.notes.isNotBlank()) user.notes else "شریک در وام‌ها",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                }
+
+                // Expand button
+                IconButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "جزییات",
+                        tint = Color(0xFF64748B)
+                    )
+                }
+            }
+
+            // Line 2: Status Badge and Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (user.isPrimary) {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xFFDCFCE7),
+                        border = BorderStroke(1.dp, Color(0xFF86EFAC).copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF10B981))
+                            )
+                            Text(
+                                text = "کاربر مبنا",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D)
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        onClick = onSetPrimary,
+                        shape = RoundedCornerShape(20.dp),
+                        color = brandViolet.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = brandViolet,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "انتخاب به عنوان مبنا",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = brandViolet
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "ویرایش",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    if (canDelete) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "حذف",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Line 3: Expandable Details Accordion
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.7f))
+                    if (user.notes.isNotBlank()) {
+                        Text(
+                            text = "یادداشت: ${user.notes}",
+                            fontSize = 11.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                    Text(
+                        text = if (user.isPrimary) "این کاربر به عنوان مبنای کل محاسبات مالی سیستم تنظیم شده است."
+                        else "این کاربر به عنوان طرف حساب در وام‌ها می‌تواند دارای سهم اختصاصی باشد.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Calculates Persian day of the week from Jalali date
+ */
+private fun getShamsiDayOfWeek(year: Int, month: Int, day: Int): String {
+    return try {
+        var jY = year - 979
+        var jM = month - 1
+        var jD = day - 1
+        var jDayNo = 365 * jY + (jY / 33) * 8 + ((jY % 33 + 3) / 4)
+        for (i in 0 until jM) {
+            jDayNo += if (i < 6) 31 else 30
+        }
+        jDayNo += jD
+        var gDayNo = jDayNo + 79
+        var gy = 1600 + 400 * (gDayNo / 146097)
+        gDayNo %= 146097
+        var leap = true
+        if (gDayNo >= 36525) {
+            gDayNo--
+            gy += 100 * (gDayNo / 36524)
+            gDayNo %= 36524
+            if (gDayNo >= 365) gDayNo++
+            else leap = false
+        }
+        gy += 4 * (gDayNo / 1461)
+        gDayNo %= 1461
+        if (gDayNo >= 366) {
+            leap = false
+            gDayNo--
+            gy += gDayNo / 365
+            gDayNo %= 365
+        }
+        val gDaysInMonth = intArrayOf(0, 31, if (leap) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+        var gm = 0
+        while (gm < 12 && gDayNo >= gDaysInMonth[gm + 1]) {
+            gDayNo -= gDaysInMonth[gm + 1]
+            gm++
+        }
+        val gd = gDayNo + 1
+        val cal = Calendar.getInstance().apply {
+            set(gy, gm, gd)
+        }
+        when (cal.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.SATURDAY -> "شنبه"
+            Calendar.SUNDAY -> "یکشنبه"
+            Calendar.MONDAY -> "دوشنبه"
+            Calendar.TUESDAY -> "سه‌شنبه"
+            Calendar.WEDNESDAY -> "چهارشنبه"
+            Calendar.THURSDAY -> "پنج‌شنبه"
+            Calendar.FRIDAY -> "جمعه"
+            else -> "امروز"
+        }
+    } catch (_: Exception) {
+        "امروز"
     }
 }
