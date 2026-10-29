@@ -867,3 +867,33 @@
 - ریلیزهای امروز: v1.0.8 (`cac6569`) → v1.0.9 (`93dece2`) → v1.0.10 (`3b99e17`، versionCode 11). ⚠️ v1.0.8 امروز همان versionCode 9 نسخهٔ حذف‌شدهٔ دیروز را دارد.
 - پیشنهاد: ورک‌فلو قبل از push تگ، `git ls-remote --tags` چک کند.
 - هشدار P4-6 فعال: SettingsScreen.kt اکنون ۱۷۹۹ خط، AddEditLoanDialog.kt ۱۷۷۷ خط.
+
+---
+
+## موج ۶ — فیکس باگ‌های بازبینی ۶: NB-45 تا NB-48 (۲۰۲۶-۱۰-۲۹)
+
+**تاریخ:** ۲۰۲۶-۱۰-۲۹ • توسعه روی برنچ `fix/wave-6` (unit-tests سبز — ران #۳۳ روی کامیت `bf9ce5a`)، سپس بازتولید روی main با `[skip ci]` (کامیت‌های `8d3892c` و `32e02ed` + چهار حذف آرتیفکت `8e15987`..`544bcc5`)؛ برابری بایت‌به‌بایت هر ۱۲ فایل بین main و برنچ تأیید شد.
+
+### ۱. NB-45 (P2) — مپ رنگ‌های هاردکد به MaterialTheme.colorScheme
+- **مشکل:** ۲۲۸ مورد `Color(0x…)` + ۲۸ مورد `Color.White` هاردکد در ۷ فایل بازطراحی‌شده — تنظیمات «پوسته و رنگ‌بندی» و حالت تاریک روی داشبورد/مطالبات/تنظیمات بی‌اثر بود؛ دو بنفش ناهمگون برند (`#6D28D9` و `#6C27DF`) در کد پخش بود.
+- **راه‌حل:** همهٔ مقادیر رنگ به تم مپ شدند: پس‌زمینهٔ کارت‌ها → `surface`؛ متن تیره → `onSurface`؛ متن ثانویه/خاکستری → `onSurfaceVariant`؛ بوردر/ترک‌ها → `outlineVariant` و `surfaceVariant`؛ بنفش‌های برند و گرادیان‌ها → `primary`/`secondary` پوستهٔ فعال؛ رنگ‌های وضعیت → ثابت‌های معنایی `SuccessGreen`/`WarningAmber` و `colorScheme.error` با تینت‌های alpha. سفید روی گرادیان برند (متن/آیکون/تامب سوییچ/کارت شیشه‌ای دستیار با alpha روی surface) عمداً حفظ شد. قید فنی Compose: رنگ مسیرِ گیج دایره‌ای داخل `Canvas` به متغیر محلی بیرون از DrawScope منتقل شد. import های بلااستفادهٔ `ui.graphics.Color` از FinancialSummaryCard و SmartFinancialAdvisorCard حذف و import های ثابت‌های معنایی به ۵ فایل اضافه شد. **بدون هیچ تغییر layout/ساختار — فقط مقادیر رنگ.**
+- **تأیید:** شمارش `Color(0x` در ۷ فایل بازطراحی‌شده = صفر؛ بیلد/تست سبز (ران #۳۳). تأیید بصری (۵ پوسته × روشن/تاریک) با کاربر باقی می‌ماند.
+- **فایل‌ها:** FinancialSummaryCard، LoanItemCard، SmartFinancialAdvisorCard، HomeScreen، ReceivablesScreen، SettingsScreen، MainActivity.
+
+### ۲. NB-46 (P3) — برگشت compactThousands
+- **مشکل/راه‌حل:** اعداد مبلغ در FinancialSummaryCard (ماندهٔ ماه، پرداخت‌شده، سهم ماهانه، طلب شرکا)، LoanItemCard (کل قسط، سهم شرکا، سهم شما در هر سه حالت نمایش) و ReceivablesScreen (hero مانده، کارت شریک، سطر سهم‌ها) از `formatNumber` به `formatPrice(…, withUnit = false, usePersian = …, compactThousands = …)` برگشتند (واحد «تومان» جدا ماند). چهار فراخوانی positional باگ‌دار `formatPrice(x, usePersianDigits, compactThousands)` در AddEditLoanDialog — که عملاً `withUnit = usePersianDigits` و `usePersian = compactThousands` می‌گذاشت — به آرگومان‌های named اصلاح شد.
+- **تأیید:** بیلد/تست سبز (ران #۳۳)؛ تأیید دستی toggle «۳ صفر کمتر» و ارقام فارسی/EN با کاربر.
+
+### ۳. NB-47 (P3) — کلیک نود قسط = toggle همان ماهِ (سال، ماه)
+- **مشکل:** `onNodeClick` در LoanItemCard به increment/decrement ترتیبی وصل بود — کلیک روی نود پرداخت‌نشدهٔ #۵ وقتی #۳ هم بی‌پرداخت است، #۳ را می‌پرداخت؛ کلیک روی نود پرداخت‌شدهٔ میانی آخرین رکورد را حذف می‌کرد.
+- **راه‌حل:** متد عمومی جدید `LoanRepository.toggleInstallmentMonth(loan, year, month, currentDate)` در یک تراکنش: نگاشت (سال، ماه) → شمارهٔ قسط با `installmentNumberForMonth` (خارج از بازه یا بزرگ‌تر از totalMonths = بدون عملیات)؛ رکورد موجودِ همان ماه = حذف با آینهٔ تاریخچه، نبود = درج؛ سپس `syncLoanCountersFromRecords` (شمارنده و پرچم ماه جاری همیشه همگام با رکوردها). زنجیره: MainViewModel.toggleInstallmentMonth → LoanItemCard (پارامتر جدید `onToggleInstallmentMonth(year, month)`) → HomeScreen → MainActivity. دکمه‌های +/− دستی (بند ۶ NB-31) دست‌نخورده ماندند.
+- **تست:** `LoanRepositoryIntegrityTest.nb47_toggleInstallmentMonthPaysTheExactClickedMonth` — با رکوردهای پراکنده: پرداخت مهرِ کلیک‌شده (نه شهریورِ اولین ماه بدون رکورد)؛ درج شهریور؛ حذف مردادِ میانی (نه مهرِ آخرین رکورد)؛ بدون عملیات برای آبان ۱۴۰۶ (خارج از بازهٔ ۱۲ماهه). ران #۳۳ سبز.
+- **محدودیت:** حالت‌های SQUARE و CHART در LoanItemCard نودِ قابل‌کلیک ندارند — رفتار جدید فقط حالت مستطیلیِ گسترش‌یافته را پوشش می‌دهد (همان‌طور که در بازبینی ثبت شده بود).
+
+### ۴. NB-48 (P4) — بهداشت ریپو
+- چهار آرتیفکت AI Studio در `public/assets/aistudio/` (~۱۴۰KB: Image/Paste×2/vaamyar) از گیت حذف و مسیر به `.gitignore` اضافه شد؛ import های بلااستفادهٔ `androidx.compose.foundation.lazy.grid.*` در AddEditLoanDialog حذف شد (فقط `lazy.items` واقعاً استفاده می‌شود).
+- **تأیید:** مسیر در ریپو حذف شد (۴ کامیت)؛ بیلد/تست سبز.
+
+### ۵. وضعیت CI و نسخه
+- ران #۳۳ (unit-tests روی `fix/wave-6` @ `bf9ce5a`): سبز — همهٔ تست‌ها از جمله `nb47` جدید پاس شدند.
+- پوش‌های main این موج همه با `[skip ci]` بودند — هیچ ران ریلیزی تریگ نشد؛ آخرین نسخه همچنان v1.0.10 / versionCode 11 است. ریلیز جدید فقط با دستور کاربر.
