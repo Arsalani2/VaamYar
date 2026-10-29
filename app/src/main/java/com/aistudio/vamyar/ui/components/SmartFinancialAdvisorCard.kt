@@ -19,11 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.SmartFinancialTip
+import com.aistudio.vamyar.ui.theme.SuccessGreen
+import com.aistudio.vamyar.ui.theme.WarningAmber
 import com.aistudio.vamyar.ui.TipType
 
 /**
@@ -51,8 +52,8 @@ fun SmartFinancialAdvisorCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 5.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF5FF)),
-        border = BorderStroke(1.dp, Color(0xFFDDD6FE).copy(alpha = 0.7f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -61,9 +62,9 @@ fun SmartFinancialAdvisorCard(
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color(0xFFFAF5FF),
-                            Color(0xFFF5F3FF),
-                            Color(0xFFEEF2FF)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                         )
                     )
                 )
@@ -84,13 +85,13 @@ fun SmartFinancialAdvisorCard(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF6D28D9).copy(alpha = 0.12f)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Bolt,
                             contentDescription = null,
-                            tint = Color(0xFF6D28D9),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -103,13 +104,13 @@ fun SmartFinancialAdvisorCard(
                             text = "دستیار هوشمند",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF6D28D9))
+                                .background(MaterialTheme.colorScheme.primary)
                         )
                     }
                 }
@@ -117,8 +118,8 @@ fun SmartFinancialAdvisorCard(
                 // Count Action Pill Button
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFDDD6FE)),
+                    color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                     shadowElevation = 1.dp,
                     modifier = Modifier.clickable { expanded = !expanded }
                 ) {
@@ -131,12 +132,12 @@ fun SmartFinancialAdvisorCard(
                             text = "${tips.size} پیشنهاد هوشمند",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6D28D9)
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Icon(
                             imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                             contentDescription = null,
-                            tint = Color(0xFF6D28D9),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -146,8 +147,8 @@ fun SmartFinancialAdvisorCard(
             // Top Tip Featured Preview Card
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White.copy(alpha = 0.95f),
-                border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f), // فیکس bug.md/NB-45
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onActionClick?.invoke(topTip) }
@@ -170,10 +171,10 @@ fun SmartFinancialAdvisorCard(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     when (topTip.type) {
-                                        TipType.URGENT_DUE -> Color(0xFFFEF3C7)
-                                        TipType.COLLECTION_REMINDER -> Color(0xFFFCE7F3)
-                                        TipType.LIQUIDITY_FORECAST -> Color(0xFFEDE9FE)
-                                        else -> Color(0xFFECFDF5)
+                                        TipType.URGENT_DUE -> WarningAmber.copy(alpha = 0.12f)
+                                        TipType.COLLECTION_REMINDER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+                                        TipType.LIQUIDITY_FORECAST -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        else -> SuccessGreen.copy(alpha = 0.1f)
                                     }
                                 ),
                             contentAlignment = Alignment.Center
@@ -187,10 +188,10 @@ fun SmartFinancialAdvisorCard(
                                 },
                                 contentDescription = null,
                                 tint = when (topTip.type) {
-                                    TipType.URGENT_DUE -> Color(0xFFD97706)
-                                    TipType.COLLECTION_REMINDER -> Color(0xFFBE185D)
-                                    TipType.LIQUIDITY_FORECAST -> Color(0xFF6D28D9)
-                                    else -> Color(0xFF059669)
+                                    TipType.URGENT_DUE -> WarningAmber
+                                    TipType.COLLECTION_REMINDER -> MaterialTheme.colorScheme.secondary
+                                    TipType.LIQUIDITY_FORECAST -> MaterialTheme.colorScheme.primary
+                                    else -> SuccessGreen
                                 },
                                 modifier = Modifier.size(18.dp)
                             )
@@ -201,12 +202,12 @@ fun SmartFinancialAdvisorCard(
                                 text = topTip.title,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = topTip.description,
                                 fontSize = 11.sp,
-                                color = Color(0xFF64748B),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
                             )
                         }
@@ -215,15 +216,15 @@ fun SmartFinancialAdvisorCard(
                     topTip.actionText?.let { actionLabel ->
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFF5F3FF),
-                            border = BorderStroke(1.dp, Color(0xFFDDD6FE).copy(alpha = 0.6f)),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                             modifier = Modifier.clickable { onActionClick?.invoke(topTip) }
                         ) {
                             Text(
                                 text = actionLabel,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF6D28D9),
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -244,8 +245,8 @@ fun SmartFinancialAdvisorCard(
                     tips.drop(1).forEach { tip ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color.White.copy(alpha = 0.9f),
-                            border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f), // فیکس bug.md/NB-45
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onActionClick?.invoke(tip) }
@@ -266,13 +267,13 @@ fun SmartFinancialAdvisorCard(
                                         modifier = Modifier
                                             .size(28.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFEDE9FE)),
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.TipsAndUpdates,
                                             contentDescription = null,
-                                            tint = Color(0xFF6D28D9),
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(15.dp)
                                         )
                                     }
@@ -281,12 +282,12 @@ fun SmartFinancialAdvisorCard(
                                             text = tip.title,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF1E293B)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = tip.description,
                                             fontSize = 10.sp,
-                                            color = Color(0xFF64748B)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -296,7 +297,7 @@ fun SmartFinancialAdvisorCard(
                                         text = label,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF6D28D9)
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }

@@ -61,6 +61,8 @@ fun HomeScreen(
     onTogglePaidThisMonth: (Loan) -> Unit,
     onIncrementPaid: (Loan) -> Unit,
     onDecrementPaid: (Loan) -> Unit,
+    // فیکس bug.md/NB-47: toggle ماهِ واقعیِ (سال، ماه) کلیک‌شده روی نود اقساط
+    onToggleInstallmentMonth: (Loan, year: Int, month: Int) -> Unit,
     arrearsPrompt: ArrearsPrompt?,
     onPayOnlyCurrentMonth: (Loan) -> Unit,
     onPayAllArrears: (Loan) -> Unit,
@@ -143,6 +145,9 @@ fun HomeScreen(
                         onTogglePaidThisMonth = { onTogglePaidThisMonth(loan) },
                         onIncrementPaid = { onIncrementPaid(loan) },
                         onDecrementPaid = { onDecrementPaid(loan) },
+                        onToggleInstallmentMonth = { year, month ->
+                            onToggleInstallmentMonth(loan, year, month)
+                        },
                         onEdit = { loanToEdit = loan },
                         onDelete = { loanToDelete = loan }
                     )
@@ -266,6 +271,9 @@ fun HomeScreen(
                             onTogglePaidThisMonth = { onTogglePaidThisMonth(loan) },
                             onIncrementPaid = { onIncrementPaid(loan) },
                             onDecrementPaid = { onDecrementPaid(loan) },
+                            onToggleInstallmentMonth = { year, month ->
+                                onToggleInstallmentMonth(loan, year, month)
+                            },
                             onEdit = { loanToEdit = loan },
                             onDelete = { loanToDelete = loan }
                         )
@@ -294,7 +302,7 @@ fun HomeScreen(
                         .fillMaxSize()
                         .background(
                             androidx.compose.ui.graphics.Brush.linearGradient(
-                                listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
+                                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                             )
                         ),
                     contentAlignment = Alignment.Center
@@ -560,7 +568,7 @@ private fun ViewModePillButton(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (selected) Color(0xFF6D28D9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp)
             )
             if (selected) {
@@ -568,7 +576,7 @@ private fun ViewModePillButton(
                     text = label,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6D28D9)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

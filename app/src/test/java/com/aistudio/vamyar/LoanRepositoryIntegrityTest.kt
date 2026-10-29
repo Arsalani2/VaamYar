@@ -860,4 +860,40 @@ class LoanRepositoryIntegrityTest {
         assertTrue(currentLoan(loan.id).isCompleted)
     }
 
+    @Test
+    fun nb47_toggleInstallmentMonthPaysTheExactClickedMonth() = runBlocking {
+        val cur = ShamsiDate(1405, 8, 15) // آبان؛ وام تیرِ ۱۴۰۵: قسط ۱=تیر(۴)، ۲=مرداد(۵)، ۳=شهریور(۶)، ۴=مهر(۷)، ۵=آبان(۸)
+        val loan = insertLoanStartingTir(paidMonths = 2) // رکوردهای واقعی: تیر و مرداد
+
+        // کلیک روی نودِ «مهر» (قسط ۴، پرداخت‌نشده): باید همان مهر پرداخت شود،
+        // نه اولین ماه بدون رکورد (شهریور) — رفتار قدیمیِ onNodeClick ترتیبی NB-47
+        repository.toggleInstallmentMonth(currentLoan(loan.id), 1405, 7, cur)
+        var records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        assertEquals(listOf(4, 5, 7), records.map { it.month }) // مهر (۷) نه شهریور (۶)
+        assertEquals(3, currentLoan(loan.id).paidMonths)
+        assertFalse(currentLoan(loan.id).isCurrentMonthPaid) // آبان هنوز بی‌پرداخت
+
+        // کلیک روی نودِ «شهریور» (قسط ۳): همان ماه درج می‌شود؛ اکنون تیر..مهر پیوسته
+        repository.toggleInstallmentMonth(currentLoan(loan.id), 1405, 6, cur)
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        assertEquals(listOf(4, 5, 6, 7), records.map { it.month })
+        assertEquals(4, currentLoan(loan.id).paidMonths)
+
+        // کلیک روی نودِ «مرداد» (قسط ۲، پرداخت‌شدهٔ میانی): فقط همان ماه حذف می‌شود،
+        // نه آخرین رکورد (مهر) — باگ قدیمیِ «کلیک روی نود پرداخت‌شده = پس‌گرفتن آخرین قسط»
+        repository.toggleInstallmentMonth(currentLoan(loan.id), 1405, 5, cur)
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+            .sortedBy { it.installmentNumber }
+        assertEquals(listOf(4, 6, 7), records.map { it.month })
+        assertEquals(3, currentLoan(loan.id).paidMonths)
+
+        // ماهِ خارج از بازهٔ اقساط (آبان ۱۴۰۶ > خرداد ۱۴۰۶ = قسط ۱۲): بدون عملیات
+        repository.toggleInstallmentMonth(currentLoan(loan.id), 1406, 8, cur)
+        records = db.loanInstallmentDao().getInstallmentsForLoanOnce(loan.id)
+        assertEquals(3, records.size)
+        assertEquals(3, currentLoan(loan.id).paidMonths)
+    }
+
 }
