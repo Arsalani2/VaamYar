@@ -1,0 +1,847 @@
+<!-- بازطراحی داشبورد اقساط (وام‌یار) -->
+<!DOCTYPE html><html dir="rtl" lang="fa" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>وامیار | مدیریت هوشمند اقساط و وام‌ها</title>
+<!-- Tailwind CSS CDN with forms and container plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration for Persian Fintech Aesthetic -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95',
+            },
+            surface: {
+              50: '#fafbfd',
+              100: '#f3f4f8',
+              card: '#ffffff',
+            }
+          },
+          fontFamily: {
+            sans: ['Vazirmatn', 'Shabnam', 'IRANSans', 'Tahoma', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 20px -2px rgba(124, 58, 237, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04)',
+            'card-hover': '0 10px 25px -4px rgba(124, 58, 237, 0.1), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+            'fab': '0 8px 24px -2px rgba(109, 40, 217, 0.45)',
+          },
+          borderRadius: {
+            '2xl': '1.25rem',
+            '3xl': '1.75rem',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Web Fonts for crisp Persian Typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<style data-purpose="base-styling">
+    body {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      background-color: #f7f8fc;
+    }
+
+    /* Smooth Progress Transitions */
+    .progress-bar-fill {
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* iOS safe areas support */
+    .ios-safe-top {
+      padding-top: env(safe-area-inset-top, 16px);
+    }
+    .ios-safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900 pb-28">
+<!-- Mobile Viewport Wrapper (Standard iPhone / Android Dimensions) -->
+<div class="max-w-md mx-auto min-h-screen relative flex flex-col bg-surface-50 shadow-2xl overflow-x-hidden border-x border-slate-100">
+<!-- BEGIN: TopHeader -->
+<header class="ios-safe-top sticky top-0 z-30 bg-surface-50/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-100">
+<div class="flex items-center justify-between">
+<!-- Logo and App Title -->
+<div class="flex items-center gap-2">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-700 via-brand-600 to-indigo-500 flex items-center justify-center shadow-md shadow-brand-500/20 text-white">
+
+</div>
+<span class="text-xl font-black tracking-tight text-slate-900">وام‌یار</span>
+</div>
+<!-- Account Profile Selector Dropdown Badge -->
+<button aria-label="انتخاب کاربر" class="group flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-full shadow-sm transition active:scale-95" type="button">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span class="text-xs font-semibold text-slate-700">مبنا: کاربر اصلی</span>
+<svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-3 space-y-4">
+<!-- BEGIN: MonthlySummaryCard -->
+<!-- Overview Card with Total Unpaid Installment, Paid Status, and Partner Debts -->
+<section class="bg-gradient-to-br from-white to-slate-50/80 rounded-3xl p-5 border border-slate-200/70 shadow-card relative overflow-hidden" data-purpose="monthly-overview"><div class="absolute -top-12 -left-12 w-36 h-36 bg-brand-500/10 rounded-full blur-2xl pointer-events-none"></div><div class="relative z-10 flex flex-col gap-4"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="text-xs font-semibold text-slate-500">مانده اقساط پرداخت‌نشده</span></div><span class="bg-brand-50 border border-brand-200/50 text-brand-700 text-[11px] font-bold px-2.5 py-1 rounded-lg">آبان ماه</span></div><div class="flex items-baseline gap-1.5"><span class="text-3xl font-extrabold text-slate-900 tracking-tight">۲,۲۳۳,۲۲۷</span><span class="text-xs font-medium text-slate-500">تومان</span></div><div class="pt-3.5 border-t border-dashed border-slate-200 grid grid-cols-2 gap-3 text-xs"><div><div class="text-slate-400 font-medium mb-1 text-[11px]">پرداخت‌شده این ماه</div><div class="text-slate-800 font-bold text-xs">۱,۸۳۰,۵۲۶ <span class="text-[10px] font-normal text-slate-400">از ۴,۰۶۳,۷۵۳</span></div></div><div class="text-left border-r border-slate-100 pr-3"><div class="text-rose-500/90 font-medium mb-1 text-[11px]">طلب باقیمانده از شرکا</div><div class="text-rose-600 font-bold text-xs">۱,۸۲۲,۰۰۰ <span class="text-[10px] font-normal text-rose-500/80">تومان</span></div></div></div><div class="pt-2"><div class="flex justify-between items-center text-xs mb-2 font-medium"><span class="text-slate-500 text-[11px]">پیشرفت تسویه اقساط</span><span class="text-brand-700 font-bold text-xs">۳۰٪</span></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="progress-bar-fill h-full bg-gradient-to-l from-brand-600 to-indigo-500 rounded-full" style="width: 30%"></div></div></div></div></section>
+<!-- END: MonthlySummaryCard -->
+<!-- BEGIN: SmartAdvisorBanner -->
+<!-- AI/Rule Based Smart Financial Assistant Prompt -->
+<section class="bg-gradient-to-r from-purple-50/80 to-indigo-50/60 border border-purple-200/70 rounded-2xl p-4 shadow-sm relative overflow-hidden space-y-3" data-purpose="smart-advisor"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-xl bg-purple-600/10 text-brand-600 flex items-center justify-center shrink-0"><svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="flex items-center gap-1.5"><span class="text-xs font-bold text-slate-800">دستیار هوشمند</span><span class="flex h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse"></span></div></div><button aria-label="مشاهده ۵ پیشنهاد هوشمند" class="flex items-center gap-1.5 text-xs font-bold text-brand-700 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-full shadow-xs border border-brand-200 transition" type="button"><span class="">۵ پیشنهاد هوشمند</span><svg class="w-3.5 h-3.5 rotate-180 text-brand-600" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path></svg></button></div><div class="bg-white/80 rounded-xl p-3 border border-purple-100 flex items-center justify-between gap-3"><div class="flex items-center gap-2 min-w-0"><div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"></circle><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="min-w-0"><div class="text-xs font-bold text-slate-800 truncate">بانک خاورمیانه زهرا</div><div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5"><span class="">سررسید قسط</span><span class="text-slate-300">•</span><span class="inline-flex items-center text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">۵ روز دیگر</span></div></div></div><div class="text-left shrink-0"><div class="text-xs font-bold text-slate-900">۱,۳۵۰,۰۰۰ <span class="text-[10px] font-normal text-slate-500">تومان</span></div><div class="text-[10px] text-slate-400 mt-0.5">مبلغ سهم شما</div></div></div></section>
+<!-- END: SmartAdvisorBanner -->
+<!-- BEGIN: ListHeaderAndFilterTabs -->
+<!-- Section Title and View Switcher Control -->
+<section class="pt-2">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
+<span class="">فهرست اقساط</span>
+
+</h2>
+<!-- View Switcher (Segmented Control) -->
+<div class="bg-slate-200/70 p-0.5 rounded-xl flex items-center text-xs font-medium text-slate-600" role="tablist">
+<!-- Rectangular (Active) -->
+<button aria-selected="true" class="bg-white text-brand-700 shadow-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition" role="tab">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<rect height="5" rx="1.5" width="18" x="3" y="5"></rect>
+<rect height="5" rx="1.5" width="18" x="3" y="14"></rect>
+</svg>
+
+</button>
+<!-- Grid -->
+<button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition" role="tab">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+
+</button>
+<!-- Chart -->
+<button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition" role="tab">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+<path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+</svg>
+
+</button>
+</div>
+</div>
+</section>
+<!-- END: ListHeaderAndFilterTabs -->
+<!-- BEGIN: LoansListSection -->
+<div class="space-y-3.5" data-purpose="loan-cards-container">
+<!-- CARD 1: Azki Insurance (بیمه ازکی) -->
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-4 transition-all hover:border-brand-300" data-purpose="loan-card-azki">
+<!-- Card Header -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<!-- Azki Stylized Brand Icon -->
+<div class="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center p-1.5 shadow-xs">
+<span class="text-sky-600 font-black text-sm tracking-tighter">azki</span>
+</div>
+<div>
+<h3 class="text-sm font-bold text-slate-900">بیمه ازکی</h3>
+<span class="text-xs text-slate-400 font-medium">هشتم هر ماه</span>
+</div>
+</div>
+<!-- Status Indicator -->
+<span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">پرداخت شد</span>
+</span>
+</div>
+<!-- Amount details -->
+<div class="mt-4 flex items-baseline justify-between">
+<span class="text-xs font-medium text-slate-500">قسط سهم شما:</span>
+<div class="text-base font-extrabold text-slate-900">
+              ۸۹۰,۰۰۰ <span class="text-xs font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress -->
+<div class="mt-3">
+<div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+<span class="">۲ از ۱۰ قسط پرداخت شده</span>
+<span class="font-bold text-brand-700">۲۰٪</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-brand-600 rounded-full" style="width: 20%"></div>
+</div>
+</div>
+<!-- Bottom Action Drawer Trigger -->
+<div class="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-brand-600 font-medium">
+<button class="flex items-center gap-1 hover:text-brand-800 transition" type="button">
+
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+
+</div>
+</article>
+<!-- CARD 2: Middle East Bank (بانک خاورمیانه) -->
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-4 transition-all hover:border-brand-300" data-purpose="loan-card-middle-east-bank">
+<!-- Card Header -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<!-- Middle East Bank Stylized Icon -->
+<div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center p-1.5 shadow-xs">
+<svg class="w-7 h-7 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-sm font-bold text-slate-900">بانک خاورمیانه</h3>
+<span class="text-xs text-slate-400 font-medium">هشتم هر ماه</span>
+</div>
+</div>
+<!-- Status Indicator -->
+<span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="">پرداخت شد</span>
+</span>
+</div>
+<!-- Multi-party breakdown section -->
+<div class="mt-3.5 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 space-y-1 text-xs">
+<div class="flex justify-between items-center text-slate-600">
+<span class="">کل قسط:</span>
+<span class="font-semibold text-slate-800">۱,۸۸۱,۵۲۶ تومان</span>
+</div>
+<div class="flex justify-between items-center text-rose-500 font-medium">
+<span class="">سهم شرکا:</span>
+<span class="">۹۴۱,۰۰۰ تومان</span>
+</div>
+</div>
+<!-- User Share Amount -->
+<div class="mt-3 flex items-baseline justify-between">
+<span class="text-xs font-semibold text-slate-600">قسط سهم شما:</span>
+<div class="text-base font-extrabold text-slate-900">
+              ۹۴۰,۵۲۶ <span class="text-xs font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress -->
+<div class="mt-3">
+<div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+<span class="">۴ از ۱۲ قسط پرداخت شده</span>
+<span class="font-bold text-brand-700">۳۳٪</span>
+</div>
+<div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-brand-600 rounded-full" style="width: 33%"></div>
+</div>
+</div>
+<!-- Bottom Action Drawer Trigger -->
+<div class="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-brand-600 font-medium">
+<button class="flex items-center gap-1 hover:text-brand-800 transition" type="button">
+
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+
+</div>
+</article>
+<!-- CARD 3: Middle East Bank - Zahra (بانک خاورمیانه زهرا) -->
+<article class="bg-white rounded-2xl border-2 border-amber-200/90 shadow-card p-4 transition-all hover:border-brand-400 relative overflow-hidden" data-purpose="loan-card-zahra">
+<!-- Pending highlight bar on the side -->
+<div class="absolute top-0 right-0 w-1.5 h-full bg-amber-400"></div>
+<!-- Card Header -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center p-1.5 shadow-xs">
+<svg class="w-7 h-7 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-sm font-bold text-slate-900">بانک خاورمیانه زهرا</h3>
+<span class="text-xs text-slate-400 font-medium">هشتم هر ماه</span>
+</div>
+</div>
+<!-- Status Indicator: Pending due date -->
+<span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+<span class="">در انتظار پرداخت (۵ روز)</span>
+</span>
+</div>
+<!-- User Share Amount -->
+<div class="mt-4 flex items-baseline justify-between">
+<span class="text-xs font-semibold text-slate-600">قسط سهم شما:</span>
+<div class="text-lg font-black text-brand-700">
+              ۱,۳۵۰,۰۰۰ <span class="text-xs font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Immediate Action Button for upcoming unpaid installment -->
+<div class="mt-3.5 pt-3 border-t border-slate-100 flex gap-2">
+<button class="flex-1 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold py-2.5 rounded-xl shadow-sm transition active:scale-98 flex items-center justify-center gap-1.5" type="button">
+<span class="">پرداخت سریع قسط</span>
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+
+</div>
+</article>
+</div>
+<!-- END: LoansListSection -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: FloatingActionButton -->
+<!-- Primary CTA to Add New Installment / Loan -->
+<div class="fixed bottom-20 left-6 z-40 max-w-md">
+<button aria-label="افزودن قسط یا وام جدید" class="w-14 h-14 bg-gradient-to-tr from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white rounded-2xl flex items-center justify-center shadow-fab transition-transform active:scale-95 group focus:outline-none focus:ring-4 focus:ring-brand-500/30" type="button">
+<svg class="w-7 h-7 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+<!-- END: FloatingActionButton -->
+<!-- BEGIN: BottomNavigation -->
+<!-- iOS Styled Modern Tab Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 ios-safe-bottom" data-purpose="bottom-navbar">
+<div class="grid grid-cols-3 h-16 items-center px-4">
+<!-- Tab 1: Installments (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center gap-1 group relative text-brand-600" href="#installments">
+<div class="relative">
+<svg class="w-6 h-6 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="w-1.5 h-1.5 bg-brand-600 rounded-full absolute -top-0.5 -right-0.5"></span>
+</div>
+<span class="text-[11px] font-bold">اقساط</span>
+</a>
+<!-- Tab 2: Receivables (مطالبات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#receivables">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">مطالبات</span>
+</a>
+<!-- Tab 3: Settings (تنظیمات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#settings">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">تنظیمات</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+</div>
+
+
+</body></html>
+
+<!-- داشبورد اقساط - حالت مربعی (وام‌یار) -->
+<!DOCTYPE html><html dir="rtl" lang="fa" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>وامیار | مدیریت هوشمند اقساط و وام‌ها</title>
+<!-- Tailwind CSS CDN with forms and container plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration for Persian Fintech Aesthetic -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95',
+            },
+            surface: {
+              50: '#fafbfd',
+              100: '#f3f4f8',
+              card: '#ffffff',
+            }
+          },
+          fontFamily: {
+            sans: ['Vazirmatn', 'Shabnam', 'IRANSans', 'Tahoma', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 20px -2px rgba(124, 58, 237, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04)',
+            'card-hover': '0 10px 25px -4px rgba(124, 58, 237, 0.1), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+            'fab': '0 8px 24px -2px rgba(109, 40, 217, 0.45)',
+          },
+          borderRadius: {
+            '2xl': '1.25rem',
+            '3xl': '1.75rem',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Web Fonts for crisp Persian Typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<style data-purpose="base-styling">
+    body {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      background-color: #f7f8fc;
+    }
+
+    /* Smooth Progress Transitions */
+    .progress-bar-fill {
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* iOS safe areas support */
+    .ios-safe-top {
+      padding-top: env(safe-area-inset-top, 16px);
+    }
+    .ios-safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900 pb-28">
+<!-- Mobile Viewport Wrapper (Standard iPhone / Android Dimensions) -->
+<div class="max-w-md mx-auto min-h-screen relative flex flex-col bg-surface-50 shadow-2xl overflow-x-hidden border-x border-slate-100">
+<!-- BEGIN: TopHeader -->
+<header class="ios-safe-top sticky top-0 z-30 bg-surface-50/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-100">
+<div class="flex items-center justify-between">
+<!-- Logo and App Title -->
+<div class="flex items-center gap-2">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-700 via-brand-600 to-indigo-500 flex items-center justify-center shadow-md shadow-brand-500/20 text-white">
+</div>
+<span class="text-xl font-black tracking-tight text-slate-900">وام‌یار</span>
+</div>
+<!-- Account Profile Selector Dropdown Badge -->
+<button aria-label="انتخاب کاربر" class="group flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-full shadow-sm transition active:scale-95" type="button">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span class="text-xs font-semibold text-slate-700">مبنا: کاربر اصلی</span>
+<svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-3 space-y-4">
+<!-- BEGIN: MonthlySummaryCard -->
+<!-- Overview Card with Total Unpaid Installment, Paid Status, and Partner Debts -->
+<section class="bg-gradient-to-br from-white to-slate-50/80 rounded-3xl p-5 border border-slate-200/70 shadow-card relative overflow-hidden" data-purpose="monthly-overview"><div class="absolute -top-12 -left-12 w-36 h-36 bg-brand-500/10 rounded-full blur-2xl pointer-events-none"></div><div class="relative z-10 flex flex-col gap-4"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="text-xs font-semibold text-slate-500">مانده اقساط پرداخت‌نشده</span></div><span class="bg-brand-50 border border-brand-200/50 text-brand-700 text-[11px] font-bold px-2.5 py-1 rounded-lg">آبان ماه</span></div><div class="flex items-baseline gap-1.5"><span class="text-3xl font-extrabold text-slate-900 tracking-tight">۲,۲۳۳,۲۲۷</span><span class="text-xs font-medium text-slate-500">تومان</span></div><div class="pt-3.5 border-t border-dashed border-slate-200 grid grid-cols-2 gap-3 text-xs"><div><div class="text-slate-400 font-medium mb-1 text-[11px]">پرداخت‌شده این ماه</div><div class="text-slate-800 font-bold text-xs">۱,۸۳۰,۵۲۶ <span class="text-[10px] font-normal text-slate-400">از ۴,۰۶۳,۷۵۳</span></div></div><div class="text-left border-r border-slate-100 pr-3"><div class="text-rose-500/90 font-medium mb-1 text-[11px]">طلب باقیمانده از شرکا</div><div class="text-rose-600 font-bold text-xs">۱,۸۲۲,۰۰۰ <span class="text-[10px] font-normal text-rose-500/80">تومان</span></div></div></div><div class="pt-2"><div class="flex justify-between items-center text-xs mb-2 font-medium"><span class="text-slate-500 text-[11px]">پیشرفت تسویه اقساط</span><span class="text-brand-700 font-bold text-xs">۳۰٪</span></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="progress-bar-fill h-full bg-gradient-to-l from-brand-600 to-indigo-500 rounded-full" style="width: 30%"></div></div></div></div></section>
+<!-- END: MonthlySummaryCard -->
+<!-- BEGIN: SmartAdvisorBanner -->
+<!-- AI/Rule Based Smart Financial Assistant Prompt -->
+<section class="bg-gradient-to-r from-purple-50/80 to-indigo-50/60 border border-purple-200/70 rounded-2xl p-4 shadow-sm relative overflow-hidden space-y-3" data-purpose="smart-advisor"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-xl bg-purple-600/10 text-brand-600 flex items-center justify-center shrink-0"><svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="flex items-center gap-1.5"><span class="text-xs font-bold text-slate-800">دستیار هوشمند</span><span class="flex h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse"></span></div></div><button aria-label="مشاهده ۵ پیشنهاد هوشمند" class="flex items-center gap-1.5 text-xs font-bold text-brand-700 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-full shadow-xs border border-brand-200 transition" type="button"><span class="">۵ پیشنهاد هوشمند</span><svg class="w-3.5 h-3.5 rotate-180 text-brand-600" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path></svg></button></div><div class="bg-white/80 rounded-xl p-3 border border-purple-100 flex items-center justify-between gap-3"><div class="flex items-center gap-2 min-w-0"><div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"></circle><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="min-w-0"><div class="text-xs font-bold text-slate-800 truncate">بانک خاورمیانه زهرا</div><div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5"><span class="">سررسید قسط</span><span class="text-slate-300">•</span><span class="inline-flex items-center text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">۵ روز دیگر</span></div></div></div><div class="text-left shrink-0"><div class="text-xs font-bold text-slate-900">۱,۳۵۰,۰۰۰ <span class="text-[10px] font-normal text-slate-500">تومان</span></div><div class="text-[10px] text-slate-400 mt-0.5">مبلغ سهم شما</div></div></div></section>
+<!-- END: SmartAdvisorBanner -->
+<!-- BEGIN: ListHeaderAndFilterTabs -->
+<!-- Section Title and View Switcher Control -->
+<section class="pt-2">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
+<span class="">فهرست اقساط</span>
+</h2>
+<!-- View Switcher (Segmented Control) -->
+<div class="bg-slate-200/70 p-0.5 rounded-xl flex items-center text-xs font-medium text-slate-600" role="tablist"><!-- Rectangular (Inactive) -->
+<button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition text-slate-500" role="tab" title="مستطیلی">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<rect height="5" rx="1.5" width="18" x="3" y="5"></rect>
+<rect height="5" rx="1.5" width="18" x="3" y="14"></rect>
+</svg>
+</button>
+<!-- Grid / Square (Active) -->
+<button aria-selected="true" class="bg-white text-brand-700 shadow-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition font-bold" role="tab" title="مربعی">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<rect height="7" rx="1" width="7" x="3" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="3"></rect>
+<rect height="7" rx="1" width="7" x="14" y="14"></rect>
+<rect height="7" rx="1" width="7" x="3" y="14"></rect>
+</svg>
+
+</button>
+<!-- Chart (Inactive) -->
+<button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition text-slate-500" role="tab" title="نموداری">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+<path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+</svg>
+</button></div>
+</div>
+</section>
+<!-- END: ListHeaderAndFilterTabs -->
+<!-- BEGIN: LoansListSection -->
+<div class="grid grid-cols-2 gap-3 pb-2" data-purpose="loan-cards-container">
+<!-- CARD 1: Azki Insurance (بیمه ازکی) -->
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-3 flex flex-col justify-between relative transition-all hover:border-brand-300 hover:shadow-md">
+<!-- Top: Status & Brand Icon -->
+<div class="flex items-start justify-between"><div class="w-8 h-8 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center shadow-xs">
+<span class="text-sky-600 font-black text-xs tracking-tighter">azki</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+<span class="">پرداخت شد</span>
+</span></div>
+<!-- Middle: Title & Amount -->
+<div class="mt-2.5">
+<h3 class="text-xs font-bold text-slate-900 truncate">بیمه ازکی</h3>
+<div class="text-[10px] text-slate-400 font-medium mt-0.5">سهم شما</div>
+<div class="text-xs font-extrabold text-slate-900 mt-0.5">
+۸۹۰,۰۰۰ <span class="text-[10px] font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-brand-600 rounded-full" style="width: 20%"></div>
+</div>
+<!-- Bottom: Action & Counter -->
+<div class="mt-2 flex items-center justify-between pt-1.5 border-t border-slate-100/80"><span class="text-[10px] font-medium text-slate-400">۲/۱۰</span>
+<button aria-label="پرداخت‌شده" class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs hover:bg-emerald-600 transition active:scale-95" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button></div>
+</article>
+<!-- CARD 2: Middle East Bank (بانک خاورمیانه) -->
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-3 flex flex-col justify-between relative transition-all hover:border-brand-300 hover:shadow-md">
+<!-- Top: Status & Bank Icon -->
+<div class="flex items-start justify-between"><div class="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shadow-xs">
+<svg class="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path>
+</svg>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+<span class="">پرداخت شد</span>
+</span></div>
+<!-- Middle: Title & Amount -->
+<div class="mt-2.5">
+<h3 class="text-xs font-bold text-slate-900 truncate">بانک خاورمیانه</h3>
+<div class="text-[10px] text-slate-400 font-medium mt-0.5">سهم شما</div>
+<div class="text-xs font-extrabold text-slate-900 mt-0.5">
+۹۴۰,۵۲۶ <span class="text-[10px] font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-brand-600 rounded-full" style="width: 33%"></div>
+</div>
+<!-- Bottom: Action & Counter -->
+<div class="mt-2 flex items-center justify-between pt-1.5 border-t border-slate-100/80"><span class="text-[10px] font-medium text-slate-400">۴/۱۲</span>
+<button aria-label="پرداخت‌شده" class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs hover:bg-emerald-600 transition active:scale-95" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button></div>
+</article>
+<!-- CARD 3: Middle East Bank - Zahra (بانک خاورمیانه زهرا) -->
+<article class="bg-white rounded-2xl border-2 border-amber-200/90 shadow-card p-3 flex flex-col justify-between relative transition-all hover:border-brand-400 hover:shadow-md">
+<!-- Top: Due Date Badge & Bank Icon -->
+<div class="flex items-start justify-between"><div class="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shadow-xs">
+<svg class="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path>
+</svg>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+<span class="">هشتم</span>
+</span></div>
+<!-- Middle: Title & Amount -->
+<div class="mt-2.5">
+<h3 class="text-xs font-bold text-slate-900 truncate">بانک خاورمیانه زهرا</h3>
+<div class="text-[10px] text-slate-400 font-medium mt-0.5">سهم شما</div>
+<div class="text-xs font-extrabold text-brand-700 mt-0.5">
+۱,۳۵۰,۰۰۰ <span class="text-[10px] font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 8%"></div>
+</div>
+<!-- Bottom: Action & Counter -->
+<div class="mt-2 flex items-center justify-between pt-1.5 border-t border-slate-100/80"><span class="text-[10px] font-medium text-slate-400">۱/۱۲</span>
+<button aria-label="پرداخت سریع قسط" class="w-6 h-6 rounded-full bg-brand-50 hover:bg-brand-600 text-brand-700 hover:text-white border border-brand-200 flex items-center justify-center shadow-xs transition active:scale-95 group" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button></div>
+</article>
+<!-- CARD 4: BluBank (بلوبانک) -->
+<article class="bg-white rounded-2xl border border-slate-200/80 shadow-card p-3 flex flex-col justify-between relative transition-all hover:border-brand-300 hover:shadow-md">
+<!-- Top: Due Date Badge & Blu Icon -->
+<div class="flex items-start justify-between"><div class="w-8 h-8 rounded-xl bg-sky-500 text-white flex items-center justify-center font-bold text-xs shadow-xs tracking-tight">
+<span class="">blu</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+<span class="">۲۷م</span>
+</span></div>
+<!-- Middle: Title & Amount -->
+<div class="mt-2.5">
+<h3 class="text-xs font-bold text-slate-900 truncate">بلوبانک</h3>
+<div class="text-[10px] text-slate-400 font-medium mt-0.5">سهم شما</div>
+<div class="text-xs font-extrabold text-slate-900 mt-0.5">
+۸۸۳,۲۲۷ <span class="text-[10px] font-normal text-slate-500">تومان</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+<div class="h-full bg-sky-500 rounded-full" style="width: 66%"></div>
+</div>
+<!-- Bottom: Action & Counter -->
+<div class="mt-2 flex items-center justify-between pt-1.5 border-t border-slate-100/80"><span class="text-[10px] font-medium text-slate-400">۴/۶</span>
+<button aria-label="پرداخت سریع قسط" class="w-6 h-6 rounded-full bg-brand-50 hover:bg-brand-600 text-brand-700 hover:text-white border border-brand-200 flex items-center justify-center shadow-xs transition active:scale-95 group" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button></div>
+</article>
+</div>
+<!-- END: LoansListSection -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: FloatingActionButton -->
+<!-- Primary CTA to Add New Installment / Loan -->
+<div class="fixed bottom-20 left-6 z-40 max-w-md">
+<button aria-label="افزودن قسط یا وام جدید" class="w-14 h-14 bg-gradient-to-tr from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white rounded-2xl flex items-center justify-center shadow-fab transition-transform active:scale-95 group focus:outline-none focus:ring-4 focus:ring-brand-500/30" type="button">
+<svg class="w-7 h-7 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+<!-- END: FloatingActionButton -->
+<!-- BEGIN: BottomNavigation -->
+<!-- iOS Styled Modern Tab Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 ios-safe-bottom" data-purpose="bottom-navbar">
+<div class="grid grid-cols-3 h-16 items-center px-4">
+<!-- Tab 1: Installments (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center gap-1 group relative text-brand-600" href="#installments">
+<div class="relative">
+<svg class="w-6 h-6 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="w-1.5 h-1.5 bg-brand-600 rounded-full absolute -top-0.5 -right-0.5"></span>
+</div>
+<span class="text-[11px] font-bold">اقساط</span>
+</a>
+<!-- Tab 2: Receivables (مطالبات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#receivables">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">مطالبات</span>
+</a>
+<!-- Tab 3: Settings (تنظیمات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#settings">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">تنظیمات</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+</div>
+
+
+
+
+</body></html>
+
+<!-- داشبورد اقساط - حالت نموداری (وام‌یار) -->
+<!DOCTYPE html><html dir="rtl" lang="fa"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>داشبورد اقساط - حالت نموداری (وام‌یار)</title>
+<!-- Tailwind CSS CDN with forms and container plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration for Persian Fintech Aesthetic -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95',
+            },
+            surface: {
+              50: '#fafbfd',
+              100: '#f3f4f8',
+              card: '#ffffff',
+            }
+          },
+          fontFamily: {
+            sans: ['Vazirmatn', 'Shabnam', 'IRANSans', 'Tahoma', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 20px -2px rgba(124, 58, 237, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04)',
+            'card-hover': '0 10px 25px -4px rgba(124, 58, 237, 0.1), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+            'fab': '0 8px 24px -2px rgba(109, 40, 217, 0.45)',
+          },
+          borderRadius: {
+            '2xl': '1.25rem',
+            '3xl': '1.75rem',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Web Fonts for crisp Persian Typography -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<style data-purpose="base-styling">
+    body {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      background-color: #f7f8fc;
+    }
+
+    /* Smooth Progress Transitions */
+    .progress-bar-fill {
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* iOS safe areas support */
+    .ios-safe-top {
+      padding-top: env(safe-area-inset-top, 16px);
+    }
+    .ios-safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900 pb-28">
+<!-- Mobile Viewport Wrapper (Standard iPhone / Android Dimensions) -->
+<div class="max-w-md mx-auto min-h-screen relative flex flex-col bg-surface-50 shadow-2xl overflow-x-hidden border-x border-slate-100">
+<!-- BEGIN: TopHeader -->
+<header class="ios-safe-top sticky top-0 z-30 bg-surface-50/90 backdrop-blur-md px-5 pt-4 pb-3 border-b border-slate-100">
+<div class="flex items-center justify-between">
+<!-- Logo and App Title -->
+<div class="flex items-center gap-2">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-700 via-brand-600 to-indigo-500 flex items-center justify-center shadow-md shadow-brand-500/20 text-white">
+</div>
+<span class="text-xl font-black tracking-tight text-slate-900">وام‌یار</span>
+</div>
+<!-- Account Profile Selector Dropdown Badge -->
+<button aria-label="انتخاب کاربر" class="group flex items-center gap-2 bg-white hover:bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-full shadow-sm transition active:scale-95" type="button">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span class="text-xs font-semibold text-slate-700">مبنا: کاربر اصلی</span>
+<svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition" fill="currentColor" viewBox="0 0 20 20">
+<path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-3 space-y-4">
+<!-- BEGIN: MonthlySummaryCard -->
+<!-- Overview Card with Total Unpaid Installment, Paid Status, and Partner Debts -->
+<section class="bg-gradient-to-br from-white to-slate-50/80 rounded-3xl p-5 border border-slate-200/70 shadow-card relative overflow-hidden" data-purpose="monthly-overview"><div class="absolute -top-12 -left-12 w-36 h-36 bg-brand-500/10 rounded-full blur-2xl pointer-events-none"></div><div class="relative z-10 flex flex-col gap-4"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="text-xs font-semibold text-slate-500">مانده اقساط پرداخت‌نشده</span></div><span class="bg-brand-50 border border-brand-200/50 text-brand-700 text-[11px] font-bold px-2.5 py-1 rounded-lg">آبان ماه</span></div><div class="flex items-baseline gap-1.5"><span class="text-3xl font-extrabold text-slate-900 tracking-tight">۲,۲۳۳,۲۲۷</span><span class="text-xs font-medium text-slate-500">تومان</span></div><div class="pt-3.5 border-t border-dashed border-slate-200 grid grid-cols-2 gap-3 text-xs"><div><div class="text-slate-400 font-medium mb-1 text-[11px]">پرداخت‌شده این ماه</div><div class="text-slate-800 font-bold text-xs">۱,۸۳۰,۵۲۶ <span class="text-[10px] font-normal text-slate-400">از ۴,۰۶۳,۷۵۳</span></div></div><div class="text-left border-r border-slate-100 pr-3"><div class="text-rose-500/90 font-medium mb-1 text-[11px]">طلب باقیمانده از شرکا</div><div class="text-rose-600 font-bold text-xs">۱,۸۲۲,۰۰۰ <span class="text-[10px] font-normal text-rose-500/80">تومان</span></div></div></div><div class="pt-2"><div class="flex justify-between items-center text-xs mb-2 font-medium"><span class="text-slate-500 text-[11px]">پیشرفت تسویه اقساط</span><span class="text-brand-700 font-bold text-xs">۳۰٪</span></div><div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="progress-bar-fill h-full bg-gradient-to-l from-brand-600 to-indigo-500 rounded-full" style="width: 30%"></div></div></div></div></section>
+<!-- END: MonthlySummaryCard -->
+<!-- BEGIN: SmartAdvisorBanner -->
+<!-- AI/Rule Based Smart Financial Assistant Prompt -->
+<section class="bg-gradient-to-r from-purple-50/80 to-indigo-50/60 border border-purple-200/70 rounded-2xl p-4 shadow-sm relative overflow-hidden space-y-3" data-purpose="smart-advisor"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-xl bg-purple-600/10 text-brand-600 flex items-center justify-center shrink-0"><svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="flex items-center gap-1.5"><span class="text-xs font-bold text-slate-800">دستیار هوشمند</span><span class="flex h-1.5 w-1.5 rounded-full bg-purple-600 animate-pulse"></span></div></div><button aria-label="مشاهده ۵ پیشنهاد هوشمند" class="flex items-center gap-1.5 text-xs font-bold text-brand-700 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-full shadow-xs border border-brand-200 transition" type="button"><span class="">۵ پیشنهاد هوشمند</span><svg class="w-3.5 h-3.5 rotate-180 text-brand-600" fill="currentColor" viewBox="0 0 20 20"><path clip-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" fill-rule="evenodd"></path></svg></button></div><div class="bg-white/80 rounded-xl p-3 border border-purple-100 flex items-center justify-between gap-3"><div class="flex items-center gap-2 min-w-0"><div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"></circle><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><div class="min-w-0"><div class="text-xs font-bold text-slate-800 truncate">بانک خاورمیانه زهرا</div><div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5"><span class="">سررسید قسط</span><span class="text-slate-300">•</span><span class="inline-flex items-center text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">۵ روز دیگر</span></div></div></div><div class="text-left shrink-0"><div class="text-xs font-bold text-slate-900">۱,۳۵۰,۰۰۰ <span class="text-[10px] font-normal text-slate-500">تومان</span></div><div class="text-[10px] text-slate-400 mt-0.5">مبلغ سهم شما</div></div></div></section>
+<!-- END: SmartAdvisorBanner -->
+<!-- BEGIN: ListHeaderAndFilterTabs -->
+<!-- Section Title and View Switcher Control -->
+<section class="pt-2">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
+<span class="">فهرست اقساط</span>
+</h2>
+<!-- View Switcher (Segmented Control) -->
+<div class="bg-slate-200/70 p-0.5 rounded-xl flex items-center text-xs font-medium text-slate-600" role="tablist"><button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition text-slate-500" role="tab" title="مستطیلی"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect height="5" rx="1.5" width="18" x="3" y="5"></rect><rect height="5" rx="1.5" width="18" x="3" y="14"></rect></svg></button><button aria-selected="false" class="hover:text-slate-900 px-2 py-1 rounded-lg flex items-center gap-1 transition text-slate-500" role="tab" title="مربعی"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect height="7" rx="1" width="7" x="3" y="3"></rect><rect height="7" rx="1" width="7" x="14" y="3"></rect><rect height="7" rx="1" width="7" x="14" y="14"></rect><rect height="7" rx="1" width="7" x="3" y="14"></rect></svg></button><button aria-selected="true" class="bg-white text-brand-700 shadow-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition font-bold" role="tab" title="نموداری"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg></button></div>
+</div>
+</section>
+<!-- END: ListHeaderAndFilterTabs -->
+<!-- BEGIN: LoansListSection -->
+<div class="space-y-3 pb-2" data-purpose="loan-cards-container"><article class="bg-white rounded-2xl border-2 border-brand-200/80 shadow-card p-3.5 flex items-center justify-between gap-3 transition-all hover:border-brand-400 hover:shadow-md"><div class="flex items-center gap-3 min-w-0"><div class="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center p-1 shadow-xs shrink-0"><span class="text-sky-600 font-black text-sm tracking-tighter">azki</span></div><div class="min-w-0 flex flex-col justify-center"><h3 class="text-xs font-bold text-slate-900 truncate">بیمه ازکی</h3><div class="text-xs font-bold text-slate-700 mt-1">۸۹۰,۰۰۰ <span class="text-[10px] font-normal text-slate-400">تومان</span></div></div></div><div class="flex items-center gap-2.5 shrink-0"><div class="relative w-11 h-11 flex items-center justify-center"><svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" fill="none" r="14" stroke="#f1f5f9" stroke-width="3.5"></circle><circle cx="18" cy="18" fill="none" r="14" stroke="#7c3aed" stroke-dasharray="88" stroke-dashoffset="70.4" stroke-linecap="round" stroke-width="3.5"></circle></svg><span class="absolute text-[10px] font-bold text-slate-700">۲۰٪</span></div><button aria-label="پرداخت شده" class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xs transition active:scale-95 shrink-0" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></article><article class="bg-white rounded-2xl border-2 border-brand-200/80 shadow-card p-3.5 flex items-center justify-between gap-3 transition-all hover:border-brand-400 hover:shadow-md"><div class="flex items-center gap-3 min-w-0"><div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center p-1 shadow-xs shrink-0"><svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path></svg></div><div class="min-w-0 flex flex-col justify-center"><h3 class="text-xs font-bold text-slate-900 truncate">بانک خاورمیانه</h3><div class="text-xs font-bold text-slate-700 mt-1">۹۴۰,۵۲۶ <span class="text-[10px] font-normal text-slate-400">تومان</span></div></div></div><div class="flex items-center gap-2.5 shrink-0"><div class="relative w-11 h-11 flex items-center justify-center"><svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" fill="none" r="14" stroke="#f1f5f9" stroke-width="3.5"></circle><circle cx="18" cy="18" fill="none" r="14" stroke="#7c3aed" stroke-dasharray="88" stroke-dashoffset="59" stroke-linecap="round" stroke-width="3.5"></circle></svg><span class="absolute text-[10px] font-bold text-slate-700">۳۳٪</span></div><button aria-label="پرداخت شده" class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-xs transition active:scale-95 shrink-0" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></div></article><article class="bg-white rounded-2xl border border-slate-200/90 shadow-card p-3.5 flex items-center justify-between gap-3 transition-all hover:border-amber-300 hover:shadow-md"><div class="flex items-center gap-3 min-w-0"><div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center p-1 shadow-xs shrink-0"><svg class="w-6 h-6 text-amber-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7v3h20V7L12 2zm-8 7v8h3V9H4zm6 0v8h3V9h-3zm6 0v8h3V9h-3zm-14 10v2h20v-2H2z"></path></svg></div><div class="min-w-0 flex flex-col justify-center"><h3 class="text-xs font-bold text-slate-900 truncate">بانک خاورمیانه زهرا</h3><div class="text-xs font-bold text-brand-700 mt-1">۱,۳۵۰,۰۰۰ <span class="text-[10px] font-normal text-slate-400">تومان</span></div></div></div><div class="flex items-center gap-2.5 shrink-0"><div class="relative w-11 h-11 flex items-center justify-center"><svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" fill="none" r="14" stroke="#f1f5f9" stroke-width="3.5"></circle><circle cx="18" cy="18" fill="none" r="14" stroke="#f59e0b" stroke-dasharray="88" stroke-dashoffset="81" stroke-linecap="round" stroke-width="3.5"></circle></svg><span class="absolute text-[10px] font-bold text-slate-700">۸٪</span></div><button aria-label="پرداخت قسط" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-brand-50 text-slate-600 hover:text-brand-700 flex items-center justify-center shadow-xs transition active:scale-95 shrink-0" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"></line><line x1="5" x2="19" y1="12" y2="12"></line></svg></button></div></article><article class="bg-white rounded-2xl border border-slate-200/90 shadow-card p-3.5 flex items-center justify-between gap-3 transition-all hover:border-sky-300 hover:shadow-md"><div class="flex items-center gap-3 min-w-0"><div class="w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center font-bold text-sm shadow-xs tracking-tight shrink-0">blu</div><div class="min-w-0 flex flex-col justify-center"><h3 class="text-xs font-bold text-slate-900 truncate">بلوبانک</h3><div class="text-xs font-bold text-slate-700 mt-1">۸۸۳,۲۲۷ <span class="text-[10px] font-normal text-slate-400">تومان</span></div></div></div><div class="flex items-center gap-2.5 shrink-0"><div class="relative w-11 h-11 flex items-center justify-center"><svg class="w-11 h-11 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" fill="none" r="14" stroke="#f1f5f9" stroke-width="3.5"></circle><circle cx="18" cy="18" fill="none" r="14" stroke="#0284c7" stroke-dasharray="88" stroke-dashoffset="30" stroke-linecap="round" stroke-width="3.5"></circle></svg><span class="absolute text-[10px] font-bold text-slate-700">۶۶٪</span></div><button aria-label="پرداخت قسط" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-brand-50 text-slate-600 hover:text-brand-700 flex items-center justify-center shadow-xs transition active:scale-95 shrink-0" type="button"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"></line><line x1="5" x2="19" y1="12" y2="12"></line></svg></button></div></article></div>
+<!-- END: LoansListSection -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: FloatingActionButton -->
+<!-- Primary CTA to Add New Installment / Loan -->
+<div class="fixed bottom-20 left-6 z-40 max-w-md">
+<button aria-label="افزودن قسط یا وام جدید" class="w-14 h-14 bg-gradient-to-tr from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 text-white rounded-2xl flex items-center justify-center shadow-fab transition-transform active:scale-95 group focus:outline-none focus:ring-4 focus:ring-brand-500/30" type="button">
+<svg class="w-7 h-7 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</button>
+</div>
+<!-- END: FloatingActionButton -->
+<!-- BEGIN: BottomNavigation -->
+<!-- iOS Styled Modern Tab Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-30 bg-white/95 backdrop-blur-lg border-t border-slate-200/80 ios-safe-bottom" data-purpose="bottom-navbar">
+<div class="grid grid-cols-3 h-16 items-center px-4">
+<!-- Tab 1: Installments (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center gap-1 group relative text-brand-600" href="#installments">
+<div class="relative">
+<svg class="w-6 h-6 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="w-1.5 h-1.5 bg-brand-600 rounded-full absolute -top-0.5 -right-0.5"></span>
+</div>
+<span class="text-[11px] font-bold">اقساط</span>
+</a>
+<!-- Tab 2: Receivables (مطالبات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#receivables">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">مطالبات</span>
+</a>
+<!-- Tab 3: Settings (تنظیمات) -->
+<a class="flex flex-col items-center justify-center gap-1 group text-slate-400 hover:text-slate-600 transition" href="#settings">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">تنظیمات</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+</div>
+
+
+</body></html>

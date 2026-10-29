@@ -1,9 +1,15 @@
 package com.aistudio.vamyar.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,6 +26,15 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.SmartFinancialTip
 import com.aistudio.vamyar.ui.TipType
 
+/**
+ * بنر دستیار هوشمند مالی (Smart Financial Advisor Banner)
+ * بازطراحی‌شده منطبق بر پروتوتایپ استیچ:
+ * - گرادیان نرم بنفش/نیلی با بوردر ظریف
+ * - هدر با آیکون صاعقه، عنوان و نشانگر پالس‌دار
+ * - دکمه کپسولی سفید برای مشاهده تعداد پیشنهادات
+ * - کارت پیش‌نمایش مینیمال برای مهم‌ترین سررسید یا نکته
+ * - قابلیت باز و بسته شدن انیمیشنی برای سایر پیشنهادات
+ */
 @Composable
 fun SmartFinancialAdvisorCard(
     tips: List<SmartFinancialTip>,
@@ -29,28 +44,35 @@ fun SmartFinancialAdvisorCard(
     if (tips.isEmpty()) return
 
     var expanded by remember { mutableStateOf(false) }
+    val topTip = tips.first()
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 5.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF5FF)),
+        border = BorderStroke(1.dp, Color(0xFFDDD6FE).copy(alpha = 0.7f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFFFAF5FF),
+                            Color(0xFFF5F3FF),
+                            Color(0xFFEEF2FF)
+                        )
+                    )
+                )
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Header
+            // Header Row: Assistant Title & Pulse + Count Button
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -58,128 +80,229 @@ fun SmartFinancialAdvisorCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "دستیار و پیشنهادات هوشمند مالی",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF6D28D9).copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = Color(0xFF6D28D9),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "دستیار هوشمند",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF6D28D9))
+                        )
+                    }
                 }
 
+                // Count Action Pill Button
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFDDD6FE)),
+                    shadowElevation = 1.dp,
+                    modifier = Modifier.clickable { expanded = !expanded }
                 ) {
-                    Text(
-                        text = if (expanded) "بستن ▲" else "${tips.size} پیشنهاد ▼",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Always show the top most important tip
-            val topTip = tips.first()
-            SingleTipItem(
-                tip = topTip,
-                onActionClick = onActionClick
-            )
-
-            // Other tips shown when expanded
-            AnimatedVisibility(visible = expanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    tips.drop(1).forEach { tip ->
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        SingleTipItem(
-                            tip = tip,
-                            onActionClick = onActionClick
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "${tips.size} پیشنهاد هوشمند",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF6D28D9)
+                        )
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = Color(0xFF6D28D9),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun SingleTipItem(
-    tip: SmartFinancialTip,
-    onActionClick: ((SmartFinancialTip) -> Unit)? = null
-) {
-    val icon = when (tip.type) {
-        TipType.URGENT_DUE -> Icons.Default.Alarm
-        TipType.COLLECTION_REMINDER -> Icons.Default.Groups
-        TipType.SNOWBALL_PAYOFF -> Icons.Default.TrendingUp
-        TipType.LIQUIDITY_PLAN -> Icons.Default.AccountBalanceWallet
-        // فیکس bug.md/F7: نکتهٔ پیش‌بینی نقدینگی ۳/۶ ماه آینده
-        TipType.LIQUIDITY_FORECAST -> Icons.Default.Insights
-        TipType.BUDGET_ADVICE -> Icons.Default.Lightbulb
-    }
-
-    val iconColor = when (tip.type) {
-        TipType.URGENT_DUE -> MaterialTheme.colorScheme.error
-        TipType.COLLECTION_REMINDER -> MaterialTheme.colorScheme.secondary
-        TipType.SNOWBALL_PAYOFF -> MaterialTheme.colorScheme.primary
-        TipType.LIQUIDITY_PLAN -> MaterialTheme.colorScheme.tertiary
-        TipType.LIQUIDITY_FORECAST -> MaterialTheme.colorScheme.primary
-        TipType.BUDGET_ADVICE -> MaterialTheme.colorScheme.secondary
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(iconColor.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = tip.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = tip.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 18.sp
-            )
-        }
-
-        if (tip.actionText != null && onActionClick != null) {
-            TextButton(
-                onClick = { onActionClick(tip) },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+            // Top Tip Featured Preview Card
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White.copy(alpha = 0.95f),
+                border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onActionClick?.invoke(topTip) }
             ) {
-                Text(
-                    text = tip.actionText,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    when (topTip.type) {
+                                        TipType.URGENT_DUE -> Color(0xFFFEF3C7)
+                                        TipType.COLLECTION_REMINDER -> Color(0xFFFCE7F3)
+                                        TipType.LIQUIDITY_FORECAST -> Color(0xFFEDE9FE)
+                                        else -> Color(0xFFECFDF5)
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = when (topTip.type) {
+                                    TipType.URGENT_DUE -> Icons.Default.AccessTime
+                                    TipType.COLLECTION_REMINDER -> Icons.Default.People
+                                    TipType.LIQUIDITY_FORECAST -> Icons.Default.Insights
+                                    else -> Icons.Default.Lightbulb
+                                },
+                                contentDescription = null,
+                                tint = when (topTip.type) {
+                                    TipType.URGENT_DUE -> Color(0xFFD97706)
+                                    TipType.COLLECTION_REMINDER -> Color(0xFFBE185D)
+                                    TipType.LIQUIDITY_FORECAST -> Color(0xFF6D28D9)
+                                    else -> Color(0xFF059669)
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = topTip.title,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E293B)
+                            )
+                            Text(
+                                text = topTip.description,
+                                fontSize = 11.sp,
+                                color = Color(0xFF64748B),
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    topTip.actionText?.let { actionLabel ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFF5F3FF),
+                            border = BorderStroke(1.dp, Color(0xFFDDD6FE).copy(alpha = 0.6f)),
+                            modifier = Modifier.clickable { onActionClick?.invoke(topTip) }
+                        ) {
+                            Text(
+                                text = actionLabel,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF6D28D9),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Expanded list of other tips
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    tips.drop(1).forEach { tip ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.9f),
+                            border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onActionClick?.invoke(tip) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFEDE9FE)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.TipsAndUpdates,
+                                            contentDescription = null,
+                                            tint = Color(0xFF6D28D9),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = tip.title,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1E293B)
+                                        )
+                                        Text(
+                                            text = tip.description,
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+
+                                tip.actionText?.let { label ->
+                                    Text(
+                                        text = label,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6D28D9)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

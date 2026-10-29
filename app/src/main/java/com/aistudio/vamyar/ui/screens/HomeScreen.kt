@@ -20,6 +20,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -92,6 +94,7 @@ fun HomeScreen(
                 item(span = { GridItemSpan(2) }) {
                     FinancialSummaryCard(
                         overview = overview,
+                        currentShamsiDate = currentShamsiDate,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands
                     )
@@ -154,6 +157,7 @@ fun HomeScreen(
                 item {
                     FinancialSummaryCard(
                         overview = overview,
+                        currentShamsiDate = currentShamsiDate,
                         usePersianDigits = usePersianDigits,
                         compactThousands = compactThousands
                     )
@@ -270,17 +274,39 @@ fun HomeScreen(
             }
         }
 
-        // Floating Action Button
-        FloatingActionButton(
-            onClick = { showAddDialog = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        // Floating Action Button with Brand Gradient Squircle
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
-                .testTag("add_loan_fab")
         ) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = "افزودن وام")
+            Surface(
+                onClick = { showAddDialog = true },
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Transparent,
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .size(56.dp)
+                    .testTag("add_loan_fab")
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "افزودن وام",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
         }
     }
 
@@ -468,60 +494,82 @@ fun ViewModeSelectorRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "فهرست اقساط",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onSurface
         )
 
-        SingleChoiceSegmentedButtonRow {
-            SegmentedButton(
-                selected = currentMode == LoanViewMode.RECTANGLE,
-                onClick = { onModeChange(LoanViewMode.RECTANGLE) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.ViewStream,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+        // Stitch-style segmented pill container
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            modifier = Modifier.padding(2.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(LoanViewMode.RECTANGLE.titleFa, style = MaterialTheme.typography.labelSmall)
+                ViewModePillButton(
+                    selected = currentMode == LoanViewMode.RECTANGLE,
+                    icon = Icons.Default.ViewStream,
+                    label = "فهرست",
+                    onClick = { onModeChange(LoanViewMode.RECTANGLE) }
+                )
+                ViewModePillButton(
+                    selected = currentMode == LoanViewMode.SQUARE,
+                    icon = Icons.Default.GridView,
+                    label = "مربعی",
+                    onClick = { onModeChange(LoanViewMode.SQUARE) }
+                )
+                ViewModePillButton(
+                    selected = currentMode == LoanViewMode.CHART,
+                    icon = Icons.Default.PieChart,
+                    label = "نموداری",
+                    onClick = { onModeChange(LoanViewMode.CHART) }
+                )
             }
+        }
+    }
+}
 
-            SegmentedButton(
-                selected = currentMode == LoanViewMode.SQUARE,
-                onClick = { onModeChange(LoanViewMode.SQUARE) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.GridView,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            ) {
-                Text(LoanViewMode.SQUARE.titleFa, style = MaterialTheme.typography.labelSmall)
-            }
-
-            SegmentedButton(
-                selected = currentMode == LoanViewMode.CHART,
-                onClick = { onModeChange(LoanViewMode.CHART) },
-                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.PieChart,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            ) {
-                Text(LoanViewMode.CHART.titleFa, style = MaterialTheme.typography.labelSmall)
+@Composable
+private fun ViewModePillButton(
+    selected: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(9.dp),
+        color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+        shadowElevation = if (selected) 2.dp else 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected) Color(0xFF6D28D9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(16.dp)
+            )
+            if (selected) {
+                Text(
+                    text = label,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6D28D9)
+                )
             }
         }
     }
