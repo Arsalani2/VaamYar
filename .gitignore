@@ -52,3 +52,6 @@ Thumbs.db
 
 # Kotlin
 .kotlin/
+
+# AI Studio artifacts (فیکس bug.md/NB-48: خروجی‌های اپلود/کپی AI Studio نباید کامیت شوند)
+public/assets/aistudio/
