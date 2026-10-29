@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.FinancialOverview
+import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
 
@@ -55,18 +55,18 @@ fun FinancialSummaryCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(
+                    Brush.verticalGradient( // فیکس bug.md/NB-45: گرادیان کارت از تم
                         colors = listOf(
-                            Color.White,
-                            Color(0xFFF8F9FD)
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 )
@@ -78,7 +78,7 @@ fun FinancialSummaryCard(
                     .size(110.dp)
                     .offset(x = (-30).dp, y = (-30).dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF7C3AED).copy(alpha = 0.06f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.06f))
             )
 
             Column(
@@ -94,19 +94,19 @@ fun FinancialSummaryCard(
                         text = "مانده اقساط پرداخت‌نشده",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF64748B)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFF5F3FF),
-                        border = BorderStroke(1.dp, Color(0xFFDDD6FE).copy(alpha = 0.6f))
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                     ) {
                         Text(
                             text = monthLabel,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6D28D9),
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -118,28 +118,30 @@ fun FinancialSummaryCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = NumberFormatter.formatNumber(
-                            number = overview.arsalanUnpaidRemainingThisMonth,
-                            usePersian = usePersianDigits
+                        text = NumberFormatter.formatPrice( // فیکس bug.md/NB-46: عدد پولی + احترام به compactThousands
+                            overview.arsalanUnpaidRemainingThisMonth,
+                            withUnit = false,
+                            usePersian = usePersianDigits,
+                            compactThousands = compactThousands
                         ),
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (isAllMonthPaid) Color(0xFF10B981) else Color(0xFF0F172A),
+                        color = if (isAllMonthPaid) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                         letterSpacing = (-0.5).sp
                     )
                     Text(
                         text = "تومان",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF64748B)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     if (isAllMonthPaid) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFECFDF5),
-                            border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                            color = SuccessGreen.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.25f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
@@ -149,14 +151,14 @@ fun FinancialSummaryCard(
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFF059669),
+                                    tint = SuccessGreen,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     text = "تسویه این ماه",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF059669)
+                                    color = SuccessGreen
                                 )
                             }
                         }
@@ -168,7 +170,7 @@ fun FinancialSummaryCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(Color(0xFFE2E8F0))
+                        .background(MaterialTheme.colorScheme.outlineVariant)
                 )
 
                 // 2-Column Metrics Grid
@@ -186,19 +188,19 @@ fun FinancialSummaryCard(
                             text = "پرداخت‌شده این ماه",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = NumberFormatter.formatNumber(overview.arsalanPaidThisMonth, usePersianDigits),
+                                text = NumberFormatter.formatPrice(overview.arsalanPaidThisMonth, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B)
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = " از ${NumberFormatter.formatNumber(overview.arsalanMonthlyShare, usePersianDigits)}",
+                                text = " از ${NumberFormatter.formatPrice(overview.arsalanMonthlyShare, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands)}", // فیکس bug.md/NB-46
                                 fontSize = 10.sp,
-                                color = Color(0xFF94A3B8)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -208,7 +210,7 @@ fun FinancialSummaryCard(
                         modifier = Modifier
                             .width(1.dp)
                             .height(30.dp)
-                            .background(Color(0xFFF1F5F9))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
 
                     // Col 2: Receivables from Partners
@@ -223,21 +225,21 @@ fun FinancialSummaryCard(
                             text = "طلب باقیمانده از شرکا",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFFF43F5E)
+                            color = MaterialTheme.colorScheme.error
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
                                 text = if (overview.othersRemainingUnpaid == 0L) "وصول شد ✓"
-                                else NumberFormatter.formatNumber(overview.othersRemainingUnpaid, usePersianDigits),
+                                else NumberFormatter.formatPrice(overview.othersRemainingUnpaid, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (overview.othersRemainingUnpaid == 0L) Color(0xFF10B981) else Color(0xFFE11D48)
+                                color = if (overview.othersRemainingUnpaid == 0L) SuccessGreen else MaterialTheme.colorScheme.error
                             )
                             if (overview.othersRemainingUnpaid > 0L) {
                                 Text(
                                     text = " تومان",
                                     fontSize = 10.sp,
-                                    color = Color(0xFFF43F5E).copy(alpha = 0.8f)
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                                 )
                             }
                         }
@@ -258,13 +260,13 @@ fun FinancialSummaryCard(
                             text = "پیشرفت تسویه اقساط",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "${NumberFormatter.formatNumber((animatedProgress * 100).toInt(), usePersian = usePersianDigits)}٪",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF6D28D9)
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
@@ -274,7 +276,7 @@ fun FinancialSummaryCard(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFF1F5F9))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Box(
                             modifier = Modifier
@@ -284,8 +286,8 @@ fun FinancialSummaryCard(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color(0xFF6D28D9),
-                                            Color(0xFF4F46E5)
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.secondary
                                         )
                                     )
                                 )

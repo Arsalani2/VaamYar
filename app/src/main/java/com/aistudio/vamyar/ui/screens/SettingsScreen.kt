@@ -44,6 +44,7 @@ import com.aistudio.vamyar.ui.ImportPreview
 import com.aistudio.vamyar.ui.dialogs.AddEditUserDialog
 import com.aistudio.vamyar.ui.dialogs.ShamsiDatePickerDialog
 import com.aistudio.vamyar.ui.theme.AppThemeMode
+import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.theme.ThemePreset
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
@@ -107,8 +108,8 @@ fun SettingsScreen(
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
     var userConfirmDeleteDialog by remember { mutableStateOf<UserProfile?>(null) }
 
-    val brandViolet = Color(0xFF6C27DF)
-    val brandIndigo = Color(0xFF4F46E5)
+    val brandViolet = MaterialTheme.colorScheme.primary
+    val brandIndigo = MaterialTheme.colorScheme.secondary
 
     // Document Launchers for Backup Export & Import
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -169,7 +170,7 @@ fun SettingsScreen(
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -197,7 +198,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = category.icon,
                                 contentDescription = category.titleFa,
-                                tint = if (isSelected) brandViolet else Color(0xFF64748B),
+                                tint = if (isSelected) brandViolet else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -205,7 +206,7 @@ fun SettingsScreen(
                                 text = category.titleFa,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) brandViolet else Color(0xFF64748B)
+                                color = if (isSelected) brandViolet else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -233,7 +234,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -262,7 +263,7 @@ fun SettingsScreen(
                                             text = "مدیریت کاربران",
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
 
@@ -293,7 +294,7 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                 // Users List
                                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -339,7 +340,7 @@ fun SettingsScreen(
                                     Text(
                                         text = "کاربر مبنا حسابی است که مبالغ کل، سهم‌ها و گزارش‌ها از دیدگاه او محاسبه و سنجیده می‌شوند.",
                                         fontSize = 11.sp,
-                                        color = Color(0xFF64748B),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         lineHeight = 18.sp
                                     )
                                 }
@@ -360,7 +361,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -392,12 +393,12 @@ fun SettingsScreen(
                                             text = "همگام‌سازی تاریخ",
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = "مبنای سررسیدهای روزانه، روزشمار و تشخیص اقساط",
                                             fontSize = 11.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -409,8 +410,8 @@ fun SettingsScreen(
 
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
-                                    color = Color(0xFFFAF9FD),
-                                    border = BorderStroke(1.dp, Color(0xFFEDE9FE)),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
@@ -428,7 +429,7 @@ fun SettingsScreen(
                                                 text = "تاریخ برنامه:",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Medium,
-                                                color = Color(0xFF64748B)
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                             Surface(
                                                 shape = RoundedCornerShape(20.dp),
@@ -456,8 +457,8 @@ fun SettingsScreen(
                                         Surface(
                                             onClick = { showDatePickerDialog = true },
                                             shape = RoundedCornerShape(12.dp),
-                                            color = Color.White,
-                                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                            color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Row(
@@ -478,7 +479,7 @@ fun SettingsScreen(
                                                     text = "تغییر دستی تاریخ",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF0F172A)
+                                                    color = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
                                         }
@@ -544,7 +545,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -556,7 +557,7 @@ fun SettingsScreen(
                                     text = "اعداد و مبالغ",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 // Row 1: Persian vs EN Digits Switcher
@@ -569,13 +570,13 @@ fun SettingsScreen(
                                         text = "نوع نمایش اعداد:",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF0F172A)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
 
                                     Surface(
                                         shape = RoundedCornerShape(14.dp),
-                                        color = Color(0xFFF1F5F9),
-                                        border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(3.dp),
@@ -591,7 +592,7 @@ fun SettingsScreen(
                                                     text = "فارسی",
                                                     fontSize = 12.sp,
                                                     fontWeight = if (usePersianDigits) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (usePersianDigits) brandViolet else Color(0xFF64748B),
+                                                    color = if (usePersianDigits) brandViolet else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                                 )
                                             }
@@ -606,7 +607,7 @@ fun SettingsScreen(
                                                     text = "EN",
                                                     fontSize = 12.sp,
                                                     fontWeight = if (!usePersianDigits) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (!usePersianDigits) brandViolet else Color(0xFF64748B),
+                                                    color = if (!usePersianDigits) brandViolet else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                                 )
                                             }
@@ -614,7 +615,7 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                 // Row 2: 3 Zeros Less Switch
                                 Row(
@@ -627,12 +628,12 @@ fun SettingsScreen(
                                             text = "حالت سه صفر کمتر",
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = "نمایش مبالغ به صورت خلاصه‌شده (مثلاً ۲۵۰ هزار ت)",
                                             fontSize = 11.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Switch(
@@ -657,7 +658,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -669,7 +670,7 @@ fun SettingsScreen(
                                     text = "حالت نمایش",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 Row(
@@ -681,10 +682,10 @@ fun SettingsScreen(
                                         Surface(
                                             onClick = { onThemeModeChange(mode) },
                                             shape = RoundedCornerShape(14.dp),
-                                            color = if (isSelected) brandViolet.copy(alpha = 0.12f) else Color(0xFFF8FAFC),
+                                            color = if (isSelected) brandViolet.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
                                             border = BorderStroke(
                                                 1.dp,
-                                                if (isSelected) brandViolet.copy(alpha = 0.35f) else Color(0xFFE2E8F0)
+                                                if (isSelected) brandViolet.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant
                                             ),
                                             modifier = Modifier.weight(1f)
                                         ) {
@@ -692,7 +693,7 @@ fun SettingsScreen(
                                                 text = mode.titleFa,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) brandViolet else Color(0xFF64748B),
+                                                color = if (isSelected) brandViolet else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
                                                 modifier = Modifier.padding(vertical = 10.dp)
                                             )
@@ -712,7 +713,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -724,7 +725,7 @@ fun SettingsScreen(
                                     text = "پوسته و رنگ‌بندی",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -762,7 +763,7 @@ fun SettingsScreen(
                                                         text = preset.titleFa,
                                                         fontSize = 13.sp,
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = if (isSelected) Color(0xFF0F172A) else Color(0xFF475569)
+                                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
 
@@ -796,7 +797,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -814,12 +815,12 @@ fun SettingsScreen(
                                             text = "پشتیبان‌گیری",
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF0F172A)
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = "خروجی استاندارد JSON همراه با هش SHA-256",
                                             fontSize = 11.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
 
@@ -841,15 +842,15 @@ fun SettingsScreen(
 
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = Color(0xFFF8FAFC),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(
                                         text = "شامل: وام‌ها، طرفین حساب، اقساط و تنظیمات کلی",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF64748B),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(12.dp)
                                     )
                                 }
@@ -902,8 +903,8 @@ fun SettingsScreen(
                                         openDocumentLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                                     },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color.White,
-                                    border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.35f)),
+                                    color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -958,8 +959,8 @@ fun SettingsScreen(
                                         }
                                     },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color(0xFFF8FAFC),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -972,7 +973,7 @@ fun SettingsScreen(
                                         Icon(
                                             imageVector = Icons.Default.Share,
                                             contentDescription = null,
-                                            tint = Color(0xFF64748B),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -980,7 +981,7 @@ fun SettingsScreen(
                                             text = "اشتراک‌گذاری فایل پشتیبان",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF334155)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -997,7 +998,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1014,19 +1015,19 @@ fun SettingsScreen(
                                         text = "مدیریت داده‌ها و بازنشانی",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(Color(0xFFF1F5F9)),
+                                            .background(MaterialTheme.colorScheme.outlineVariant),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Tune,
                                             contentDescription = null,
-                                            tint = Color(0xFF64748B),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1036,8 +1037,8 @@ fun SettingsScreen(
                                 Surface(
                                     onClick = { showClearLoansConfirmDialog = true },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color(0xFFFFF1F2),
-                                    border = BorderStroke(1.dp, Color(0xFFFECDD3)),
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -1050,7 +1051,7 @@ fun SettingsScreen(
                                         Icon(
                                             imageVector = Icons.Default.DeleteOutline,
                                             contentDescription = null,
-                                            tint = Color(0xFFE11D48),
+                                            tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -1058,7 +1059,7 @@ fun SettingsScreen(
                                             text = "پاکسازی وام‌ها (شروع خام برنامه)",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFE11D48)
+                                            color = MaterialTheme.colorScheme.error
                                         )
                                     }
                                 }
@@ -1067,8 +1068,8 @@ fun SettingsScreen(
                                 Surface(
                                     onClick = { showFullResetConfirmDialog = true },
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color.White,
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -1081,7 +1082,7 @@ fun SettingsScreen(
                                         Icon(
                                             imageVector = Icons.Default.RestartAlt,
                                             contentDescription = null,
-                                            tint = Color(0xFF64748B),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -1089,7 +1090,7 @@ fun SettingsScreen(
                                             text = "بازنشانی کامل (شامل کاربران)",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF334155)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -1106,7 +1107,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1123,7 +1124,7 @@ fun SettingsScreen(
                                         text = "اعلان‌ها",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Box(
                                         modifier = Modifier
@@ -1173,7 +1174,7 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -1184,7 +1185,7 @@ fun SettingsScreen(
                                         text = "ساعت اعلان روزانه سررسید",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
 
                                     Surface(
@@ -1539,15 +1540,15 @@ private fun UserManagementItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val brandViolet = Color(0xFF6C27DF)
+    val brandViolet = MaterialTheme.colorScheme.primary
     var isExpanded by remember { mutableStateOf(false) }
 
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = if (user.isPrimary) brandViolet.copy(alpha = 0.05f) else Color(0xFFFAF9FD),
+        color = if (user.isPrimary) brandViolet.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(
             1.dp,
-            if (user.isPrimary) brandViolet.copy(alpha = 0.25f) else Color(0xFFE2E8F0)
+            if (user.isPrimary) brandViolet.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outlineVariant
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1586,7 +1587,7 @@ private fun UserManagementItemCard(
                                 modifier = Modifier
                                     .size(14.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF10B981))
+                                    .background(SuccessGreen)
                                     .border(1.5.dp, Color.White, CircleShape)
                                     .align(Alignment.BottomStart)
                             )
@@ -1598,12 +1599,12 @@ private fun UserManagementItemCard(
                             text = user.name,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (user.isPrimary) "حساب پیش‌فرض سیستم" else if (user.notes.isNotBlank()) user.notes else "شریک در وام‌ها",
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1616,7 +1617,7 @@ private fun UserManagementItemCard(
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = "جزییات",
-                        tint = Color(0xFF64748B)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1630,8 +1631,8 @@ private fun UserManagementItemCard(
                 if (user.isPrimary) {
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFFDCFCE7),
-                        border = BorderStroke(1.dp, Color(0xFF86EFAC).copy(alpha = 0.5f))
+                        color = SuccessGreen.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.15f))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -1642,13 +1643,13 @@ private fun UserManagementItemCard(
                                 modifier = Modifier
                                     .size(6.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF10B981))
+                                    .background(SuccessGreen)
                             )
                             Text(
                                 text = "کاربر مبنا",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF15803D)
+                                color = SuccessGreen
                             )
                         }
                     }
@@ -1691,7 +1692,7 @@ private fun UserManagementItemCard(
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "ویرایش",
-                            tint = Color(0xFF64748B),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -1720,19 +1721,19 @@ private fun UserManagementItemCard(
                         .padding(top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.7f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
                     if (user.notes.isNotBlank()) {
                         Text(
                             text = "یادداشت: ${user.notes}",
                             fontSize = 11.sp,
-                            color = Color(0xFF64748B)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Text(
                         text = if (user.isPrimary) "این کاربر به عنوان مبنای کل محاسبات مالی سیستم تنظیم شده است."
                         else "این کاربر به عنوان طرف حساب در وام‌ها می‌تواند دارای سهم اختصاصی باشد.",
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

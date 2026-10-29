@@ -608,6 +608,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // فیکس bug.md/NB-47: کلیک روی نودِ ماهِ مشخص در کارت وام — toggle همان (سال، ماه)
+    // واقعی در Repository، نه اولین ماه بدون رکورد / آخرین رکورد (مسیر ترتیبی +/-).
+    fun toggleInstallmentMonth(loan: Loan, year: Int, month: Int) {
+        viewModelScope.launch {
+            repository.toggleInstallmentMonth(loan, year, month, _currentShamsiDate.value)
+        }
+    }
+
     // فیکس bug.md/NB-37: مجموعهٔ (سال، ماه) اقساط از دیالوگ + تاریخِ مؤثر اپ —
     // Repository در همان تراکنش، رکوردها را هم‌ارز و شمارنده‌ها را sync می‌کند.
     fun saveLoan(loan: Loan, shares: List<DebtorShare>, paidYearMonths: Set<Pair<Int, Int>>) {

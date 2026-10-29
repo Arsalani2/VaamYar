@@ -151,7 +151,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     androidx.compose.ui.graphics.Brush.linearGradient(
-                                        listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
+                                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                                     )
                                 ),
                             contentAlignment = Alignment.Center
@@ -288,9 +288,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF6D28D9),
-                            selectedTextColor = Color(0xFF6D28D9),
-                            indicatorColor = Color(0xFF6D28D9).copy(alpha = 0.12f),
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         ),
@@ -343,6 +343,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onTogglePaidThisMonth = { viewModel.toggleLoanCurrentMonthPaid(it) },
                         onIncrementPaid = { viewModel.incrementPaidInstallment(it) },
                         onDecrementPaid = { viewModel.decrementPaidInstallment(it) },
+                        onToggleInstallmentMonth = { loan, year, month ->
+                            viewModel.toggleInstallmentMonth(loan, year, month)
+                        },
                         arrearsPrompt = arrearsPrompt,
                         onPayOnlyCurrentMonth = { viewModel.payOnlyCurrentMonth(it) },
                         onPayAllArrears = { viewModel.payAllArrearsAndCurrent(it) },

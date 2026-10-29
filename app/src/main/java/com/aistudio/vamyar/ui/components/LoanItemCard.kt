@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.model.DebtorShare
+import com.aistudio.vamyar.ui.theme.SuccessGreen
+import com.aistudio.vamyar.ui.theme.WarningAmber
 import com.aistudio.vamyar.model.Loan
 import com.aistudio.vamyar.model.LoanInstallment
 import com.aistudio.vamyar.model.LoanShareCalculator
@@ -60,6 +62,8 @@ fun LoanItemCard(
     onTogglePaidThisMonth: () -> Unit,
     onIncrementPaid: () -> Unit,
     onDecrementPaid: () -> Unit,
+    // فیکس bug.md/NB-47: toggle ماهِ واقعیِ (سال، ماه) کلیک‌شده به‌جای +/- ترتیبی
+    onToggleInstallmentMonth: (year: Int, month: Int) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -103,7 +107,7 @@ fun LoanItemCard(
     val myShare = LoanShareCalculator.computeMyShare(loan, debtorShares)
     val hasPartners = partnersTotalShare > 0L || loan.hasPartners
 
-    val brandViolet = Color(0xFF6D28D9)
+    val brandViolet = MaterialTheme.colorScheme.primary
 
     when (viewMode) {
         // ۱. حالت مستطیلی (RECTANGLE / List Mode)
@@ -114,10 +118,10 @@ fun LoanItemCard(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .clickable { expanded = !expanded },
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
-                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else Color(0xFFE2E8F0)
+                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
@@ -159,13 +163,13 @@ fun LoanItemCard(
                                     text = loan.title,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "${NumberFormatter.formatNumber(loan.dueDay, usePersian = usePersianDigits)}ام هر ماه",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF64748B)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -174,8 +178,8 @@ fun LoanItemCard(
                         if (loan.isCurrentMonthPaid) {
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
-                                color = Color(0xFFECFDF5),
-                                border = BorderStroke(1.dp, Color(0xFFA7F3D0))
+                                color = SuccessGreen.copy(alpha = 0.1f),
+                                border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.25f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -185,14 +189,14 @@ fun LoanItemCard(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = Color(0xFF059669),
+                                        tint = SuccessGreen,
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
                                         text = "پرداخت شد",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF059669)
+                                        color = SuccessGreen
                                     )
                                 }
                             }
@@ -200,18 +204,18 @@ fun LoanItemCard(
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = when {
-                                    loan.isCompleted -> Color(0xFFF1F5F9)
-                                    daysToDueThisMonth < 0 -> Color(0xFFFEF2F2)
-                                    daysRemaining == 0 -> Color(0xFFFFFBEB)
-                                    else -> Color(0xFFFFFBEB)
+                                    loan.isCompleted -> MaterialTheme.colorScheme.outlineVariant
+                                    daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                                    daysRemaining == 0 -> WarningAmber.copy(alpha = 0.12f)
+                                    else -> WarningAmber.copy(alpha = 0.12f)
                                 },
                                 border = BorderStroke(
                                     1.dp,
                                     when {
-                                        loan.isCompleted -> Color(0xFFCBD5E1)
-                                        daysToDueThisMonth < 0 -> Color(0xFFFECDD3)
-                                        daysRemaining == 0 -> Color(0xFFFDE68A)
-                                        else -> Color(0xFFFDE68A)
+                                        loan.isCompleted -> MaterialTheme.colorScheme.outlineVariant
+                                        daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                                        daysRemaining == 0 -> WarningAmber.copy(alpha = 0.3f)
+                                        else -> WarningAmber.copy(alpha = 0.3f)
                                     }
                                 )
                             ) {
@@ -225,7 +229,7 @@ fun LoanItemCard(
                                             modifier = Modifier
                                                 .size(6.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFFD97706))
+                                                .background(WarningAmber)
                                         )
                                     }
                                     Text(
@@ -239,10 +243,10 @@ fun LoanItemCard(
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = when {
-                                            loan.isCompleted -> Color(0xFF64748B)
-                                            daysToDueThisMonth < 0 -> Color(0xFFDC2626)
-                                            daysRemaining == 0 -> Color(0xFFB45309)
-                                            else -> Color(0xFFB45309)
+                                            loan.isCompleted -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.error
+                                            daysRemaining == 0 -> WarningAmber
+                                            else -> WarningAmber
                                         }
                                     )
                                 }
@@ -254,8 +258,8 @@ fun LoanItemCard(
                     if (hasPartners) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
@@ -266,24 +270,24 @@ fun LoanItemCard(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("کل قسط:", fontSize = 11.sp, color = Color(0xFF64748B))
+                                    Text("کل قسط:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
-                                        "${NumberFormatter.formatNumber(loan.monthlyAmount, usePersianDigits)} تومان",
+                                        "${NumberFormatter.formatPrice(loan.monthlyAmount, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands)} تومان", // فیکس bug.md/NB-46
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF1E293B)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("سهم شرکا:", fontSize = 11.sp, color = Color(0xFFF43F5E))
+                                    Text("سهم شرکا:", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                     Text(
-                                        "${NumberFormatter.formatNumber(partnersTotalShare, usePersianDigits)} تومان",
+                                        "${NumberFormatter.formatPrice(partnersTotalShare, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands)} تومان", // فیکس bug.md/NB-46
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFFE11D48)
+                                        color = MaterialTheme.colorScheme.error
                                     )
                                 }
                             }
@@ -300,20 +304,20 @@ fun LoanItemCard(
                             text = "قسط سهم شما:",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = NumberFormatter.formatNumber(myShare, usePersianDigits),
+                                text = NumberFormatter.formatPrice(myShare, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (loan.isCurrentMonthPaid) Color(0xFF0F172A) else brandViolet
+                                color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.onSurface else brandViolet
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 text = "تومان",
                                 fontSize = 11.sp,
-                                color = Color(0xFF64748B)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -327,7 +331,7 @@ fun LoanItemCard(
                             Text(
                                 text = "${NumberFormatter.formatNumber(loan.paidMonths, usePersianDigits)} از ${NumberFormatter.formatNumber(loan.totalMonths, usePersianDigits)} قسط پرداخت شده",
                                 fontSize = 11.sp,
-                                color = Color(0xFF64748B)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "${NumberFormatter.formatNumber((loan.progress * 100).toInt(), usePersianDigits)}٪",
@@ -342,7 +346,7 @@ fun LoanItemCard(
                                 .fillMaxWidth()
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Color(0xFFF1F5F9))
+                                .background(MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -373,8 +377,8 @@ fun LoanItemCard(
                             shape = RoundedCornerShape(12.dp),
                             colors = if (loan.isCurrentMonthPaid) {
                                 ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFECFDF5),
-                                    contentColor = Color(0xFF059669)
+                                    containerColor = SuccessGreen.copy(alpha = 0.1f),
+                                    contentColor = SuccessGreen
                                 )
                             } else {
                                 ButtonDefaults.buttonColors(
@@ -405,7 +409,7 @@ fun LoanItemCard(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             InstallmentNodesView(
                                 totalMonths = loan.totalMonths,
                                 paidMonths = loan.paidMonths,
@@ -417,9 +421,11 @@ fun LoanItemCard(
                                 overdueYearMonths = overdueYearMonths,
                                 currentYearMonth = currentYearMonth,
                                 onNodeClick = { clickedInstallment ->
+                                    // فیکس bug.md/NB-47: toggle همان ماهِ واقعیِ
+                                    // (سال، ماه) کلیک‌شده — نه رفتار ترتیبی +/-
+                                    // که با رکوردهای پراکنده ماهِ اشتباه را می‌پرداخت.
                                     val m = ShamsiDateHelper.installmentMonth(loan.startYear, loan.startMonth, clickedInstallment)
-                                    val isPaid = (m.year to m.month) in paidYearMonths
-                                    if (isPaid) onDecrementPaid() else onIncrementPaid()
+                                    onToggleInstallmentMonth(m.year, m.month)
                                 }
                             )
 
@@ -431,7 +437,7 @@ fun LoanItemCard(
                             ) {
                                 TextButton(
                                     onClick = onDelete,
-                                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFDC2626))
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -458,10 +464,10 @@ fun LoanItemCard(
                     .padding(5.dp)
                     .clickable { expanded = !expanded },
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
-                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else Color(0xFFE2E8F0)
+                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
@@ -496,17 +502,17 @@ fun LoanItemCard(
 
                         Surface(
                             shape = RoundedCornerShape(20.dp),
-                            color = if (loan.isCurrentMonthPaid) Color(0xFFECFDF5) else Color(0xFFF1F5F9),
+                            color = if (loan.isCurrentMonthPaid) SuccessGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.outlineVariant,
                             border = BorderStroke(
                                 1.dp,
-                                if (loan.isCurrentMonthPaid) Color(0xFFA7F3D0) else Color(0xFFE2E8F0)
+                                if (loan.isCurrentMonthPaid) SuccessGreen.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outlineVariant
                             )
                         ) {
                             Text(
                                 text = if (loan.isCurrentMonthPaid) "پرداخت شد" else "${NumberFormatter.formatNumber(loan.dueDay, usePersian = usePersianDigits)}ام",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (loan.isCurrentMonthPaid) Color(0xFF059669) else Color(0xFF64748B),
+                                color = if (loan.isCurrentMonthPaid) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
@@ -518,24 +524,24 @@ fun LoanItemCard(
                             text = loan.title,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A),
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "سهم شما",
                             fontSize = 10.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = NumberFormatter.formatNumber(myShare, usePersianDigits),
+                                text = NumberFormatter.formatPrice(myShare, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (loan.isCurrentMonthPaid) Color(0xFF0F172A) else brandViolet
+                                color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.onSurface else brandViolet
                             )
                             Spacer(modifier = Modifier.width(2.dp))
-                            Text("تومان", fontSize = 9.sp, color = Color(0xFF64748B))
+                            Text("تومان", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
@@ -545,7 +551,7 @@ fun LoanItemCard(
                             .fillMaxWidth()
                             .height(5.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFFF1F5F9))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Box(
                             modifier = Modifier
@@ -566,7 +572,7 @@ fun LoanItemCard(
                             text = "${NumberFormatter.formatNumber(loan.paidMonths, usePersianDigits)}/${NumberFormatter.formatNumber(loan.totalMonths, usePersianDigits)}",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Box(
@@ -574,12 +580,12 @@ fun LoanItemCard(
                                 .size(28.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (loan.isCurrentMonthPaid) Color(0xFF10B981)
-                                    else Color(0xFFF5F3FF)
+                                    if (loan.isCurrentMonthPaid) SuccessGreen
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                                 )
                                 .border(
                                     1.dp,
-                                    if (loan.isCurrentMonthPaid) Color(0xFF059669) else Color(0xFFDDD6FE),
+                                    if (loan.isCurrentMonthPaid) SuccessGreen else MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
                                     CircleShape
                                 )
                                 .clickable { onTogglePaidThisMonth() },
@@ -597,7 +603,7 @@ fun LoanItemCard(
                     // Expanded Section
                     AnimatedVisibility(visible = expanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             InstallmentNodesView(
                                 totalMonths = loan.totalMonths,
                                 paidMonths = loan.paidMonths,
@@ -628,10 +634,10 @@ fun LoanItemCard(
                     .padding(horizontal = 16.dp, vertical = 5.dp)
                     .clickable { expanded = !expanded },
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
-                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else Color(0xFFE2E8F0)
+                    color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
@@ -674,19 +680,19 @@ fun LoanItemCard(
                                     text = loan.title,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Row(verticalAlignment = Alignment.Bottom) {
                                     Text(
-                                        text = NumberFormatter.formatNumber(myShare, usePersianDigits),
+                                        text = NumberFormatter.formatPrice(myShare, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (loan.isCurrentMonthPaid) Color(0xFF0F172A) else brandViolet
+                                        color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.onSurface else brandViolet
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
-                                    Text("تومان", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                                    Text("تومان", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -701,6 +707,9 @@ fun LoanItemCard(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.size(44.dp)
                             ) {
+                                // فیکس bug.md/NB-45: رنگ مسیر از تم بیرون از Canvas
+                                // خوانده می‌شود (DrawScope محیط composable نیست)
+                                val gaugeTrackColor = MaterialTheme.colorScheme.outlineVariant
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                     val strokeWidth = 3.5.dp.toPx()
                                     val diameter = size.minDimension - strokeWidth
@@ -708,7 +717,7 @@ fun LoanItemCard(
                                     val arcSize = Size(diameter, diameter)
 
                                     drawArc(
-                                        color = Color(0xFFF1F5F9),
+                                        color = gaugeTrackColor,
                                         startAngle = -90f,
                                         sweepAngle = 360f,
                                         useCenter = false,
@@ -718,7 +727,7 @@ fun LoanItemCard(
                                     )
 
                                     drawArc(
-                                        color = if (loan.isCurrentMonthPaid) Color(0xFF10B981) else brandViolet,
+                                        color = if (loan.isCurrentMonthPaid) SuccessGreen else brandViolet,
                                         startAngle = -90f,
                                         sweepAngle = 360f * animatedProgress,
                                         useCenter = false,
@@ -731,7 +740,7 @@ fun LoanItemCard(
                                     text = "${NumberFormatter.formatNumber((animatedProgress * 100).toInt(), usePersian = usePersianDigits)}٪",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E293B)
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
@@ -742,7 +751,7 @@ fun LoanItemCard(
                                     .clip(CircleShape)
                                     .background(
                                         if (loan.isCurrentMonthPaid) brandViolet
-                                        else Color(0xFFF1F5F9)
+                                        else MaterialTheme.colorScheme.outlineVariant
                                     )
                                     .clickable { onTogglePaidThisMonth() },
                                 contentAlignment = Alignment.Center
@@ -750,7 +759,7 @@ fun LoanItemCard(
                                 Icon(
                                     imageVector = if (loan.isCurrentMonthPaid) Icons.Default.Check else Icons.Default.Add,
                                     contentDescription = null,
-                                    tint = if (loan.isCurrentMonthPaid) Color.White else Color(0xFF475569),
+                                    tint = if (loan.isCurrentMonthPaid) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -763,7 +772,7 @@ fun LoanItemCard(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            HorizontalDivider(color = Color(0xFFF1F5F9))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             InstallmentNodesView(
                                 totalMonths = loan.totalMonths,
                                 paidMonths = loan.paidMonths,

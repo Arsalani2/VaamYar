@@ -1275,6 +1275,37 @@ class LoanRepository(
         }
 
     /**
+     * فیکس bug.md/NB-47: کلیک روی نودِ ماهِ مشخص در کارت وام باید همان ماهِ واقعیِ
+     * (سال، ماه) را toggle کند — درج رکورد همان ماه اگر پرداخت‌نشده است، حذفِ
+     * همان رکورد اگر پرداخت‌شده است — نه رفتار ترتیبیِ recordInstallmentPayment
+     * («اولین ماه بدون رکورد = پرداخت / آخرین رکورد = پس‌گرفتن») که با رکوردهای
+     * پراکنده، ماهِ اشتباه را جابه‌جا می‌کرد. بند ۶ NB-31 برای دکمه‌های +/− دست‌نخورده
+     * می‌ماند؛ این مسیرِ مستقیمِ نودهای تقویمِ کارت است (هم‌ارز toggle لوکال دیالوگ NB-37).
+     */
+    suspend fun toggleInstallmentMonth(
+        loan: Loan,
+        year: Int,
+        month: Int,
+        currentDate: ShamsiDate
+    ) = withContext(Dispatchers.IO) {
+        database.withTransaction<Unit> {
+            val current = loanDao.getLoanByIdOnce(loan.id) ?: return@withTransaction
+            val number = ShamsiDateHelper.installmentNumberForMonth(
+                current.startYear, current.startMonth, year, month
+            ) ?: return@withTransaction
+            if (number > current.totalMonths) return@withTransaction
+            val already = loanInstallmentDao.getInstallmentsForLoanOnce(current.id)
+                .any { it.year == year && it.month == month }
+            if (already) {
+                removeInstallmentRecord(current, number, year, month)
+            } else {
+                insertInstallmentRecord(current, number, year, month, currentDate)
+            }
+            syncLoanCountersFromRecords(current, currentDate)
+        }
+    }
+
+    /**
      * افزایش/کاهش دستی (دکمه‌های +/−) — طبق بند ۶ متد فیکس NB-31 همچنان ترتیبی کار
      * می‌کنند اما روی رکوردهای واقعی: «+» اولین ماهِ بدون رکورد را می‌پردازد و «−»
      * آخرین رکورد را پس می‌گیرد. فیکس‌های P1-3/NB-3 (حذف آینهٔ تاریخچه، بدون تکراری،

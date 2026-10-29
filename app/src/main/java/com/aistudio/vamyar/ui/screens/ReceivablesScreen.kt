@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.ui.PersonReceivableSummary
+import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.dialogs.ReminderShareDialog
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
@@ -61,8 +62,8 @@ fun ReceivablesScreen(
         (totalCollectedThisMonth.toFloat() / totalReceivableAmount).coerceIn(0f, 1f)
     } else 0f
 
-    val brandViolet = Color(0xFF6C27DF)
-    val brandIndigo = Color(0xFF4F46E5)
+    val brandViolet = MaterialTheme.colorScheme.primary
+    val brandIndigo = MaterialTheme.colorScheme.secondary
 
     LazyColumn(
         modifier = modifier
@@ -78,13 +79,13 @@ fun ReceivablesScreen(
                     text = "مطالبات",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color(0xFF0F172A)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "سهم واریزی شرکای وام به حساب $activeUserName",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -98,7 +99,7 @@ fun ReceivablesScreen(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
                     modifier = Modifier
@@ -116,7 +117,7 @@ fun ReceivablesScreen(
                             text = "کل مانده این ماه:",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         Surface(
@@ -151,20 +152,22 @@ fun ReceivablesScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = NumberFormatter.formatNumber(
-                                number = remainingUnpaid,
-                                usePersian = usePersianDigits
+                            text = NumberFormatter.formatPrice( // فیکس bug.md/NB-46: عدد پولی + احترام به compactThousands
+                                remainingUnpaid,
+                                withUnit = false,
+                                usePersian = usePersianDigits,
+                                compactThousands = compactThousands
                             ),
                             fontSize = 30.sp,
                             fontWeight = FontWeight.Black,
-                            color = if (remainingUnpaid == 0L && totalReceivableAmount > 0) Color(0xFF10B981) else Color(0xFF0F172A),
+                            color = if (remainingUnpaid == 0L && totalReceivableAmount > 0) SuccessGreen else MaterialTheme.colorScheme.onSurface,
                             letterSpacing = (-0.5).sp
                         )
                         Text(
                             text = "تومان",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF94A3B8),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
@@ -175,7 +178,7 @@ fun ReceivablesScreen(
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFFF1F5F9))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Box(
                             modifier = Modifier
@@ -200,13 +203,13 @@ fun ReceivablesScreen(
                             text = "دریافت‌شده: ${NumberFormatter.formatPrice(totalCollectedThisMonth, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "باقی‌مانده: ${NumberFormatter.formatPrice(remainingUnpaid, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (remainingUnpaid == 0L) Color(0xFF10B981) else brandViolet
+                            color = if (remainingUnpaid == 0L) SuccessGreen else brandViolet
                         )
                     }
                 }
@@ -297,7 +300,7 @@ fun PartnerReceivableCard(
     onToggleShare: (Long, Boolean) -> Unit,
     onRemindClick: () -> Unit
 ) {
-    val brandViolet = Color(0xFF6C27DF)
+    val brandViolet = MaterialTheme.colorScheme.primary
 
     Card(
         modifier = Modifier
@@ -306,7 +309,7 @@ fun PartnerReceivableCard(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier
@@ -344,13 +347,13 @@ fun PartnerReceivableCard(
                             text = summary.personName,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${NumberFormatter.formatNumber(summary.loansCount, usePersian = usePersianDigits)} سهم اقساط این ماه",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -360,34 +363,34 @@ fun PartnerReceivableCard(
                     if (summary.isAllPaidCurrentMonth) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFFDCFCE7),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF86EFAC).copy(alpha = 0.5f))
+                            color = SuccessGreen.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.15f))
                         ) {
                             Text(
                                 text = "تسویه کامل این ماه ✓",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF15803D),
+                                color = SuccessGreen,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     } else {
                         Text(
-                            text = NumberFormatter.formatNumber(summary.remainingUnpaidThisMonth, usePersianDigits),
+                            text = NumberFormatter.formatPrice(summary.remainingUnpaidThisMonth, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color(0xFF0F172A)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "تومان طلب",
                             fontSize = 10.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            HorizontalDivider(color = Color(0xFFF1F5F9))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // Indented & Guided Sub-items Section (Stitch prototype: right border guide line)
             Row(
@@ -464,13 +467,13 @@ private fun ReceivableShareRow(
     compactThousands: Boolean,
     onToggle: (Boolean) -> Unit
 ) {
-    val brandViolet = Color(0xFF6C27DF)
+    val brandViolet = MaterialTheme.colorScheme.primary
     val isPaid = share.isPaidForCurrentMonth
 
     Surface(
         onClick = { onToggle(!isPaid) },
         shape = RoundedCornerShape(14.dp),
-        color = if (isPaid) Color(0xFFF8FAFC) else Color.Transparent,
+        color = if (isPaid) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -491,10 +494,10 @@ private fun ReceivableShareRow(
                     modifier = Modifier
                         .size(22.dp)
                         .clip(RoundedCornerShape(7.dp))
-                        .background(if (isPaid) brandViolet else Color.White)
+                        .background(if (isPaid) brandViolet else MaterialTheme.colorScheme.surface) // فیکس bug.md/NB-45
                         .border(
                             width = 1.5.dp,
-                            color = if (isPaid) brandViolet else Color(0xFFCBD5E1),
+                            color = if (isPaid) brandViolet else MaterialTheme.colorScheme.outlineVariant,
                             shape = RoundedCornerShape(7.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -514,13 +517,13 @@ private fun ReceivableShareRow(
                         text = share.loanTitle,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isPaid) Color(0xFF64748B) else Color(0xFF0F172A)
+                        color = if (isPaid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             text = "${NumberFormatter.formatNumber(share.dueDay, usePersian = usePersianDigits)}م ماه",
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (share.shareDescription.isNotBlank()) {
                             Text(
@@ -536,15 +539,15 @@ private fun ReceivableShareRow(
             // Left: Amount
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = NumberFormatter.formatNumber(share.shareAmount, usePersianDigits),
+                    text = NumberFormatter.formatPrice(share.shareAmount, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isPaid) Color(0xFF94A3B8) else Color(0xFF0F172A)
+                    color = if (isPaid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "تومان",
                     fontSize = 10.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
