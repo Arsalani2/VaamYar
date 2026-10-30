@@ -685,4 +685,240 @@ class PureLogicUnitTest {
         assertEquals(0L, empty.next6MonthsTotal)
         assertEquals(6, empty.months.size)
     }
+
+    // ---------------------------------------------------------------- SB-01 (دفاع ایمپورت بکاپ دست‌ساز)
+
+    /** ریشهٔ بکاپ دست‌سازِ مینیمال (بدون چک‌سام — مجاز به‌عنوان legacy) با payload قابل تزریق. */
+    private fun sb01_handcraftedRoot(payloadBuild: (org.json.JSONObject) -> Unit): String {
+        val payload = org.json.JSONObject()
+        payloadBuild(payload)
+        return org.json.JSONObject()
+            .put("app", "VaamYar")
+            .put("appIdentifier", "com.aistudio.vamyar")
+            .put("schemaVersion", 1)
+            .put("payload", payload)
+            .toString()
+    }
+
+    private fun sb01_loanObj(id: Long) = org.json.JSONObject()
+        .put("id", id)
+        .put("title", "وام $id")
+        .put("dueDay", 10)
+        .put("monthlyAmount", 1_000_000L)
+        .put("totalMonths", 12)
+        .put("paidMonths", 0)
+        .put("startYear", 1405)
+        .put("startMonth", 1)
+
+    /** فیکس bug.md/SB-01: فایل بزرگ‌تر از سقف مطلق (۱۰M کاراکتر) قبل از هر پارسی رد می‌شود. */
+    @Test
+    fun sb01_backupLargerThanJsonCapIsRejected() {
+        val huge = "a".repeat(BackupHelper.MAX_BACKUP_JSON_CHARS + 10)
+        val result = BackupHelper.parseAndValidateBackup(huge)
+        assertTrue(result.isFailure)
+        assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, result.exceptionOrNull()?.message)
+    }
+
+    /** فیکس bug.md/SB-01: سقف تعداد رکوردها در همهٔ آرایه‌ها — رد با پیام واحد. */
+    @Test
+    fun sb01_backupCountCapsRejectHandcraftedFiles() {
+        // ۵۰۱ وام (سقف ۵۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val arr = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_LOANS + 1) arr.put(sb01_loanObj(i.toLong()))
+                p.put("users", org.json.JSONArray()).put("loans", arr)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+        // ۲۰۱ کاربر (سقف ۲۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val arr = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_USERS + 1) arr.put(org.json.JSONObject().put("id", i.toLong()).put("name", "کاربر$i").put("isPrimary", i == 1))
+                p.put("users", arr)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+        // ۱۰۰۱ سهم (سقف ۱۰۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val shares = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_SHARES + 1) shares.put(org.json.JSONObject().put("loanId", 10L).put("personName", "شریک$i").put("shareAmount", 100L))
+                p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L))).put("shares", shares)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+        // ۶۰٬۰۰۱ قسط (سقف ۶۰٬۰۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val arr = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_INSTALLMENTS + 1) arr.put(org.json.JSONObject().put("loanId", 10L).put("installmentNumber", 1).put("year", 1405).put("month", 1).put("amount", 0L))
+                p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L))).put("installments", arr)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+        // ۶۰٬۰۰۱ رکورد پرداخت (سقف ۶۰٬۰۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val arr = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_RECORDS + 1) arr.put(org.json.JSONObject().put("id", i.toLong()).put("loanId", 10L).put("installmentNumber", 1).put("amountPaid", 0L))
+                p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L))).put("records", arr)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+    }
+
+    /** فیکس bug.md/SB-01: آیکون base64 عظیم یا بیش از سقف تعداد → رد کل فایل (ضد OOM هنگام decode). */
+    @Test
+    fun sb01_oversizedOrTooManyIconsAreRejected() {
+        // یک آیکون با base64 بزرگ‌تر از سقف
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val icons = org.json.JSONArray()
+                    .put(org.json.JSONObject().put("loanId", 10L).put("fileName", "ic.png").put("data", "A".repeat(BackupHelper.MAX_ICON_BASE64_CHARS + 1)))
+                p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L))).put("icons", icons)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+        // ۵۰۱ آیکون (سقف ۵۰۰)
+        run {
+            val json = sb01_handcraftedRoot { p ->
+                val icons = org.json.JSONArray()
+                for (i in 1..BackupHelper.MAX_BACKUP_ICONS + 1) icons.put(org.json.JSONObject().put("loanId", 10L).put("fileName", "ic$i.png").put("data", "AAAA"))
+                p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L))).put("icons", icons)
+            }
+            val r = BackupHelper.parseAndValidateBackup(json)
+            assertTrue(r.isFailure)
+            assertEquals(BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, r.exceptionOrNull()?.message)
+        }
+    }
+
+    /** فیکس bug.md/SB-01: مقادیر خصمانهٔ بکاپ دست‌ساز کلمپ/کوتاه می‌شوند، نه کرش یا دادهٔ منفی. */
+    @Test
+    fun sb01_hostileValuesAreClamped() {
+        val longText = "x".repeat(10_000)
+        val json = sb01_handcraftedRoot { p ->
+            p.put(
+                "users",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("id", 1L).put("name", longText).put("isPrimary", true).put("notes", longText))
+            ).put(
+                "loans",
+                org.json.JSONArray()
+                    .put(
+                        org.json.JSONObject()
+                            .put("id", 10L).put("title", longText)
+                            .put("dueDay", 99)
+                            .put("monthlyAmount", -5_000L)
+                            .put("totalMonths", 12).put("paidMonths", 0)
+                            .put("startYear", 999).put("startMonth", 99)
+                            .put("endYear", 9999).put("endMonth", 0)
+                            .put("myShareAmount", -1L)
+                            .put("notes", longText)
+                    )
+            ).put(
+                "shares",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("loanId", 10L).put("personName", longText).put("loanTitle", longText).put("shareAmount", -1L).put("dueDay", 99).put("shareDescription", longText))
+            ).put(
+                "records",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("id", 1L).put("loanId", 10L).put("installmentNumber", 0).put("amountPaid", -5L).put("loanTitle", longText))
+            ).put(
+                "installments",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("loanId", 10L).put("installmentNumber", 1).put("year", 9999).put("month", 99).put("amount", -1L))
+            )
+        }
+
+        val data = BackupHelper.parseAndValidateBackup(json).getOrNull()!!
+        // کاربر
+        assertEquals(BackupHelper.MAX_TEXT_FIELD_CHARS, data.users.first().name.length)
+        assertEquals(BackupHelper.MAX_NOTES_FIELD_CHARS, data.users.first().notes.length)
+        // وام
+        val loan = data.loans.first()
+        assertEquals(BackupHelper.MAX_TEXT_FIELD_CHARS, loan.title.length)
+        assertEquals(BackupHelper.MAX_NOTES_FIELD_CHARS, loan.notes.length)
+        assertEquals(31, loan.dueDay)
+        assertEquals(0L, loan.monthlyAmount)
+        assertEquals(0L, loan.myShareAmount)
+        assertEquals(BackupHelper.MIN_SHAMSI_YEAR, loan.startYear)
+        assertEquals(12, loan.startMonth)
+        assertEquals(BackupHelper.MAX_SHAMSI_YEAR, loan.endYear)
+        assertEquals(1, loan.endMonth)
+        // سهم
+        val share = data.shares.first()
+        assertEquals(BackupHelper.MAX_TEXT_FIELD_CHARS, share.personName.length)
+        assertEquals(0L, share.shareAmount)
+        assertEquals(31, share.dueDay)
+        assertEquals(BackupHelper.MAX_NOTES_FIELD_CHARS, share.shareDescription.length)
+        // رکورد
+        val record = data.records.first()
+        assertEquals(1, record.installmentNumber)
+        assertEquals(0L, record.amountPaid)
+        assertEquals(BackupHelper.MAX_TEXT_FIELD_CHARS, record.loanTitle.length)
+        // قسط
+        val installment = data.installments.first()
+        assertEquals(BackupHelper.MAX_SHAMSI_YEAR, installment.year)
+        assertEquals(12, installment.month)
+        assertEquals(0L, installment.amount)
+    }
+
+    /** فیکس bug.md/SB-01: publicId تکراری — اولین رکورد نگه داشته می‌شود، تکراری خالی می‌شود. */
+    @Test
+    fun sb01_duplicatePublicIdsKeepFirstAndBlankTheSecond() {
+        val json = sb01_handcraftedRoot { p ->
+            p.put(
+                "users",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("id", 1L).put("name", "اول").put("isPrimary", true).put("publicId", "U-dup001"))
+                    .put(org.json.JSONObject().put("id", 2L).put("name", "دوم").put("publicId", "U-dup001"))
+            ).put(
+                "loans",
+                org.json.JSONArray()
+                    .put(sb01_loanObj(10L).put("publicId", "L-dup001"))
+                    .put(sb01_loanObj(11L).put("publicId", "L-dup001"))
+            ).put(
+                "shares",
+                org.json.JSONArray()
+                    .put(org.json.JSONObject().put("loanId", 10L).put("personName", "الف").put("publicId", "S-dup001"))
+                    .put(org.json.JSONObject().put("loanId", 10L).put("personName", "ب").put("publicId", "S-dup001"))
+            )
+        }
+
+        val data = BackupHelper.parseAndValidateBackup(json).getOrNull()!!
+        assertEquals("U-dup001", data.users[0].publicId)
+        assertEquals("", data.users[1].publicId)
+        assertEquals("L-dup001", data.loans[0].publicId)
+        assertEquals("", data.loans[1].publicId)
+        assertEquals("S-dup001", data.shares[0].publicId)
+        assertEquals("", data.shares[1].publicId)
+    }
+
+    /** فیکس bug.md/SB-01: بکاپ legacy مینیمال (بدون publicId/installments/icons/چک‌سام/حتی users) همچنان پارس می‌شود. */
+    @Test
+    fun sb01_legacyMinimalBackupStillParses() {
+        val json = sb01_handcraftedRoot { p ->
+            p.put("users", org.json.JSONArray()).put("loans", org.json.JSONArray().put(sb01_loanObj(10L)))
+        }
+        val data = BackupHelper.parseAndValidateBackup(json).getOrNull()!!
+        // بدون users → کاربر مبنا ساخته می‌شود (مسیر legacy NB-4)
+        assertTrue(data.users.isNotEmpty() && data.users.first().isPrimary)
+        assertEquals(1, data.loans.size)
+        assertTrue(data.installments.isEmpty())
+        assertTrue(data.icons.isEmpty())
+    }
 }

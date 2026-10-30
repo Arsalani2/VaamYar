@@ -42,6 +42,27 @@ data class LoanIconItem(
 
 object LoanIconHelper {
 
+    // فیکس bug.md/SB-01: سقف ابعاد آیکون سفارشی — فایل بکاپ دست‌ساز می‌تواند بیت‌مپی
+    // عظیم (مثلاً ۲۰۰۰۰×۲۰۰۰۰) داخل base64 بدهد که هنگام decode حافظه را می‌بلعد؛
+    // ایمپورت قبل از نوشتن، ابعاد را فقط با inJustDecodeBounds چک می‌کند.
+    const val MAX_ICON_DIMENSION_PX = 1024
+
+    /**
+     * فیکس bug.md/SB-01: اگر بیت‌مپ از [MAX_ICON_DIMENSION_PX] بزرگ‌تر باشد true
+     * برمی‌گرداند. فقط هدر تصویر خوانده می‌شود (بدون تخصیص پیکسل‌ها)؛ در خطا false
+     * (پارسر خودش بعداً رد می‌کند).
+     */
+    fun exceedsMaxIconDimensions(bytes: ByteArray): Boolean {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            (options.outWidth > MAX_ICON_DIMENSION_PX || options.outHeight > MAX_ICON_DIMENSION_PX)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     val PRESET_ICONS = listOf(
         LoanIconItem("account_balance", "بانک و وام", Icons.Default.AccountBalance),
         LoanIconItem("directions_car", "خودرو و نقلیه", Icons.Default.DirectionsCar),
