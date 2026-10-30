@@ -1782,34 +1782,122 @@ fun SettingsScreen(
 
     // Modal: Confirm Full Reset
     if (showFullResetConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showFullResetConfirmDialog = false },
-            title = { Text("بازنشانی کامل برنامه") },
-            text = {
-                Text(
-                    "همهٔ وام‌ها، سهم‌های شرکا، تاریخچهٔ پرداخت‌ها و همهٔ کاربران (حتی کاربر مبنا) " +
-                        "برای همیشه پاک می‌شوند و برنامه یک کاربر مبنا پیش‌فرض می‌سازد. " +
-                        "این عملیات فقط با فایل پشتیبان قابل بازگشت است. ادامه می‌دهید؟"
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onFullReset()
-                        showFullResetConfirmDialog = false
-                        Toast.makeText(context, "برنامه کامل بازنشانی شد و کاربر مبنا ساخته شد", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showFullResetConfirmDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                modifier = Modifier.fillMaxWidth(0.96f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text("بله، بازنشانی کامل شود")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showFullResetConfirmDialog = false }) {
-                    Text("انصراف")
+                    // Pulsating / soft danger badge
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "بازنشانی کامل برنامه به حالت اولیه",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "همهٔ وام‌ها، سهم‌های شرکا، تاریخچهٔ پرداخت‌ها و همهٔ کاربران برای همیشه پاک می‌شوند و برنامه از صفر با کاربر مبنا پیش‌فرض راه‌اندازی می‌شود.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp
+                        )
+                    }
+
+                    // Amber/Rose callout box
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "این عملیات غیرقابل بازگشت است مگر اینکه قبلاً فایل پشتیبان تهیه کرده باشید.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showFullResetConfirmDialog = false },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                        ) {
+                            Text("انصراف", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                onFullReset()
+                                showFullResetConfirmDialog = false
+                                Toast.makeText(context, "برنامه کامل بازنشانی شد و کاربر مبنا ساخته شد", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1.5f)
+                                .height(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("بله، بازنشانی شود", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 
     // Modal: Import Preview Dialog
@@ -1842,105 +1930,351 @@ fun SettingsScreen(
     }
 
     pendingImport?.let { (importJson, preview) ->
-        AlertDialog(
+        androidx.compose.ui.window.Dialog(
             onDismissRequest = {
                 if (!importInProgress) pendingImport = null
-            },
-            title = { Text("پیش‌نمایش ایمپورت پشتیبان") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("تاریخ فایل: ${preview.exportedDate}")
-                    Text("کاربران: ${preview.userCount}  |  وام‌ها: ${preview.loanCount}  |  سهم‌ها: ${preview.shareCount}")
-                    Text("سوابق پرداخت: ${preview.recordCount}  |  اقساط: ${preview.installmentCount}  |  آیکون‌ها: ${preview.iconCount}")
+            }
+        ) {
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.96f)
+                    .padding(vertical = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(brandViolet.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SettingsBackupRestore,
+                                    contentDescription = null,
+                                    tint = brandViolet,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "پیش‌نمایش ایمپورت پشتیبان",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "بررسی محتوای پشتیبان قبل از اعمال روی دیتابیس",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
 
-                    if (preview.newUsers.isNotEmpty()) {
-                        Text("کاربران جدید:", fontWeight = FontWeight.Bold)
-                        Text(preview.newUsers.joinToString("، "), fontSize = 12.sp)
+                        IconButton(
+                            onClick = { if (!importInProgress) pendingImport = null },
+                            modifier = Modifier.size(32.dp),
+                            enabled = !importInProgress
+                        ) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "بستن", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
-                    if (preview.existingUsers.isNotEmpty()) {
-                        Text("کاربران تکراری (موجود):", fontWeight = FontWeight.Bold)
-                        Text(preview.existingUsers.joinToString("، "), fontSize = 12.sp)
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Metadata Summary Box
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "تاریخ فایل: ${preview.exportedDate}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "فایل معتبر ✓",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF059669),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            // 3-column stats matrix
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = NumberFormatter.formatNumber(preview.loanCount, usePersianDigits),
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 15.sp,
+                                            color = brandViolet
+                                        )
+                                        Text(text = "وام", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = NumberFormatter.formatNumber(preview.userCount, usePersianDigits),
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 15.sp,
+                                            color = brandViolet
+                                        )
+                                        Text(text = "کاربر", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = NumberFormatter.formatNumber(preview.recordCount, usePersianDigits),
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 15.sp,
+                                            color = brandViolet
+                                        )
+                                        Text(text = "پرداخت", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
                     }
-                    if (preview.newLoans.isNotEmpty()) {
-                        Text("وام‌های جدید:", fontWeight = FontWeight.Bold)
-                        Text(preview.newLoans.joinToString("، "), fontSize = 12.sp)
-                    }
-                    if (preview.existingLoans.isNotEmpty()) {
-                        Text("وام‌های تکراری (موجود):", fontWeight = FontWeight.Bold)
-                        Text(preview.existingLoans.joinToString("، "), fontSize = 12.sp)
-                    }
-                    if (preview.newShareCount > 0) {
-                        Text("سهم‌های شراکت جدید: ${preview.newShareCount}")
+
+                    // Entity details chips
+                    if (preview.newLoans.isNotEmpty() || preview.newUsers.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (preview.newLoans.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.1f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "${preview.newLoans.size} وام جدید",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF059669),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp)
+                                    )
+                                }
+                            }
+                            if (preview.newUsers.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = brandViolet.copy(alpha = 0.1f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "${preview.newUsers.size} کاربر جدید",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = brandViolet,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     if (preview.legacyMatch) {
-                        Text(
-                            "⚠️ برخی موارد تکراری با «کلید جایگزین» شناخته شده‌اند نه با شناسهٔ یکتای بکاپ؛ در ادغام، این موارد به‌جای درج دوباره به‌روزرسانی/رد می‌شوند.",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "⚠️ برخی موارد با «کلید جایگزین» تطبیق داده شده‌اند نه با شناسهٔ یکتا؛ در ادغام، این موارد به‌روزرسانی می‌شوند.",
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
                     }
 
-                    HorizontalDivider()
-                    Text("حالت ایمپورت را انتخاب کنید:", fontWeight = FontWeight.Bold)
+                    // Mode Selection
+                    Text(
+                        text = "نحوه اعمال داده‌ها:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
                     ImportMode.entries.forEach { mode ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !importInProgress) { selectedImportMode = mode }
+                        val isModeSelected = selectedImportMode == mode
+                        Surface(
+                            onClick = { if (!importInProgress) selectedImportMode = mode },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isModeSelected) brandViolet.copy(alpha = 0.08f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                width = if (isModeSelected) 1.5.dp else 1.dp,
+                                color = if (isModeSelected) brandViolet
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            RadioButton(
-                                selected = selectedImportMode == mode,
-                                onClick = null,
-                                enabled = !importInProgress
-                            )
-                            Text(mode.titleFa, fontSize = 13.sp)
-                        }
-                    }
-                    if (selectedImportMode == ImportMode.REPLACE_ALL) {
-                        Text(
-                            "⚠️ جایگزینی کامل، تمام داده‌های فعلی را پاک می‌کند.",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    enabled = !importInProgress,
-                    onClick = {
-                        importInProgress = true
-                        coroutineScope.launch {
-                            val result = onImportBackup(importJson, selectedImportMode)
-                            importInProgress = false
-                            if (result.isSuccess) {
-                                Toast.makeText(context, result.getOrNull() ?: "ایمپورت با موفقیت انجام شد", Toast.LENGTH_LONG).show()
-                                pendingImport = null
-                            } else {
-                                Toast.makeText(context, "خطا در ایمپورت پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                RadioButton(
+                                    selected = isModeSelected,
+                                    onClick = null,
+                                    enabled = !importInProgress,
+                                    colors = RadioButtonDefaults.colors(selectedColor = brandViolet)
+                                )
+                                Column {
+                                    Text(
+                                        text = mode.titleFa,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isModeSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    val modeDesc = if (mode == ImportMode.REPLACE_ALL) "حذف کل داده‌های فعلی و جایگزینی با محتوای فایل" else "افزودن اطلاعات فایل بدون حذف یا تکرار رکوردهای قبلی"
+                                    Text(
+                                        text = modeDesc,
+                                        fontSize = 10.sp,
+                                        color = if (mode == ImportMode.REPLACE_ALL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                    },
-                    colors = if (selectedImportMode == ImportMode.REPLACE_ALL) {
-                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.buttonColors()
                     }
-                ) {
-                    Text("شروع ایمپورت")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !importInProgress,
-                    onClick = { pendingImport = null }
-                ) {
-                    Text("انصراف")
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            enabled = !importInProgress,
+                            onClick = { pendingImport = null },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                        ) {
+                            Text("انصراف", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            enabled = !importInProgress,
+                            onClick = {
+                                importInProgress = true
+                                coroutineScope.launch {
+                                    val result = onImportBackup(importJson, selectedImportMode)
+                                    importInProgress = false
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, result.getOrNull() ?: "ایمپورت با موفقیت انجام شد", Toast.LENGTH_LONG).show()
+                                        pendingImport = null
+                                    } else {
+                                        Toast.makeText(context, "خطا در ایمپورت پشتیبان: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
+                            colors = if (selectedImportMode == ImportMode.REPLACE_ALL) {
+                                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            } else {
+                                ButtonDefaults.buttonColors(containerColor = brandViolet)
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .weight(1.5f)
+                                .height(48.dp)
+                        ) {
+                            if (importInProgress) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDownload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("شروع ایمپورت", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 }
 

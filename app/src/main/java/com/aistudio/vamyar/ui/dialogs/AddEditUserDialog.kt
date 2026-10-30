@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.util.PersianNameNormalizer
@@ -60,98 +61,179 @@ fun AddEditUserDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier.fillMaxWidth(0.95f)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier.fillMaxWidth(0.96f)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header
+                // Modern Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (userToEdit == null) "تعریف کاربر جدید" else "ویرایش مشخصات کاربر",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "بستن")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (userToEdit == null) Icons.Default.PersonAdd else Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = if (userToEdit == null) "تعریف کاربر جدید" else "ویرایش مشخصات کاربر",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "جهت تفکیک سهم شرکا و مدیریت دقیق مطالبات",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "بستن",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
-                HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                // Name
+                // Name Input
                 OutlinedTextField(
                     value = name,
                     onValueChange = {
                         name = it
                         nameError = duplicateNameError(it)
                     },
-                    label = { Text("نام کاربر") },
-                    placeholder = { Text("مثلاً: علی یا مریم") },
+                    label = { Text("نام و نام خانوادگی یا عنوان") },
+                    placeholder = { Text("مثلاً: علی رضایی یا حساب مشترک") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
                     isError = nameError != null,
-                    supportingText = { nameError?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    supportingText = { nameError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) } },
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Notes / Description
+                // Notes / Role
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("توضیحات یا نقش کاربر") },
-                    placeholder = { Text("مثلاً: شریک وام‌های شخصی") },
+                    label = { Text("نقش یا توضیحات (اختیاری)") },
+                    placeholder = { Text("مثلاً: همسر، همکار، شریک وام مسکن") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Color picker
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("رنگ نشانگر پروفایل:", style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "رنگ نشانگر پروفایل:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                            .padding(vertical = 10.dp, horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         colorOptions.forEach { colorHex ->
                             val color = Color(colorHex)
                             val isSelected = selectedColor == colorHex
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(36.dp)
                                     .clip(CircleShape)
                                     .background(color)
                                     .clickable { selectedColor = colorHex }
                                     .then(
-                                        if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                        if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                                         else Modifier
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "انتخاب‌شده",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                            )
+                                }
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text("انصراف")
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text("انصراف", fontWeight = FontWeight.Bold)
                     }
 
                     Button(
                         onClick = {
-                            // فیکس bug.md/NB-20: ذخیره فقط با نام غیرخالی و غیرتکراری
                             val duplicateError = duplicateNameError(name)
                             nameError = duplicateError
                             if (name.isNotBlank() && duplicateError == null) {
@@ -165,9 +247,18 @@ fun AddEditUserDialog(
                             }
                         },
                         enabled = name.isNotBlank(),
-                        modifier = Modifier.weight(1f)
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .height(48.dp)
                     ) {
-                        Text("ذخیره کاربر")
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("ذخیره کاربر", fontWeight = FontWeight.Bold)
                     }
                 }
             }

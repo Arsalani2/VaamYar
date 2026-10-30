@@ -2,6 +2,7 @@ package com.aistudio.vamyar.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,16 +34,15 @@ fun InstallmentNodesView(
     startMonth: Int,
     accentColor: Color,
     usePersianDigits: Boolean = true,
-    // فیکس bug.md/F1+NB-31: نودها از رکوردهای واقعی رنگ می‌گیرند، نه از شمارندهٔ ترتیبی —
-    // paidYearMonths = مجموعهٔ (سال، ماه) اقساط پرداخت‌شده (null = fallback ترتیبیِ قدیمی)،
-    // overdueYearMonths = ماه‌های سررسیدگذشتهٔ بدون رکورد، currentYearMonth = ماه جاریِ تقویم.
     paidYearMonths: Set<Pair<Int, Int>>? = null,
     overdueYearMonths: Set<Pair<Int, Int>> = emptySet(),
     currentYearMonth: Pair<Int, Int>? = null,
     onNodeClick: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // قسطِ متناظر با ماهِ جاریِ تقویم (اگر داخل بازهٔ وام باشد) — نه «قسط بعدیِ ترتیبی»
+    val brandViolet = Color(0xFF6C27DF)
+
+    // Current month installment index
     val currentMonthIndex = currentYearMonth?.let { (cy, cm) ->
         val n = (cy * 12 + cm - 1) - (startYear * 12 + startMonth - 1) + 1
         if (n in 1..totalMonths) n else null
@@ -50,7 +51,7 @@ fun InstallmentNodesView(
     // Pulsing animation for the current active month
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
+        initialValue = 0.4f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(850, easing = FastOutSlowInEasing),
@@ -61,99 +62,119 @@ fun InstallmentNodesView(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Legend indicators
+        // Sub-box Headline & Description
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = "تقویم ماه‌های اقساط (به تفکیک ماه شمسی):",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+            Icon(
+                imageVector = Icons.Default.DateRange,
+                contentDescription = null,
+                tint = brandViolet,
+                modifier = Modifier.size(18.dp)
             )
+            Text(
+                text = "تقویم ماه‌های اقساط",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+            Text(
+                text = "(به تفکیک ماه شمسی)",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color(0xFF94A3B8)
+            )
+        }
 
+        // Visual Legend / Filter Guide Card matching Stitch prototype
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFF8FAFC),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.7f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Paid
+                // Item 1: Paid
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(9.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
                             .background(accentColor)
                     )
-                    Text("پرداخت شده", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
+                    Text("پرداخت شده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
                 }
 
-                // Current
+                // Item 2: Upcoming
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(9.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
-                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            .border(1.5.dp, brandViolet, CircleShape)
+                            .background(Color.White)
                     )
-                    Text("قسط پیش‌رو", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
+                    Text("قسط پیش‌رو", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
                 }
 
-                // فیکس bug.md/F1+NB-31: راهنمای وضعیت عقب‌افتاده
+                // Item 3: Overdue
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(9.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .background(Color(0xFFE11D48))
                     )
-                    Text("عقب‌افتاده", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
+                    Text("عقب‌افتاده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
                 }
 
-                // Remaining
+                // Item 4: Remaining
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(9.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(Color(0xFFCBD5E1))
                     )
-                    Text("مانده", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
+                    Text("مانده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF94A3B8))
                 }
             }
         }
 
-        // Nodes Grid (FlowRow) with Shamsi Month Names
+        // Horizontal Scrollable / FlowRow Grid with Responsive Chips
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             for (k in 1..totalMonths) {
-                // Calculate exact Shamsi month and year for this installment
                 val monthFromZero = (startMonth - 1) + (k - 1)
                 val year = startYear + (monthFromZero / 12)
                 val month = (monthFromZero % 12) + 1
                 val monthName = ShamsiDateHelper.getMonthName(month)
-                // فیکس bug.md/NB-23: متغیر مردهٔ shortYear (بدون هیچ استفاده‌ای) حذف شد.
 
-                // فیکس bug.md/F1+NB-31: پرداخت‌بودن از رکوردهای واقعی (ماه شمسی)؛
-                // ماهِ سررسیدگذشتهٔ بدون رکورد = عقب‌افتاده
                 val isPaid = paidYearMonths?.contains(year to month) ?: (k <= paidMonths)
                 val isOverdue = !isPaid && overdueYearMonths.contains(year to month)
                 val isCurrent = k == currentMonthIndex && !isPaid && paidMonths < totalMonths
@@ -161,21 +182,31 @@ fun InstallmentNodesView(
                 val nodeBgColor by animateColorAsState(
                     targetValue = when {
                         isPaid -> accentColor
-                        isOverdue -> MaterialTheme.colorScheme.errorContainer
-                        isCurrent -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        isOverdue -> Color(0xFFFFF1F2)
+                        isCurrent -> Color.White
+                        else -> Color(0xFFF8FAFC)
                     },
                     label = "nodeColor_$k"
                 )
 
                 Surface(
                     modifier = Modifier
-                        .widthIn(min = 54.dp)
+                        .widthIn(min = 52.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .then(
                             if (isCurrent) Modifier.border(
                                 width = 2.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha),
+                                color = brandViolet.copy(alpha = pulseAlpha),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            else if (isOverdue) Modifier.border(
+                                width = 1.dp,
+                                color = Color(0xFFFECDD3),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            else if (!isPaid) Modifier.border(
+                                width = 1.dp,
+                                color = Color(0xFFE2E8F0),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             else Modifier
@@ -186,49 +217,54 @@ fun InstallmentNodesView(
                         ),
                     shape = RoundedCornerShape(12.dp),
                     color = nodeBgColor,
-                    tonalElevation = if (isCurrent) 4.dp else 1.dp
+                    shadowElevation = if (isPaid) 2.dp else if (isCurrent) 1.dp else 0.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             if (isPaid) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            } else if (isCurrent) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(brandViolet)
                                 )
                             }
                             Text(
                                 text = monthName,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isCurrent || isPaid || isOverdue) FontWeight.Bold else FontWeight.Medium,
                                 fontSize = 11.sp,
+                                fontWeight = if (isCurrent || isPaid || isOverdue) FontWeight.Bold else FontWeight.Medium,
                                 color = when {
                                     isPaid -> Color.White
-                                    isOverdue -> MaterialTheme.colorScheme.onErrorContainer
-                                    isCurrent -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurface
+                                    isOverdue -> Color(0xFFBE123C)
+                                    isCurrent -> brandViolet
+                                    else -> Color(0xFF475569)
                                 }
                             )
                         }
 
-                        // Year and installment number
                         Text(
-                            text = "${NumberFormatter.formatNumber(year, usePersian = usePersianDigits)}",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = NumberFormatter.formatNumber(year, usePersian = usePersianDigits),
                             fontSize = 9.sp,
+                            fontWeight = FontWeight.Normal,
                             color = when {
                                 isPaid -> Color.White.copy(alpha = 0.85f)
-                                isOverdue -> MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-                                isCurrent -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                isOverdue -> Color(0xFFE11D48).copy(alpha = 0.8f)
+                                isCurrent -> brandViolet.copy(alpha = 0.8f)
+                                else -> Color(0xFF94A3B8)
                             }
                         )
                     }

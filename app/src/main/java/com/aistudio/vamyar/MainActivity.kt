@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.ui.MainViewModel
+import com.aistudio.vamyar.ui.dialogs.AddEditUserDialog
 import com.aistudio.vamyar.ui.dialogs.AppGuideDialog
 import com.aistudio.vamyar.ui.screens.*
 import com.aistudio.vamyar.ui.theme.MyApplicationTheme
@@ -80,7 +82,8 @@ class MainActivity : ComponentActivity() {
 fun VamyarMainApp(viewModel: MainViewModel) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
-    var showUserPickerMenu by remember { mutableStateOf(false) }
+    var showUserPickerModal by remember { mutableStateOf(false) }
+    var showAddUserFromSwitcher by remember { mutableStateOf(false) }
 
     // Request Notification permission on Android 13+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -181,90 +184,38 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                 },
                 actions = {
                     // Quick User Switcher Pill
-                    Box(modifier = Modifier.padding(end = 8.dp)) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                            modifier = Modifier.clickable { showUserPickerMenu = true }
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clickable { showUserPickerModal = true }
+                            .testTag("user_switcher_pill")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(activeUserColor))
-                                )
-                                Text(
-                                    text = "مبنا: $activeUserName",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        // Dropdown for switching primary user
-                        DropdownMenu(
-                            expanded = showUserPickerMenu,
-                            onDismissRequest = { showUserPickerMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = "انتخاب کاربر مبنا:",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                },
-                                onClick = {},
-                                enabled = false
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(activeUserColor))
                             )
-                            allUsers.forEach { user ->
-                                val isSelected = user.id == primaryUser?.id
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(12.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(user.avatarColorHex))
-                                            )
-                                            Text(
-                                                text = user.name,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                            if (isSelected) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    onClick = {
-                                        viewModel.setPrimaryUser(user.id)
-                                        showUserPickerMenu = false
-                                    }
-                                )
-                            }
+                            Text(
+                                text = "مبنا: $activeUserName",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "تغییر کاربر",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -401,6 +352,248 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         // ایمپورت با حالت انتخابی کاربر در دیالوگ تأیید اجرا می‌شود.
                         onPreviewImport = { json -> viewModel.prepareImportPreview(json) },
                         onImportBackup = { json, mode -> viewModel.importBackupJson(json, mode) }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showUserPickerModal) {
+        UserSwitcherModalDialog(
+            users = allUsers,
+            currentPrimaryUser = primaryUser,
+            onSelectUser = { userId ->
+                viewModel.setPrimaryUser(userId)
+                showUserPickerModal = false
+            },
+            onAddNewUser = {
+                showUserPickerModal = false
+                showAddUserFromSwitcher = true
+            },
+            onDismiss = { showUserPickerModal = false }
+        )
+    }
+
+    if (showAddUserFromSwitcher) {
+        AddEditUserDialog(
+            userToEdit = null,
+            existingUsers = allUsers,
+            onDismiss = { showAddUserFromSwitcher = false },
+            onSave = { newUser ->
+                viewModel.saveUser(newUser)
+                viewModel.setPrimaryUser(newUser.id)
+                showAddUserFromSwitcher = false
+            }
+        )
+    }
+}
+
+@Composable
+fun UserSwitcherModalDialog(
+    users: List<UserProfile>,
+    currentPrimaryUser: UserProfile?,
+    onSelectUser: (Long) -> Unit,
+    onAddNewUser: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "انتخاب و سوییچ کاربر مبنا",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "محاسبات سهم شخصی و مطالبات بر پایه این کاربر است",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "بستن",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // User list
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(users.size) { index ->
+                        val user = users[index]
+                        val isSelected = user.id == currentPrimaryUser?.id
+                        val avatarColor = Color(user.avatarColorHex)
+
+                        Surface(
+                            onClick = { onSelectUser(user.id) },
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                width = if (isSelected) 1.8.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Avatar
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(avatarColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = user.name.take(1),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 17.sp
+                                        )
+                                    }
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text(
+                                            text = user.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (user.isPrimary) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = "حساب اصلی",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            val noteText = if (user.notes.isNotBlank()) user.notes else "شریک مالی"
+                                            Text(
+                                                text = noteText,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "انتخاب‌شده",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Add User Button
+                OutlinedButton(
+                    onClick = onAddNewUser,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PersonAdd,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "+ افزودن کاربر یا ذی‌نفع جدید",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
                 }
             }
