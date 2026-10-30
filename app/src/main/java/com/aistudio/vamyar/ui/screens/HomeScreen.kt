@@ -207,11 +207,7 @@ fun HomeScreen(
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = MaterialTheme.colorScheme.surface,
-<<<<<<< HEAD
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-=======
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 shadowElevation = 1.dp,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -228,21 +224,12 @@ fun HomeScreen(
                                             text = "وضعیت ماهانه",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Surface(
                                             shape = RoundedCornerShape(20.dp),
                                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
-=======
-                                            color = Color(0xFF64748B)
-                                        )
-                                        Surface(
-                                            shape = RoundedCornerShape(20.dp),
-                                            color = Color(0xFFDCFCE7),
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF86EFAC).copy(alpha = 0.5f))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         ) {
                                             Row(
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -253,31 +240,19 @@ fun HomeScreen(
                                                     modifier = Modifier
                                                         .size(6.dp)
                                                         .clip(androidx.compose.foundation.shape.CircleShape)
-<<<<<<< HEAD
                                                         .background(MaterialTheme.colorScheme.primary)
-=======
-                                                        .background(Color(0xFF10B981))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 )
                                                 Text(
                                                     text = "آماده برنامه‌ریزی",
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                                     color = MaterialTheme.colorScheme.primary
-=======
-                                                    color = Color(0xFF15803D)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 )
                                             }
                                         }
                                     }
 
-<<<<<<< HEAD
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-=======
-                                    HorizontalDivider(color = Color(0xFFF1F5F9))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -288,11 +263,7 @@ fun HomeScreen(
                                             Text(
                                                 text = "مجموع اقساط سررسید شده",
                                                 fontSize = 11.sp,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-=======
-                                                color = Color(0xFF94A3B8)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                             )
                                             Row(
                                                 verticalAlignment = Alignment.Bottom,
@@ -302,20 +273,12 @@ fun HomeScreen(
                                                     text = NumberFormatter.formatNumber(0, usePersianDigits),
                                                     fontSize = 24.sp,
                                                     fontWeight = FontWeight.Black,
-<<<<<<< HEAD
                                                     color = MaterialTheme.colorScheme.onSurface
-=======
-                                                    color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 )
                                                 Text(
                                                     text = "تومان",
                                                     fontSize = 11.sp,
-<<<<<<< HEAD
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                                                    color = Color(0xFF64748B),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     modifier = Modifier.padding(bottom = 3.dp)
                                                 )
                                             }
@@ -330,11 +293,7 @@ fun HomeScreen(
                                 shape = RoundedCornerShape(28.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-<<<<<<< HEAD
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-=======
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEDE9FE))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -354,11 +313,7 @@ fun HomeScreen(
                                                 .clip(RoundedCornerShape(26.dp))
                                                 .background(
                                                     Brush.linearGradient(
-<<<<<<< HEAD
                                                         listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-=======
-                                                        listOf(Color(0xFF6D28D9), Color(0xFF4F46E5), Color(0xFF818CF8))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     )
                                                 ),
                                             contentAlignment = Alignment.Center
@@ -374,11 +329,7 @@ fun HomeScreen(
                                         // Badge: 0% penalty
                                         Surface(
                                             shape = RoundedCornerShape(20.dp),
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.tertiaryContainer,
-=======
-                                            color = Color(0xFFFBBF24),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                             shadowElevation = 2.dp,
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
@@ -388,11 +339,7 @@ fun HomeScreen(
                                                 text = "٪۰ جریمه دیرکرد",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Black,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
-=======
-                                                color = Color(0xFF0F172A),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
@@ -400,11 +347,7 @@ fun HomeScreen(
                                         // Badge: Smart Reminder
                                         Surface(
                                             shape = RoundedCornerShape(20.dp),
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.primary,
-=======
-                                            color = Color(0xFF10B981),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                             shadowElevation = 2.dp,
                                             modifier = Modifier
                                                 .align(Alignment.BottomStart)
@@ -414,11 +357,7 @@ fun HomeScreen(
                                                 text = "یادآور هوشمند ✓",
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onPrimary,
-=======
-                                                color = Color.White,
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
@@ -429,22 +368,14 @@ fun HomeScreen(
                                         text = "شروع مدیریت بی‌دغدغه اقساط",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Black,
-<<<<<<< HEAD
                                         color = MaterialTheme.colorScheme.onSurface,
-=======
-                                        color = Color(0xFF0F172A),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         textAlign = TextAlign.Center
                                     )
 
                                     Text(
                                         text = "با ثبت اولین وام، دیگر سررسیدها را فراموش نمی‌کنید؛ سهم شرکا خودکار محاسبه شده و از استرس دیرکرد خلاص می‌شوید.",
                                         fontSize = 12.sp,
-<<<<<<< HEAD
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                                        color = Color(0xFF64748B),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         textAlign = TextAlign.Center,
                                         lineHeight = 20.sp
                                     )
@@ -462,11 +393,7 @@ fun HomeScreen(
                                                 .fillMaxWidth()
                                                 .background(
                                                     Brush.linearGradient(
-<<<<<<< HEAD
                                                         listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
-=======
-                                                        listOf(Color(0xFF6D28D9), Color(0xFF4F46E5))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     )
                                                 )
                                                 .padding(vertical = 14.dp),
@@ -504,37 +431,21 @@ fun HomeScreen(
                                             text = "⚡ سریع و کاربردی",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Text(text = "•", color = MaterialTheme.colorScheme.outlineVariant)
-=======
-                                            color = Color(0xFF64748B)
-                                        )
-                                        Text(text = "•", color = Color(0xFFCBD5E1))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         Text(
                                             text = "🔔 افزودن هشدار",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Text(text = "•", color = MaterialTheme.colorScheme.outlineVariant)
-=======
-                                            color = Color(0xFF64748B)
-                                        )
-                                        Text(text = "•", color = Color(0xFFCBD5E1))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         Text(
                                             text = "👥 تفکیک سهم شرکا",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
-=======
-                                            color = Color(0xFF64748B)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         )
                                     }
                                 }
@@ -546,11 +457,7 @@ fun HomeScreen(
                                     text = "یا با یک لمس انتخاب کنید: الگوهای آماده",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                     color = MaterialTheme.colorScheme.onSurface
-=======
-                                    color = Color(0xFF475569)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 )
 
                                 Row(
@@ -562,11 +469,7 @@ fun HomeScreen(
                                         onClick = { showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
-<<<<<<< HEAD
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-=======
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Column(
@@ -578,21 +481,13 @@ fun HomeScreen(
                                                 modifier = Modifier
                                                     .size(36.dp)
                                                     .clip(RoundedCornerShape(10.dp))
-<<<<<<< HEAD
                                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-=======
-                                                    .background(Color(0xFFEDE9FE)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.AccountBalance,
                                                     contentDescription = null,
-<<<<<<< HEAD
                                                     tint = MaterialTheme.colorScheme.primary,
-=======
-                                                    tint = Color(0xFF6D28D9),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -600,21 +495,13 @@ fun HomeScreen(
                                                 text = "بانکی و قرض‌الحسنه",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurface,
-=======
-                                                color = Color(0xFF0F172A),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                             Text(
                                                 text = "مهر، رسالت، مسکن",
                                                 fontSize = 9.sp,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                                                color = Color(0xFF94A3B8),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                         }
@@ -625,11 +512,7 @@ fun HomeScreen(
                                         onClick = { showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
-<<<<<<< HEAD
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-=======
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Column(
@@ -641,21 +524,13 @@ fun HomeScreen(
                                                 modifier = Modifier
                                                     .size(36.dp)
                                                     .clip(RoundedCornerShape(10.dp))
-<<<<<<< HEAD
                                                     .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)),
-=======
-                                                    .background(Color(0xFFE0E7FF)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.ShoppingBag,
                                                     contentDescription = null,
-<<<<<<< HEAD
                                                     tint = MaterialTheme.colorScheme.secondary,
-=======
-                                                    tint = Color(0xFF4338CA),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -663,21 +538,13 @@ fun HomeScreen(
                                                 text = "خرید اقساطی",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurface,
-=======
-                                                color = Color(0xFF0F172A),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                             Text(
                                                 text = "اسنپ‌پی، دیجی‌پی",
                                                 fontSize = 9.sp,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                                                color = Color(0xFF94A3B8),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                         }
@@ -688,11 +555,7 @@ fun HomeScreen(
                                         onClick = { showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
-<<<<<<< HEAD
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-=======
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Column(
@@ -704,21 +567,13 @@ fun HomeScreen(
                                                 modifier = Modifier
                                                     .size(36.dp)
                                                     .clip(RoundedCornerShape(10.dp))
-<<<<<<< HEAD
                                                     .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
-=======
-                                                    .background(Color(0xFFFCE7F3)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.People,
                                                     contentDescription = null,
-<<<<<<< HEAD
                                                     tint = MaterialTheme.colorScheme.tertiary,
-=======
-                                                    tint = Color(0xFFBE185D),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -726,21 +581,13 @@ fun HomeScreen(
                                                 text = "خانگی و دوره‌ای",
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurface,
-=======
-                                                color = Color(0xFF0F172A),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                             Text(
                                                 text = "صندوق‌های فامیلی",
                                                 fontSize = 9.sp,
-<<<<<<< HEAD
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                                                color = Color(0xFF94A3B8),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                                 textAlign = TextAlign.Center
                                             )
                                         }
@@ -913,23 +760,14 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(RoundedCornerShape(22.dp))
-<<<<<<< HEAD
                             .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f))
                             .border(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f), RoundedCornerShape(22.dp)),
-=======
-                            .background(Color(0xFFFFF1F2))
-                            .border(1.dp, Color(0xFFFECDD3), RoundedCornerShape(22.dp)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteForever,
                             contentDescription = null,
-<<<<<<< HEAD
                             tint = MaterialTheme.colorScheme.error,
-=======
-                            tint = Color(0xFFE11D48),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -939,23 +777,14 @@ fun HomeScreen(
                         text = "حذف وام",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
-<<<<<<< HEAD
                         color = MaterialTheme.colorScheme.onSurface
-=======
-                        color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                     )
 
                     // Loan Snapshot Summary Card
                     Surface(
                         shape = RoundedCornerShape(18.dp),
-<<<<<<< HEAD
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-=======
-                        color = Color(0xFFF8FAFC),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -975,72 +804,44 @@ fun HomeScreen(
                                         modifier = Modifier
                                             .size(28.dp)
                                             .clip(RoundedCornerShape(8.dp))
-<<<<<<< HEAD
                                             .background(MaterialTheme.colorScheme.surface)
                                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
-=======
-                                            .background(Color.White)
-                                            .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(8.dp)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = loan.title.take(2),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurface
-=======
-                                            color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         )
                                     }
                                     Text(
                                         text = loan.title,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                         color = MaterialTheme.colorScheme.onSurface
-=======
-                                        color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                     )
                                 }
 
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
-<<<<<<< HEAD
                                     color = if (loan.isCompleted) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (loan.isCompleted) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
-=======
-                                    color = if (loan.isCompleted) Color(0xFFEDE9FE) else Color(0xFFDCFCE7),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (loan.isCompleted) Color(0xFFDDD6FE) else Color(0xFF86EFAC).copy(alpha = 0.5f)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                     )
                                 ) {
                                     Text(
                                         text = if (loan.isCompleted) "تسویه شده" else "فعال",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                         color = if (loan.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-=======
-                                        color = if (loan.isCompleted) Color(0xFF6D28D9) else Color(0xFF15803D),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
                             }
 
-<<<<<<< HEAD
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-=======
-                            HorizontalDivider(color = Color(0xFFE2E8F0).copy(alpha = 0.6f))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1048,67 +849,41 @@ fun HomeScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-<<<<<<< HEAD
                                     color = MaterialTheme.colorScheme.surface,
                                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-=======
-                                    color = Color.White,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(8.dp),
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-<<<<<<< HEAD
                                         Text("مبلغ کل وام:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-=======
-                                        Text("مبلغ کل وام:", fontSize = 10.sp, color = Color(0xFF94A3B8))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         Text(
                                             text = NumberFormatter.formatPrice(loan.totalLoanAmount, usePersianDigits),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurface
-=======
-                                            color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         )
                                     }
                                 }
 
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-<<<<<<< HEAD
                                     color = MaterialTheme.colorScheme.surface,
                                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-=======
-                                    color = Color.White,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9)),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(8.dp),
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-<<<<<<< HEAD
                                         Text("اقساط مانده:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-=======
-                                        Text("اقساط مانده:", fontSize = 10.sp, color = Color(0xFF94A3B8))
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         val remaining = loan.remainingMonths
                                         Text(
                                             text = "${NumberFormatter.formatNumber(remaining, usePersianDigits)} از ${NumberFormatter.formatNumber(loan.totalMonths, usePersianDigits)}",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                             color = MaterialTheme.colorScheme.onSurface
-=======
-                                            color = Color(0xFF0F172A)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         )
                                     }
                                 }
@@ -1121,11 +896,7 @@ fun HomeScreen(
                         text = "این وام و همه داده‌های مرتبط برای همیشه حذف می‌شوند.",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
-<<<<<<< HEAD
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-=======
-                        color = Color(0xFF64748B),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                         textAlign = TextAlign.Center
                     )
                 }
@@ -1137,11 +908,7 @@ fun HomeScreen(
                         loanToDelete = null
                     },
                     shape = RoundedCornerShape(14.dp),
-<<<<<<< HEAD
                     color = MaterialTheme.colorScheme.error,
-=======
-                    color = Color(0xFFE11D48),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                     shadowElevation = 3.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1155,11 +922,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = null,
-<<<<<<< HEAD
                             tint = MaterialTheme.colorScheme.onError,
-=======
-                            tint = Color.White,
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1167,11 +930,7 @@ fun HomeScreen(
                             text = "حذف",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                             color = MaterialTheme.colorScheme.onError
-=======
-                            color = Color.White
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                         )
                     }
                 }
@@ -1180,22 +939,14 @@ fun HomeScreen(
                 Surface(
                     onClick = { loanToDelete = null },
                     shape = RoundedCornerShape(14.dp),
-<<<<<<< HEAD
                     color = MaterialTheme.colorScheme.surfaceVariant,
-=======
-                    color = Color(0xFFF1F5F9),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = "بازگشت",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                         color = MaterialTheme.colorScheme.onSurface,
-=======
-                        color = Color(0xFF475569),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(vertical = 12.dp)
                     )

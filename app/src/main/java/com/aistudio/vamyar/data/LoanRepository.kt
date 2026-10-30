@@ -655,11 +655,8 @@ class LoanRepository(
 
     // User Management Methods
     suspend fun setPrimaryUser(userId: Long) = withContext(Dispatchers.IO) {
-<<<<<<< HEAD
         // فیکس bug.md/NB-49: گارد شناسه نامعتبر
         if (userId <= 0L) return@withContext
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
         userProfileDao.setPrimaryUser(userId)
     }
 
@@ -822,13 +819,10 @@ class LoanRepository(
      */
     suspend fun checkCanDeleteUser(userId: Long): UserDeleteCheckResult = withContext(Dispatchers.IO) {
         val user = userProfileDao.getUserById(userId) ?: return@withContext UserDeleteCheckResult(canDelete = true)
-<<<<<<< HEAD
         // فیکس bug.md/NB-50: کاربر مبنا تحت هیچ شرایطی قابل حذف نیست
         if (user.isPrimary) {
             return@withContext UserDeleteCheckResult(canDelete = false, blockingLoanTitles = listOf("کاربر مبنا را نمی‌توان حذف کرد"))
         }
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
         val shares = debtorShareDao.getAllSharesOnce()
         val blocking = shares.filter { share ->
             if (user.publicId.isNotBlank() && share.ownerPublicId.isNotBlank()) {
@@ -845,12 +839,9 @@ class LoanRepository(
     }
 
     suspend fun deleteUser(userId: Long) = withContext(Dispatchers.IO) {
-<<<<<<< HEAD
         // فیکس bug.md/NB-50: دفاع در عمق — اگر کاربر مبنا باشد حذف نادیده گرفته می‌شود
         val user = userProfileDao.getUserById(userId)
         if (user == null || user.isPrimary) return@withContext
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
         userProfileDao.deleteUserById(userId)
     }
 

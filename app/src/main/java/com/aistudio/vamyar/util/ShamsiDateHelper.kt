@@ -234,7 +234,6 @@ object ShamsiDateHelper {
     fun getEffectiveShamsiDate(prefs: AppPreferences): ShamsiDate =
         if (prefs.isCustomDateEnabled) ShamsiDate(prefs.customYear, prefs.customMonth, prefs.customDay)
         else getSystemShamsiDate()
-<<<<<<< HEAD
 
     /**
      * فیکس bug.md/NB-51: تبدیل تاریخ شمسی به میلادی (الگوریتم استاندارد برکوفسکی / پورنادر).
@@ -309,6 +308,4 @@ object ShamsiDateHelper {
             else -> "امروز"
         }
     }
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 }

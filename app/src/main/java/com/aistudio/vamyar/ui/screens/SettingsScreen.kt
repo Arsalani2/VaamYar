@@ -441,11 +441,7 @@ fun SettingsScreen(
 
                                 // Active Date Box (Soft Gradient Container)
                                 val dayOfWeek = remember(currentShamsiDate) {
-<<<<<<< HEAD
                                     ShamsiDateHelper.getShamsiDayOfWeek(currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day)
-=======
-                                    getShamsiDayOfWeek(currentShamsiDate.year, currentShamsiDate.month, currentShamsiDate.day)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 }
 
                                 Surface(
@@ -2028,21 +2024,13 @@ fun SettingsScreen(
                                 )
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-<<<<<<< HEAD
                                     color = SuccessGreen.copy(alpha = 0.15f)
-=======
-                                    color = Color(0xFF10B981).copy(alpha = 0.15f)
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 ) {
                                     Text(
                                         text = "فایل معتبر ✓",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                         color = SuccessGreen,
-=======
-                                        color = Color(0xFF059669),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
@@ -2125,22 +2113,14 @@ fun SettingsScreen(
                             if (preview.newLoans.isNotEmpty()) {
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-<<<<<<< HEAD
                                     color = SuccessGreen.copy(alpha = 0.12f),
-=======
-                                    color = Color(0xFF10B981).copy(alpha = 0.1f),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(
                                         text = "${preview.newLoans.size} وام جدید",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-<<<<<<< HEAD
                                         color = SuccessGreen,
-=======
-                                        color = Color(0xFF059669),
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp)
                                     )
@@ -2506,63 +2486,3 @@ private fun UserManagementItemCard(
         }
     }
 }
-<<<<<<< HEAD
-=======
-
-/**
- * Calculates Persian day of the week from Jalali date
- */
-private fun getShamsiDayOfWeek(year: Int, month: Int, day: Int): String {
-    return try {
-        var jY = year - 979
-        var jM = month - 1
-        var jD = day - 1
-        var jDayNo = 365 * jY + (jY / 33) * 8 + ((jY % 33 + 3) / 4)
-        for (i in 0 until jM) {
-            jDayNo += if (i < 6) 31 else 30
-        }
-        jDayNo += jD
-        var gDayNo = jDayNo + 79
-        var gy = 1600 + 400 * (gDayNo / 146097)
-        gDayNo %= 146097
-        var leap = true
-        if (gDayNo >= 36525) {
-            gDayNo--
-            gy += 100 * (gDayNo / 36524)
-            gDayNo %= 36524
-            if (gDayNo >= 365) gDayNo++
-            else leap = false
-        }
-        gy += 4 * (gDayNo / 1461)
-        gDayNo %= 1461
-        if (gDayNo >= 366) {
-            leap = false
-            gDayNo--
-            gy += gDayNo / 365
-            gDayNo %= 365
-        }
-        val gDaysInMonth = intArrayOf(0, 31, if (leap) 29 else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-        var gm = 0
-        while (gm < 12 && gDayNo >= gDaysInMonth[gm + 1]) {
-            gDayNo -= gDaysInMonth[gm + 1]
-            gm++
-        }
-        val gd = gDayNo + 1
-        val cal = Calendar.getInstance().apply {
-            set(gy, gm, gd)
-        }
-        when (cal.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.SATURDAY -> "شنبه"
-            Calendar.SUNDAY -> "یکشنبه"
-            Calendar.MONDAY -> "دوشنبه"
-            Calendar.TUESDAY -> "سه‌شنبه"
-            Calendar.WEDNESDAY -> "چهارشنبه"
-            Calendar.THURSDAY -> "پنج‌شنبه"
-            Calendar.FRIDAY -> "جمعه"
-            else -> "امروز"
-        }
-    } catch (_: Exception) {
-        "امروز"
-    }
-}
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff

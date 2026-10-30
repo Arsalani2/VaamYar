@@ -36,16 +36,11 @@ interface UserProfileDao {
     @Query("UPDATE user_profiles SET isPrimary = 1 WHERE id = :id")
     suspend fun markUserAsPrimary(id: Long)
 
-<<<<<<< HEAD
     // فیکس bug.md/NB-49: گارد در برابر شناسه نامعتبر؛ هرگز اجازه نمی‌دهد id <= 0
     // پرچم مبنای کاربران دیگر را پاک کرده و سیستم را بدون کاربر مبنا رها کند.
     @Transaction
     suspend fun setPrimaryUser(id: Long) {
         if (id <= 0L) return
-=======
-    @Transaction
-    suspend fun setPrimaryUser(id: Long) {
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
         clearPrimaryFlags()
         markUserAsPrimary(id)
     }

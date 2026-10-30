@@ -896,7 +896,6 @@ class LoanRepositoryIntegrityTest {
         assertEquals(3, currentLoan(loan.id).paidMonths)
     }
 
-<<<<<<< HEAD
     // ---------------------------------------------------------------- NB-49 و NB-50
 
     /** فیکس bug.md/NB-49: شناسهٔ نامعتبر نباید پرچم مبنای کاربران را پاک کند */
@@ -935,6 +934,4 @@ class LoanRepositoryIntegrityTest {
         assertEquals(primary.id, primaryAfter!!.id)
     }
 
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 }

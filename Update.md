@@ -1068,7 +1068,6 @@
    - نشانگر اخطار گرد قرمز با آیکون هشدار.
    - باکس راهنمای متنی اخطار با استایل هشدار که کاربر را از غیرقابل بازگشت بودن عملیات آگاه می‌سازد.
    - دکمه اختصاصی حذف کامل با رنگ متمایز ارور.
-<<<<<<< HEAD
 
 ---
 
@@ -1125,5 +1124,3 @@
 ### ۴. تست‌های رگرسیون (Regression Tests)
 - اضافه شدن تست جامع `nb51_shamsiDayOfWeekAndOffset_matchesOfficialCalendar` در `PureLogicUnitTest.kt` جهت اعتبارسنجی دقیق روزهای هفته و افست تقویم بر اساس تاریخ‌های رسمی ایران.
 - اضافه شدن تست‌های `nb49_setPrimaryUserWithInvalidIdDoesNotClearPrimaryFlags` و `nb50_cannotDeletePrimaryUser` در `LoanRepositoryIntegrityTest.kt` جهت اطمینان از حفظ دائمی کاربر مبنا در دیتابیس.
-=======
->>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
