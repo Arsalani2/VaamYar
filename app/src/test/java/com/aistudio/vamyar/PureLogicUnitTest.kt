@@ -19,6 +19,7 @@ import com.aistudio.vamyar.util.PersianNameNormalizer
 import com.aistudio.vamyar.util.PublicId
 import com.aistudio.vamyar.util.ShamsiDate
 import com.aistudio.vamyar.util.ShamsiDateHelper
+import com.aistudio.vamyar.notification.NotificationHelper
 import com.aistudio.vamyar.util.computeLiquidityForecast
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -1166,5 +1167,30 @@ class PureLogicUnitTest {
         assertEquals(1234L, AutoBackupHelper.autoBackupTimestampFromFileName("auto-1234-1.json"))
         assertNull(AutoBackupHelper.autoBackupTimestampFromFileName("other.json"))
         dir.deleteRecursively()
+    }
+
+    // ---------------------------------------------------------------- SB-08 (راهنمای اعلان/باتری OEM)
+
+    /** فیکس bug.md/SB-08: مسیرهای برندِ سازنده + گام‌های عمومی همیشه پیوست. */
+    @Test
+    fun sb08_oemBatteryPathsMatchBrandAndAlwaysIncludeGenericSteps() {
+        // شیائومی (شامل Redmi/Poco): ۲ گام مخصوص + ۲ گام عمومی
+        val xiaomi = NotificationHelper.oemBatteryPaths("Xiaomi")
+        assertTrue(xiaomi.first().contains("صرفه‌جویی باتری"))
+        assertEquals(4, xiaomi.size)
+        // هوآوی/آنر
+        val huawei = NotificationHelper.oemBatteryPaths("HUAWEI")
+        assertTrue(huawei.first().contains("راه‌اندازی اپ"))
+        // سامسونگ
+        val samsung = NotificationHelper.oemBatteryPaths("samsung")
+        assertTrue(samsung.first().contains("محدودیت‌های پس‌زمینه"))
+        // برند ناشناس → فقط گام‌های عمومی
+        val unknown = NotificationHelper.oemBatteryPaths("someUnknownBrand")
+        assertEquals(2, unknown.size)
+        // همهٔ برندها: گام اعلان‌ها + گام بهینه‌سازی باتری را دارند
+        listOf(xiaomi, huawei, samsung, unknown).forEach { paths ->
+            assertTrue(paths.any { it.contains("اعلان‌ها") })
+            assertTrue(paths.any { it.contains("بهینه‌سازی باتری") })
+        }
     }
 }

@@ -125,4 +125,50 @@ object NotificationHelper {
             }
         }
     }
+
+    // ------------------------------------------------ فیکس bug.md/SB-08: راهنمای اعلان/باتری OEM
+
+    /**
+     * فیکس bug.md/SB-08: متن Toast وقتی اجازهٔ «ساعت و هشدار دقیق» رد شده —
+     * کاربر باید بداند یادآوری‌ها دیرتر ولی همچنان می‌رسند (فول‌بک واقعی است).
+     */
+    const val OEM_EXACT_ALARM_FALLBACK_TEXT =
+        "اجازهٔ «ساعت و هشدار دقیق» رد شده است؛ یادآوری‌ها دیرتر ولی همچنان می‌رسند."
+
+    /** فیکس bug.md/SB-08: آیا برنامه اجازهٔ exact alarm دارد؟ (اندروید < S همیشه true) */
+    fun canScheduleExact(context: Context): Boolean {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
+    /**
+     * فیکس bug.md/SB-08: مسیرهای تنظیمات باتری/اعلانِ برندهای رایج (whitelist).
+     * سازندهٔ دستگاه (Build.MANUFACTURER، lowercased مقایسه می‌شود) به مسیرهای
+     * مخصوص همان برند map می‌شود؛ برند ناشناس فقط گام‌های عمومی را می‌گیرد.
+     * همیشه گام‌های عمومی (اعلان‌ها + بهینه‌سازی باتری) هم پیوست می‌شوند.
+     * خالص و قابل‌تست JVM — پارامتر سازنده صریح است، نه Build مستقیم.
+     */
+    fun oemBatteryPaths(manufacturer: String): List<String> {
+        val m = manufacturer.lowercase()
+        val brandSpecific = when {
+            "xiaomi" in m || "redmi" in m || "poco" in m -> listOf(
+                "تنظیمات ← اپ‌ها ← مدیریت اپ‌ها ← وام‌یار ← صرفه‌جویی باتری ← «بدون محدودیت»",
+                "تنظیمات ← باتری ← بهینه‌ساز باتری ← وام‌یار را از پایان خودکار مستثنا کنید"
+            )
+            "huawei" in m || "honor" in m -> listOf(
+                "تنظیمات ← باتری ← راه‌اندازی اپ ← وام‌یار ← کلیدهای «مدیریت خودکار» را خاموش کنید",
+                "تنظیمات ← اپ‌ها ← وام‌یار ← مصرف باتری ← راه‌اندازی ← «بدون محدودیت»"
+            )
+            "samsung" in m -> listOf(
+                "تنظیمات ← باتری ← محدودیت‌های پس‌زمینه ← وام‌یار ← «بدون محدودیت»",
+                "تنظیمات ← نگهداری دستگاه ← باتری ← اپ‌های خواب‌رفته ← وام‌یار را از فهرست خارج کنید"
+            )
+            else -> emptyList()
+        }
+        val generic = listOf(
+            "تنظیمات ← اپ‌ها ← وام‌یار ← اعلان‌ها ← مطمئن شوید اعلان‌ها روشن‌اند",
+            "تنظیمات ← باتری ← بهینه‌سازی باتری ← وام‌یار ← «بهینه‌سازی نشود»"
+        )
+        return brandSpecific + generic
+    }
 }
