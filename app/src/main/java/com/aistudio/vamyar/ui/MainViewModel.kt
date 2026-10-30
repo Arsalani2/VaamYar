@@ -796,6 +796,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val data = parseResult.getOrThrow()
 
+            // فیکس bug.md/SB-01: رد بکاپ دست‌سازی که بیت‌مپ عظیم (ده‌ها هزار
+            // پیکسل در هر بُعد) به‌عنوان آیکون وام دارد — decode چنین تصویری
+            // صدها مگابایت حافظه می‌خواهد. قبل از نوشتن هر فایلی رد می‌شود.
+            val hasOversizedIcon = data.icons.any { bi ->
+                com.aistudio.vamyar.util.LoanIconHelper.exceedsMaxIconDimensions(
+                    android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
+                )
+            }
+            if (hasOversizedIcon) {
+                return Result.failure(IllegalArgumentException(com.aistudio.vamyar.util.BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE))
+            }
+
             // فیکس bug.md/NB-18: فایل آیکون‌های embedشدهٔ بکاپ اول روی دیسکِ همین
             // دستگاه نوشته می‌شوند و مسیر محلیِ تازه به restore داده می‌شود؛ اگر
             // restore با خطا rolback شود، همین فایل‌های تازه دوباره پاک می‌شوند

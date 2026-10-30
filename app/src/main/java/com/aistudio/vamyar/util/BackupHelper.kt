@@ -54,6 +54,26 @@ object BackupHelper {
     const val APP_IDENTIFIER = "com.aistudio.vamyar"
     const val APP_NAME = "VaamYar"
 
+    // فیکس bug.md/SB-01: کپ‌های ورودیِ فایل پشتیبانِ دست‌ساز (ضد «هانتر») — فایل بدون
+    // چک‌سام به‌عنوان legacy پذیرفته می‌شود، پس سقف‌های صریح لازم است تا JSON غول‌پیکر
+    // (OOM/ANR)، رکوردهای انبوه یا آیکون base64 عظیم وارد نشود. همه با پیام واحد رد می‌شوند.
+    const val MAX_BACKUP_JSON_CHARS = 10_000_000
+    const val MAX_BACKUP_USERS = 200
+    const val MAX_BACKUP_LOANS = 500
+    const val MAX_BACKUP_SHARES = 1_000
+    const val MAX_BACKUP_INSTALLMENTS = 60_000
+    const val MAX_BACKUP_RECORDS = 60_000
+    const val MAX_BACKUP_ICONS = 500
+    const val MAX_ICON_BASE64_CHARS = 1_400_000 // ~۱ مگابایت بعد از دکود base64
+    const val MAX_TEXT_FIELD_CHARS = 60   // نام/عنوان (هم‌قوارهٔ InputLimits.MAX_TITLE_LENGTH)
+    const val MAX_NOTES_FIELD_CHARS = 2000 // یادداشت/توضیح
+    const val MIN_SHAMSI_YEAR = 1300
+    const val MAX_SHAMSI_YEAR = 1500
+    const val ERR_BACKUP_INVALID_OR_TOO_LARGE = "فایل پشتیبان نامعتبر یا خیلی بزرگ است."
+
+    private fun backupRejected(): Result<Nothing> =
+        Result.failure(IllegalArgumentException(ERR_BACKUP_INVALID_OR_TOO_LARGE))
+
     /**
      * Serializes complete application state into an encrypted/verifiable JSON string with SHA-256 integrity hash.
      */
@@ -221,6 +241,9 @@ object BackupHelper {
      * Parses, validates, and automatically migrates backup data from older versions.
      */
     fun parseAndValidateBackup(jsonString: String): Result<BackupRestoreData> {
+        // فیکس bug.md/SB-01: سقف حجم فایل — قبل از هر پارسی (فایل ~۱۰MB بزرگ‌تر از هر
+        // بکاپ واقعی است؛ جلوگیری از OOM قبل از ورود به org.json)
+        if (jsonString.length > MAX_BACKUP_JSON_CHARS) return backupRejected()
         return try {
             val root = JSONObject(jsonString)
 
@@ -248,19 +271,26 @@ object BackupHelper {
             val exportDate = root.optString("exportDateShamsi", "نامشخص")
 
             // 3. Parse and Validate Users (فیکس bug.md/NB-4: تضمین وجود دقیقاً یک کاربر مبنا)
+            // فیکس bug.md/SB-01: سقف تعداد + کوتاه‌سازی متن‌ها + ددوپ publicId در بکاپ دست‌ساز
             val usersList = mutableListOf<UserProfile>()
             val usersArray = payload.optJSONArray("users") ?: JSONArray()
+            if (usersArray.length() > MAX_BACKUP_USERS) return backupRejected()
+            val seenUserPublicIds = mutableSetOf<String>()
             for (i in 0 until usersArray.length()) {
                 val u = usersArray.getJSONObject(i)
+                val rawUserPublicId = u.optString("publicId", "")
+                // فیکس bug.md/SB-01: ددوپ publicId — اولین می‌ماند، تکراری خالی می‌شود
+                // (restore به رکورد خالی شناسهٔ تازه می‌دهد؛ همان مسیر بکاپ‌های legacy)
+                val userPublicId = if (rawUserPublicId.isNotEmpty() && !seenUserPublicIds.add(rawUserPublicId)) "" else rawUserPublicId
                 usersList.add(
                     UserProfile(
                         id = u.optLong("id", 0L),
-                        name = u.optString("name", "کاربر"),
+                        name = u.optString("name", "کاربر").take(MAX_TEXT_FIELD_CHARS),
                         isPrimary = u.optBoolean("isPrimary", false),
                         avatarColorHex = u.optLong("avatarColorHex", 0xFF10B981L),
-                        notes = u.optString("notes", ""),
+                        notes = u.optString("notes", "").take(MAX_NOTES_FIELD_CHARS),
                         // فیکس bug.md/F6: حفظ شناسهٔ عمومی در بکاپ/بازیابی (بکاپ قدیمی → خالی، بعداً در restore پر می‌شود)
-                        publicId = u.optString("publicId", "")
+                        publicId = userPublicId
                     )
                 )
             }
@@ -271,35 +301,44 @@ object BackupHelper {
             }
 
             // 4. Parse Shares first to assist legacy loan migration
+            // فیکس bug.md/SB-01: سقف تعداد + کوتاه‌سازی متن‌ها + کلمپ مقادیر خصمانه + ددوپ publicId
             val sharesList = mutableListOf<DebtorShare>()
             val sharesArray = payload.optJSONArray("shares") ?: JSONArray()
+            if (sharesArray.length() > MAX_BACKUP_SHARES) return backupRejected()
+            val seenSharePublicIds = mutableSetOf<String>()
             for (i in 0 until sharesArray.length()) {
                 val s = sharesArray.getJSONObject(i)
+                val rawSharePublicId = s.optString("publicId", "")
+                // فیکس bug.md/SB-01: ددوپ publicId — اولین می‌ماند، تکراری خالی می‌شود
+                val sharePublicId = if (rawSharePublicId.isNotEmpty() && !seenSharePublicIds.add(rawSharePublicId)) "" else rawSharePublicId
                 sharesList.add(
                     DebtorShare(
                         id = s.optLong("id", 0L),
                         loanId = s.optLong("loanId", 0L),
-                        loanTitle = s.optString("loanTitle", ""),
-                        personName = s.optString("personName", ""),
-                        shareAmount = s.optLong("shareAmount", 0L),
-                        dueDay = s.optInt("dueDay", 1),
+                        loanTitle = s.optString("loanTitle", "").take(MAX_TEXT_FIELD_CHARS),
+                        personName = s.optString("personName", "").take(MAX_TEXT_FIELD_CHARS),
+                        shareAmount = s.optLong("shareAmount", 0L).coerceAtLeast(0L),
+                        dueDay = s.optInt("dueDay", 1).coerceIn(1, 31),
                         isPaidForCurrentMonth = s.optBoolean("isPaidForCurrentMonth", false),
                         lastPaidMonthName = s.optString("lastPaidMonth", s.optString("lastPaidMonthName", "")),
-                        shareDescription = s.optString("shareDescription", ""),
+                        shareDescription = s.optString("shareDescription", "").take(MAX_NOTES_FIELD_CHARS),
                         // فیکس bug.md/F6: حفظ شناسهٔ سهم و شناسهٔ مالک آن
-                        publicId = s.optString("publicId", ""),
+                        publicId = sharePublicId,
                         ownerPublicId = s.optString("ownerPublicId", "")
                     )
                 )
             }
 
             // 5. Parse, Validate, and Migrate Loans
+            // فیکس bug.md/SB-01: سقف تعداد + کلمپ مقادیر خصمانه + کوتاه‌سازی متن‌ها + ددوپ publicId
             val loansList = mutableListOf<Loan>()
             val loansArray = payload.optJSONArray("loans") ?: JSONArray()
+            if (loansArray.length() > MAX_BACKUP_LOANS) return backupRejected()
+            val seenLoanPublicIds = mutableSetOf<String>()
             for (i in 0 until loansArray.length()) {
                 val l = loansArray.getJSONObject(i)
                 val loanId = l.optLong("id", 0L)
-                val monthlyAmount = l.optLong("monthlyAmount", 0L)
+                val monthlyAmount = l.optLong("monthlyAmount", 0L).coerceAtLeast(0L)
                 val existingSharesForLoan = sharesList.filter { it.loanId == loanId }
                 val hasPartnersInJson = if (l.has("hasPartners")) {
                     l.getBoolean("hasPartners")
@@ -308,34 +347,38 @@ object BackupHelper {
                 }
 
                 // فیکس bug.md/P2-14: بازسازی سهم من برای بکاپ‌های قدیمی
+                // فیکس bug.md/SB-01: مبلغ سهم مهاجرت‌یافته هم هرگز منفی نمی‌شود
                 val migratedMyShare = when {
                     !hasPartnersInJson -> {
-                        val rawMyShare = l.optLong("myShareAmount", 0L)
+                        val rawMyShare = l.optLong("myShareAmount", 0L).coerceAtLeast(0L)
                         if (rawMyShare == 0L) monthlyAmount else rawMyShare
                     }
-                    l.has("myShareAmount") -> l.optLong("myShareAmount", 0L)
+                    l.has("myShareAmount") -> l.optLong("myShareAmount", 0L).coerceAtLeast(0L)
                     else -> (monthlyAmount - existingSharesForLoan.sumOf { it.shareAmount }).coerceAtLeast(0L)
-                }
+                }.coerceAtLeast(0L)
 
                 // فیکس bug.md/NB-4: محدودسازی و اعتبارسنجی مقادیر ماه و اقساط
                 val safeTotalMonths = l.optInt("totalMonths", 12).coerceIn(1, 120)
                 val safePaidMonths = l.optInt("paidMonths", 0).coerceIn(0, safeTotalMonths)
 
+                val rawLoanPublicId = l.optString("publicId", "")
+                // فیکس bug.md/SB-01: ددوپ publicId — اولین می‌ماند، تکراری خالی می‌شود
+                val loanPublicId = if (rawLoanPublicId.isNotEmpty() && !seenLoanPublicIds.add(rawLoanPublicId)) "" else rawLoanPublicId
                 loansList.add(
                     Loan(
                         id = loanId,
-                        title = l.optString("title", "وام"),
-                        dueDay = l.optInt("dueDay", 1),
+                        title = l.optString("title", "وام").take(MAX_TEXT_FIELD_CHARS),
+                        dueDay = l.optInt("dueDay", 1).coerceIn(1, 31),
                         monthlyAmount = monthlyAmount,
                         totalMonths = safeTotalMonths,
                         paidMonths = safePaidMonths,
-                        startYear = l.optInt("startYear", 1403),
-                        startMonth = l.optInt("startMonth", 1),
-                        endYear = l.optInt("endYear", 1404),
-                        endMonth = l.optInt("endMonth", 1),
+                        startYear = l.optInt("startYear", 1403).coerceIn(MIN_SHAMSI_YEAR, MAX_SHAMSI_YEAR),
+                        startMonth = l.optInt("startMonth", 1).coerceIn(1, 12),
+                        endYear = l.optInt("endYear", 1404).coerceIn(MIN_SHAMSI_YEAR, MAX_SHAMSI_YEAR),
+                        endMonth = l.optInt("endMonth", 1).coerceIn(1, 12),
                         category = l.optString("category", "بانکی"),
                         colorHex = l.optLong("colorHex", 0xFF1E88E5L),
-                        notes = l.optString("notes", ""),
+                        notes = l.optString("notes", "").take(MAX_NOTES_FIELD_CHARS),
                         myShareAmount = migratedMyShare,
                         hasPartners = hasPartnersInJson,
                         isArchived = l.optBoolean("isArchived", false),
@@ -344,23 +387,25 @@ object BackupHelper {
                         iconShape = l.optString("iconShape", "ROUNDED_SQUARE"),
                         customIconPath = if (l.isNull("customIconPath")) null else l.optString("customIconPath", null),
                         // فیکس bug.md/F6: حفظ شناسهٔ عمومی وام
-                        publicId = l.optString("publicId", "")
+                        publicId = loanPublicId
                     )
                 )
             }
 
             // 6. Parse Payment Records
+            // فیکس bug.md/SB-01: سقف تعداد + کلمپ مقادیر خصمانه + کوتاه‌سازی متن
             val recordsList = mutableListOf<PaymentRecord>()
             val recordsArray = payload.optJSONArray("records") ?: JSONArray()
+            if (recordsArray.length() > MAX_BACKUP_RECORDS) return backupRejected()
             for (i in 0 until recordsArray.length()) {
                 val r = recordsArray.getJSONObject(i)
                 recordsList.add(
                     PaymentRecord(
                         id = r.optLong("id", 0L),
                         loanId = r.optLong("loanId", 0L),
-                        loanTitle = r.optString("loanTitle", ""),
-                        installmentNumber = r.optInt("installmentNumber", 1),
-                        amountPaid = r.optLong("amountPaid", 0L),
+                        loanTitle = r.optString("loanTitle", "").take(MAX_TEXT_FIELD_CHARS),
+                        installmentNumber = r.optInt("installmentNumber", 1).coerceAtLeast(1),
+                        amountPaid = r.optLong("amountPaid", 0L).coerceAtLeast(0L),
                         paymentDateShamsi = r.optString("paymentDateShamsi", ""),
                         timestamp = r.optLong("timestamp", System.currentTimeMillis())
                     )
@@ -376,6 +421,8 @@ object BackupHelper {
             // خالی برمی‌گردد و restore به بازسازی ترتیبی از paidMonths برمی‌گردد)
             val installmentsList = mutableListOf<LoanInstallment>()
             val installmentsArray = payload.optJSONArray("installments") ?: JSONArray()
+            // فیکس bug.md/SB-01: سقف تعداد + کلمپ مقادیر خصمانه
+            if (installmentsArray.length() > MAX_BACKUP_INSTALLMENTS) return backupRejected()
             for (i in 0 until installmentsArray.length()) {
                 val ins = installmentsArray.getJSONObject(i)
                 installmentsList.add(
@@ -383,9 +430,9 @@ object BackupHelper {
                         id = ins.optLong("id", 0L),
                         loanId = ins.optLong("loanId", 0L),
                         installmentNumber = ins.optInt("installmentNumber", 1),
-                        year = ins.optInt("year", 1405),
+                        year = ins.optInt("year", 1405).coerceIn(MIN_SHAMSI_YEAR, MAX_SHAMSI_YEAR),
                         month = ins.optInt("month", 1).coerceIn(1, 12),
-                        amount = ins.optLong("amount", 0L),
+                        amount = ins.optLong("amount", 0L).coerceAtLeast(0L),
                         paidAtTimestamp = ins.optLong("paidAtTimestamp", System.currentTimeMillis()),
                         paidDateShamsi = ins.optString("paidDateShamsi", "")
                     )
@@ -403,6 +450,9 @@ object BackupHelper {
             // fallback برداری برمی‌گردد)
             val iconsList = mutableListOf<BackupIcon>()
             val iconsArray = payload.optJSONArray("icons") ?: JSONArray()
+            // فیکس bug.md/SB-01: سقف تعداد + رد کل فایل اگر حتی یک آیکون base64 عظیم داشته
+            // باشد (پیش از هر decode؛ جلوگیری از OOM در ایمپورت آیکون‌ها)
+            if (iconsArray.length() > MAX_BACKUP_ICONS) return backupRejected()
             for (i in 0 until iconsArray.length()) {
                 val ic = iconsArray.getJSONObject(i)
                 iconsList.add(
@@ -413,6 +463,7 @@ object BackupHelper {
                     )
                 )
             }
+            if (iconsList.any { it.dataBase64.length > MAX_ICON_BASE64_CHARS }) return backupRejected()
             val sanitizedIcons = iconsList.filter { it.loanId in validLoanIds && it.dataBase64.isNotBlank() }
 
             // 7. Parse Preferences
