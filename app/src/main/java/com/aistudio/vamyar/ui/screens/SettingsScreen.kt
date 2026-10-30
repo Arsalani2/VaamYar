@@ -1632,15 +1632,19 @@ fun SettingsScreen(
                     onClick = {
                         showOemBatteryGuide = false
                         try {
+                            // نکته: ثابت android.provider.Settings.ACTION_SCHEDULE_EXACT_ALARM در
+                            // compileSdk 36.1 حذف/غیرقابل‌ارجاع شده؛ مقدار مستندِ همان اکشن به‌صورت
+                            // رشتهٔ لفظی (فول‌بک با try/catch اگر صفحه‌ای نبود).
                             context.startActivity(
-                                Intent(android.provider.Settings.ACTION_SCHEDULE_EXACT_ALARM).apply {
+                                Intent("android.settings.ACTION_SCHEDULE_EXACT_ALARM").apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                             )
                         } catch (e: Exception) {
                             try {
+                                // مقدار مستندِ Settings.ACTION_ALARM_REMINDER_SETTINGS
                                 context.startActivity(
-                                    Intent(android.provider.Settings.ACTION_ALARM_REMINDER_SETTINGS).apply {
+                                    Intent("android.settings.ACTION_ALARM_REMINDER_SETTINGS").apply {
                                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     }
                                 )
