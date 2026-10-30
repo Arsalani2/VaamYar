@@ -4,6 +4,7 @@ package com.aistudio.vamyar.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,7 +33,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -103,6 +106,11 @@ fun SettingsScreen(
     var pendingImport by remember { mutableStateOf<Pair<String, ImportPreview>?>(null) }
     var selectedImportMode by remember { mutableStateOf(ImportMode.REPLACE_ALL) }
     var importInProgress by remember { mutableStateOf(false) }
+    // فیکس bug.md/SB-02: تا آماده‌شدن پیش‌نمایش فایل پشتیبانِ (احتمالاً سنگین)، UI
+    // بلاک نمی‌شود؛ دیالوگ «در حال آماده‌سازی» با دکمهٔ لغو نشان داده می‌شود و لغو
+    // واقعاً Job را cancel می‌کند.
+    var importPreviewInProgress by remember { mutableStateOf(false) }
+    var previewJob by remember { mutableStateOf<Job?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
@@ -136,15 +144,29 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            coroutineScope.launch {
+            importPreviewInProgress = true
+            previewJob = coroutineScope.launch {
                 try {
                     val jsonString = withContext(Dispatchers.IO) {
+                        // فیکس bug.md/SB-01: رد فایل‌های عظیم قبل از خواندن در حافظه —
+                        // سایز سند از provider پرسیده می‌شود (بدون دانلود/باز کردن فایل)
+                        val fileSize: Long? = context.contentResolver
+                            .query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                                val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                                if (idx >= 0 && cursor.moveToFirst() && !cursor.isNull(idx)) cursor.getLong(idx) else null
+                            }
+                        if (fileSize != null && fileSize > com.aistudio.vamyar.util.BackupHelper.MAX_BACKUP_JSON_CHARS) {
+                            return@withContext null
+                        }
                         context.contentResolver.openInputStream(uri)?.use { input ->
                             input.bufferedReader(Charsets.UTF_8).readText()
                         } ?: ""
                     }
 
-                    if (jsonString.isNotBlank()) {
+                    if (jsonString == null) {
+                        // فایل از سقف مجاز (۱۰ مگابایت) بزرگ‌تر بود
+                        Toast.makeText(context, com.aistudio.vamyar.util.BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE, Toast.LENGTH_LONG).show()
+                    } else if (jsonString.isNotBlank()) {
                         val previewResult = onPreviewImport(jsonString)
                         val preview = previewResult.getOrNull()
                         if (previewResult.isSuccess && preview != null) {
@@ -154,8 +176,13 @@ fun SettingsScreen(
                             Toast.makeText(context, "خطا در خواندن پشتیبان: ${previewResult.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                         }
                     }
+                } catch (e: CancellationException) {
+                    // لغو توسط کاربر — بی‌صدا
+                    throw e
                 } catch (e: Exception) {
                     Toast.makeText(context, "خطا در خواندن فایل: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    importPreviewInProgress = false
                 }
             }
         }
@@ -1429,6 +1456,34 @@ fun SettingsScreen(
     }
 
     // Modal: Import Preview Dialog
+    // فیکس bug.md/SB-02: دیالوگ وضعیت «در حال آماده‌سازی پیش‌نمایش» — پارس فایل‌های
+    // سنگین روی IO طول می‌کشد؛ به‌جای انگشت‌روی‌شدنِ UI، وضعیت شفاف + امکان لغو.
+    if (importPreviewInProgress) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("در حال آماده‌سازی پیش‌نمایش") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text("در حال خواندن و بررسی فایل پشتیبان…")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    previewJob?.cancel()
+                    previewJob = null
+                    importPreviewInProgress = false
+                }) {
+                    Text("لغو")
+                }
+            }
+        )
+    }
+
     pendingImport?.let { (importJson, preview) ->
         AlertDialog(
             onDismissRequest = {
