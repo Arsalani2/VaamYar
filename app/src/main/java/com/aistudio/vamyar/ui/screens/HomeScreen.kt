@@ -423,17 +423,18 @@ fun HomeScreen(
         )
     }
 
-    // فیکس bug.md/F7 (تأیید کاربر — بازبینی ۴.۵): دیالوگ تفکیک ماه‌های پیش‌بینی نقدینگی —
-    // سهم خودِ کاربر در هر ماه (ماه‌های پرداخت‌شده ۰ هستند)، مجموع ۳ و ۶ ماهه + مقایسه
-    // با میانگین پرداخت‌های واقعی خودِ او. بدون فیلد درآمد.
+    // فیکس bug.md/F7 + SB-09 (= NB-39): جدول سادهٔ پیش‌بینی نقدینگی — سهم خودِ
+    // کاربر در هر ماه + مجموع ۳ و ۶ ماهه. گزارش کاربر: «الکی پیچیده است» →
+    // متن کوتاه یک‌خطی + ردیف‌های ساده (بدون پرانتز تعداد وام، بدون پاراگراف
+    // مقایسهٔ تاریخچه). ماه‌های پرداخت‌شده ۰ هستند. بدون فیلد درآمد.
     if (showLiquidityDialog && liquidityForecast != null) {
         AlertDialog(
             onDismissRequest = { showLiquidityDialog = false },
-            title = { Text("پیش‌بینی نقدینگی ۶ ماه آینده") },
+            title = { Text("پیش‌بینی نقدینگی") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        "سهم ماهانهٔ خود شما در اقساطِ پیشِ رو (از ماه جاری؛ قسطِ پرداخت‌شده حساب نمی‌شود):",
+                        "سهم شما در اقساط ماه‌های پیشِ رو:",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -446,11 +447,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = if (row.loansCount > 0) {
-                                    "$monthName $yearStr (${NumberFormatter.formatNumber(row.loansCount, usePersianDigits)} وام)"
-                                } else {
-                                    "$monthName $yearStr"
-                                },
+                                text = "$monthName $yearStr",
                                 fontSize = 13.sp
                             )
                             Text(
@@ -462,23 +459,17 @@ fun HomeScreen(
                     }
                     HorizontalDivider()
                     Text(
-                        "مجموع ۳ ماه آینده (شامل این ماه): ${NumberFormatter.formatPrice(liquidityForecast.next3MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                        "مجموع ۳ ماه آینده: ${NumberFormatter.formatPrice(liquidityForecast.next3MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "مجموع ۶ ماه آینده (شامل این ماه): ${NumberFormatter.formatPrice(liquidityForecast.next6MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
+                        "مجموع ۶ ماه آینده: ${NumberFormatter.formatPrice(liquidityForecast.next6MonthsTotal, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                         fontWeight = FontWeight.Bold
                     )
                     val avg = liquidityForecast.historyMonthlyAverage
                     if (avg != null && liquidityForecast.historyMonthsCount > 0) {
                         Text(
-                            "میانگین پرداخت ماهانهٔ شما از ${NumberFormatter.formatNumber(liquidityForecast.historyMonthsCount, usePersianDigits)} ماه تاریخچهٔ واقعی: ${NumberFormatter.formatPrice(avg, usePersian = usePersianDigits, compactThousands = compactThousands)}",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(
-                            "هنوز تاریخچهٔ پرداختی واقعی ثبت نشده است تا میانگین با آن مقایسه شود.",
+                            "میانگین پرداخت ماهانهٔ شما: ${NumberFormatter.formatPrice(avg, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
