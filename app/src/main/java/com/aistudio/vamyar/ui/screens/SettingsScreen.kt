@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
 import com.aistudio.vamyar.data.UserDeleteCheckResult
+import com.aistudio.vamyar.notification.NotificationHelper
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.ui.ImportMode
 import com.aistudio.vamyar.ui.ImportPreview
@@ -100,6 +101,8 @@ fun SettingsScreen(
     var showFullResetConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var showReminderTimePicker by remember { mutableStateOf(false) }
+    // فیکس bug.md/SB-08: راهنمای اعلان/باتری OEM — دیالوگ مسیرهای whitelist باتری
+    var showOemBatteryGuide by remember { mutableStateOf(false) }
 
     val reminderTimeLabel = remember(reminderHour, reminderMinute, usePersianDigits) {
         NumberFormatter.formatClock(reminderHour, reminderMinute, usePersianDigits)
@@ -1434,6 +1437,47 @@ fun SettingsScreen(
                                     }
                                 }
 
+                                // فیکس bug.md/SB-08: راهنمای اعلان/باتری گوشی‌های
+                                // تهاجمی (Xiaomi/Huawei/Samsung و…) — اگر exact alarm
+                                // رد شده باشد، هنگام باز کردن راهنما Toast صادقانه
+                                // می‌آید که یادآوری‌ها دیرتر ولی همچنان می‌رسند.
+                                Surface(
+                                    onClick = {
+                                        if (!NotificationHelper.canScheduleExact(context)) {
+                                            Toast.makeText(
+                                                context,
+                                                NotificationHelper.OEM_EXACT_ALARM_FALLBACK_TEXT,
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                        showOemBatteryGuide = true
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = brandViolet.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.25f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 11.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.BatteryStd,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "اعلان یادآوری نمی‌آید؟ (راهنمای باتری گوشی)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = brandViolet
+                                        )
+                                    }
                                 }
 
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -1542,6 +1586,84 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showReminderTimePicker = false }) {
                     Text("انصراف")
+                }
+            }
+        )
+    }
+
+    // Modal: راهنمای اعلان/باتری گوشی‌های OEM (فیکس bug.md/SB-08) — مسیرهای
+    // whitelist باتریِ برندِ خودِ کاربر + گام‌های عمومی؛ لینک مستقیم به
+    // تنظیمات «ساعت و هشدار دقیق» اگر اجازه رد شده باشد.
+    if (showOemBatteryGuide) {
+        AlertDialog(
+            onDismissRequest = { showOemBatteryGuide = false },
+            title = { Text("اعلان یادآوری نمی‌آید؟") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "برخی گوشی‌ها (شیائومی، هوآوی، سامسونگ و…) برای صرفه‌جویی باتری، یادآوری برنامه‌ها را خاموش می‌کنند. برای وام‌یار این مسیرها را چک کنید:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    NotificationHelper.oemBatteryPaths(android.os.Build.MANUFACTURER)
+                        .forEachIndexed { index, step ->
+                            Text(
+                                text = "${NumberFormatter.formatNumber(index + 1, usePersianDigits)}. $step",
+                                fontSize = 12.sp
+                            )
+                        }
+                    HorizontalDivider()
+                    Text(
+                        text = "پس از اعمال، دکمهٔ «ارسال اعلان آزمایشی» همین صفحه را امتحان کنید.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (!NotificationHelper.canScheduleExact(context)) {
+                        Text(
+                            text = NotificationHelper.OEM_EXACT_ALARM_FALLBACK_TEXT,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOemBatteryGuide = false
+                        try {
+                            // نکته: ثابت android.provider.Settings.ACTION_SCHEDULE_EXACT_ALARM در
+                            // compileSdk 36.1 حذف/غیرقابل‌ارجاع شده؛ مقدار مستندِ همان اکشن به‌صورت
+                            // رشتهٔ لفظی (فول‌بک با try/catch اگر صفحه‌ای نبود).
+                            context.startActivity(
+                                Intent("android.settings.ACTION_SCHEDULE_EXACT_ALARM").apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                            )
+                        } catch (e: Exception) {
+                            try {
+                                // مقدار مستندِ Settings.ACTION_ALARM_REMINDER_SETTINGS
+                                context.startActivity(
+                                    Intent("android.settings.ACTION_ALARM_REMINDER_SETTINGS").apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                )
+                            } catch (e2: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "تنظیمات «ساعت و هشدار» دستگاه را دستی باز کنید",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("باز کردن تنظیمات ساعت و هشدار")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOemBatteryGuide = false }) {
+                    Text("بستن")
                 }
             }
         )
