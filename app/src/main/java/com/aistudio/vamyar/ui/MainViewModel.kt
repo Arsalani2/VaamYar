@@ -33,10 +33,12 @@ import com.aistudio.vamyar.util.PersianNameNormalizer
 import com.aistudio.vamyar.util.ShamsiDate
 import com.aistudio.vamyar.util.ShamsiDateHelper
 import com.aistudio.vamyar.util.computeLiquidityForecast
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class FinancialOverview(
     val activeUserName: String = "کاربر من",
@@ -719,175 +721,184 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * از اجرا نشان دهد و کاربر صریحاً حالت را انتخاب و تأیید کند.
      */
     suspend fun prepareImportPreview(jsonString: String): Result<ImportPreview> {
-        return try {
-            val parseResult = com.aistudio.vamyar.util.BackupHelper.parseAndValidateBackup(jsonString)
-            if (parseResult.isFailure) {
-                return Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
-            }
-            val data = parseResult.getOrThrow()
+        // فیکس bug.md/SB-02: پارس JSON بکاپ (تا ۱۰ مگابایت) روی IO اجرا می‌شود تا
+        // Main thread هنگام فایل‌های سنگین ANR نشود؛ UI تا آماده‌شدن پیش‌نمایش
+        // loader نشان می‌دهد و کاربر می‌تواند عملیات را لغو کند.
+        return withContext(Dispatchers.IO) {
+            try {
+                val parseResult = com.aistudio.vamyar.util.BackupHelper.parseAndValidateBackup(jsonString)
+                if (parseResult.isFailure) {
+                    return@withContext Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
+                }
+                val data = parseResult.getOrThrow()
 
-            val curUsers = allUsers.value
-            val curLoans = allLoans.value
-            val curShares = allShares.value
+                val curUsers = allUsers.value
+                val curLoans = allLoans.value
+                val curShares = allShares.value
 
-            var legacyMatch = false
-            val newUsers = mutableListOf<String>()
-            val existingUsers = mutableListOf<String>()
-            for (u in data.users) {
-                val matched = matchExistingUser(u, curUsers)
-                if (matched == null) {
-                    newUsers.add(u.name)
-                } else {
-                    existingUsers.add(u.name)
-                    // تطبیق با کلید fallback (نه publicId) → کاربر باید بداند
-                    if (!(com.aistudio.vamyar.util.PublicId.isValidUserId(u.publicId) && matched.publicId == u.publicId)) {
-                        legacyMatch = true
+                var legacyMatch = false
+                val newUsers = mutableListOf<String>()
+                val existingUsers = mutableListOf<String>()
+                for (u in data.users) {
+                    val matched = matchExistingUser(u, curUsers)
+                    if (matched == null) {
+                        newUsers.add(u.name)
+                    } else {
+                        existingUsers.add(u.name)
+                        // تطبیق با کلید fallback (نه publicId) → کاربر باید بداند
+                        if (!(com.aistudio.vamyar.util.PublicId.isValidUserId(u.publicId) && matched.publicId == u.publicId)) {
+                            legacyMatch = true
+                        }
                     }
                 }
-            }
-            val newLoans = mutableListOf<String>()
-            val existingLoans = mutableListOf<String>()
-            for (l in data.loans) {
-                val matched = matchExistingLoan(l, curLoans)
-                if (matched == null) {
-                    newLoans.add(l.title)
-                } else {
-                    existingLoans.add(l.title)
-                    if (!(com.aistudio.vamyar.util.PublicId.isValidLoanId(l.publicId) && matched.publicId == l.publicId)) {
-                        legacyMatch = true
+                val newLoans = mutableListOf<String>()
+                val existingLoans = mutableListOf<String>()
+                for (l in data.loans) {
+                    val matched = matchExistingLoan(l, curLoans)
+                    if (matched == null) {
+                        newLoans.add(l.title)
+                    } else {
+                        existingLoans.add(l.title)
+                        if (!(com.aistudio.vamyar.util.PublicId.isValidLoanId(l.publicId) && matched.publicId == l.publicId)) {
+                            legacyMatch = true
+                        }
                     }
                 }
-            }
-            // سهم‌ها فقط شمارش می‌شوند (فهرست‌شان در دیالوگ طولانی می‌شود)
-            val newShareCount = data.shares.count { s ->
-                val matchedLoan = matchExistingLoan(data.loans.firstOrNull { it.id == s.loanId } ?: return@count false, curLoans)
-                val localLoanId = matchedLoan?.id ?: -1L
-                matchExistingShare(s, curShares, localLoanId) == null
-            }
+                // سهم‌ها فقط شمارش می‌شوند (فهرست‌شان در دیالوگ طولانی می‌شود)
+                val newShareCount = data.shares.count { s ->
+                    val matchedLoan = matchExistingLoan(data.loans.firstOrNull { it.id == s.loanId } ?: return@count false, curLoans)
+                    val localLoanId = matchedLoan?.id ?: -1L
+                    matchExistingShare(s, curShares, localLoanId) == null
+                }
 
-            Result.success(
-                ImportPreview(
-                    userCount = data.users.size,
-                    loanCount = data.loans.size,
-                    shareCount = data.shares.size,
-                    recordCount = data.records.size,
-                    installmentCount = data.installments.size,
-                    iconCount = data.icons.size,
-                    newUsers = newUsers,
-                    existingUsers = existingUsers,
-                    newLoans = newLoans,
-                    existingLoans = existingLoans,
-                    newShareCount = newShareCount,
-                    exportedDate = data.exportedDate,
-                    legacyMatch = legacyMatch
+                Result.success(
+                    ImportPreview(
+                        userCount = data.users.size,
+                        loanCount = data.loans.size,
+                        shareCount = data.shares.size,
+                        recordCount = data.records.size,
+                        installmentCount = data.installments.size,
+                        iconCount = data.icons.size,
+                        newUsers = newUsers,
+                        existingUsers = existingUsers,
+                        newLoans = newLoans,
+                        existingLoans = existingLoans,
+                        newShareCount = newShareCount,
+                        exportedDate = data.exportedDate,
+                        legacyMatch = legacyMatch
+                    )
                 )
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 
     suspend fun importBackupJson(jsonString: String, mode: ImportMode = ImportMode.REPLACE_ALL): Result<String> {
-        return try {
-            val parseResult = com.aistudio.vamyar.util.BackupHelper.parseAndValidateBackup(jsonString)
-            if (parseResult.isFailure) {
-                return Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
-            }
-
-            val data = parseResult.getOrThrow()
-
-            // فیکس bug.md/SB-01: رد بکاپ دست‌سازی که بیت‌مپ عظیم (ده‌ها هزار
-            // پیکسل در هر بُعد) به‌عنوان آیکون وام دارد — decode چنین تصویری
-            // صدها مگابایت حافظه می‌خواهد. قبل از نوشتن هر فایلی رد می‌شود.
-            val hasOversizedIcon = data.icons.any { bi ->
-                com.aistudio.vamyar.util.LoanIconHelper.exceedsMaxIconDimensions(
-                    android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
-                )
-            }
-            if (hasOversizedIcon) {
-                return Result.failure(IllegalArgumentException(com.aistudio.vamyar.util.BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE))
-            }
-
-            // فیکس bug.md/NB-18: فایل آیکون‌های embedشدهٔ بکاپ اول روی دیسکِ همین
-            // دستگاه نوشته می‌شوند و مسیر محلیِ تازه به restore داده می‌شود؛ اگر
-            // restore با خطا rolback شود، همین فایل‌های تازه دوباره پاک می‌شوند
-            // تا فایل یتیم نماند.
-            val writtenIconPaths = data.icons.mapNotNull { bi ->
-                val bytes = android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
-                val savedPath = com.aistudio.vamyar.util.LoanIconHelper.saveCustomIconBytes(app, bytes)
-                if (savedPath != null) bi.loanId to savedPath else null
-            }.toMap()
-
-            // Restore Database — فیکس bug.md/NB-34: دو حالت ایمپورت:
-            // - REPLACE_ALL: رفتار قبلی (جایگزینی کامل + هشدار پیش‌نمایش NB-29)
-            // - MERGE_*: ادغام بدون پاک‌شدن دادهٔ فعلی (فقط موارد جدید درج؛
-            //   تکراری‌ها به‌روزرسانی یا رد) — idempotent برای ایمپورت دوبارِ همان فایل
-            val restoreResult = runCatching {
-                if (mode == ImportMode.REPLACE_ALL) {
-                    repository.restoreDatabaseSnapshot(
-                        users = data.users,
-                        loans = data.loans,
-                        shares = data.shares,
-                        records = data.records,
-                        // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
-                        // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
-                        installments = data.installments,
-                        // فیکس bug.md/NB-18: مسیرهای محلیِ تازهٔ آیکون‌های بازنویسی‌شده
-                        iconPaths = writtenIconPaths
-                    )
-                } else {
-                    repository.mergeFromBackup(
-                        users = data.users,
-                        loans = data.loans,
-                        shares = data.shares,
-                        records = data.records,
-                        installments = data.installments,
-                        iconPaths = writtenIconPaths,
-                        updateDuplicates = mode == ImportMode.MERGE_UPDATE_DUPLICATES
-                    )
-                }
-            }
-            if (restoreResult.isFailure) {
-                writtenIconPaths.values.forEach { com.aistudio.vamyar.util.LoanIconHelper.deleteCustomIconFile(it) }
-                return Result.failure(restoreResult.exceptionOrNull() ?: Exception("بازیابی ناموفق بود."))
-            }
-
-            // Restore preferences
-            // فیکس bug.md/P2-12: تنظیماتِ بازیابی‌شده قبلاً فقط در StateFlowها نوشته می‌شد
-            // و در AppPreferences ذخیره نمی‌شد؛ بعد از restart به حالت قبل برمی‌گشت. اکنون
-            // همان setterهای دائمی (که هم StateFlow و هم AppPreferences را می‌نویسند)
-            // فراخوانی می‌شوند. enumها هم دفاعی parse می‌شوند تا مقدار نامعتبر در فایل
-            // بکاپ، بازیابی بقیهٔ تنظیمات را نیمه‌کاره رها نکند (قبلاً یک رشتهٔ خرابِ
-            // themeMode، ارقام و فشرده‌سازی را هم از پا درمی‌آورد).
+        // فیکس bug.md/SB-02: کل ایمپورت (پارس + دکود/نوشتن آیکون‌ها + restore) روی IO
+        // اجرا می‌شود تا Main thread بلاک/ANR نشود.
+        return withContext(Dispatchers.IO) {
             try {
-                setThemeMode(runCatching { AppThemeMode.valueOf(data.preferences.themeMode) }.getOrDefault(_themeMode.value))
-                setThemePreset(runCatching { ThemePreset.valueOf(data.preferences.themePreset) }.getOrDefault(_themePreset.value))
-                setUsePersianDigits(data.preferences.usePersianDigits)
-                setCompactThousands(data.preferences.compactThousands)
-
-                if (data.preferences.isCustomDateEnabled) {
-                    setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
-                } else {
-                    syncDateWithSystem()
+                val parseResult = com.aistudio.vamyar.util.BackupHelper.parseAndValidateBackup(jsonString)
+                if (parseResult.isFailure) {
+                    return@withContext Result.failure(parseResult.exceptionOrNull() ?: Exception("فایل پشتیبان نامعتبر است."))
                 }
-            } catch (_: Exception) {}
 
+                val data = parseResult.getOrThrow()
 
-            // فیکس bug.md/NB-34: پیام موفقیت بر اساس حالتِ انتخابی کاربر —
-            // در ادغام، خلاصهٔ MergeSummary (جدید/به‌روزرسانی/رد) گزارش می‌شود
-            val summary = if (mode == ImportMode.REPLACE_ALL) {
-                "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
-            } else {
-                val ms = restoreResult.getOrNull() as? com.aistudio.vamyar.data.LoanRepository.MergeSummary
-                if (ms != null) {
-                    "ادغام انجام شد — کاربران: ${ms.newUsers} جدید، ${ms.updatedUsers} به‌روزرسانی، ${ms.skippedUsers} رد؛ وام‌ها: ${ms.newLoans} جدید، ${ms.updatedLoans} به‌روزرسانی، ${ms.skippedLoans} رد؛ سهم‌ها: ${ms.newShares} جدید، ${ms.updatedShares} به‌روزرسانی، ${ms.skippedShares} رد."
-                } else {
-                    "ادغام انجام شد."
+                // فیکس bug.md/SB-01: رد بکاپ دست‌سازی که بیت‌مپ عظیم (ده‌ها هزار
+                // پیکسل در هر بُعد) به‌عنوان آیکون وام دارد — decode چنین تصویری
+                // صدها مگابایت حافظه می‌خواهد. قبل از نوشتن هر فایلی رد می‌شود.
+                val hasOversizedIcon = data.icons.any { bi ->
+                    com.aistudio.vamyar.util.LoanIconHelper.exceedsMaxIconDimensions(
+                        android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
+                    )
                 }
+                if (hasOversizedIcon) {
+                    return@withContext Result.failure(IllegalArgumentException(com.aistudio.vamyar.util.BackupHelper.ERR_BACKUP_INVALID_OR_TOO_LARGE))
+                }
+
+                // فیکس bug.md/NB-18: فایل آیکون‌های embedشدهٔ بکاپ اول روی دیسکِ همین
+                // دستگاه نوشته می‌شوند و مسیر محلیِ تازه به restore داده می‌شود؛ اگر
+                // restore با خطا rolback شود، همین فایل‌های تازه دوباره پاک می‌شوند
+                // تا فایل یتیم نماند.
+                val writtenIconPaths = data.icons.mapNotNull { bi ->
+                    val bytes = android.util.Base64.decode(bi.dataBase64, android.util.Base64.NO_WRAP)
+                    val savedPath = com.aistudio.vamyar.util.LoanIconHelper.saveCustomIconBytes(app, bytes)
+                    if (savedPath != null) bi.loanId to savedPath else null
+                }.toMap()
+
+                // Restore Database — فیکس bug.md/NB-34: دو حالت ایمپورت:
+                // - REPLACE_ALL: رفتار قبلی (جایگزینی کامل + هشدار پیش‌نمایش NB-29)
+                // - MERGE_*: ادغام بدون پاک‌شدن دادهٔ فعلی (فقط موارد جدید درج؛
+                //   تکراری‌ها به‌روزرسانی یا رد) — idempotent برای ایمپورت دوبارِ همان فایل
+                val restoreResult = runCatching {
+                    if (mode == ImportMode.REPLACE_ALL) {
+                        repository.restoreDatabaseSnapshot(
+                            users = data.users,
+                            loans = data.loans,
+                            shares = data.shares,
+                            records = data.records,
+                            // فیکس bug.md/F1+NB-31: رکوردهای واقعی اقساط از بکاپ بازیابی می‌شوند
+                            // (بکاپ قدیمی → خالی → بازسازی ترتیبی در خود restore)
+                            installments = data.installments,
+                            // فیکس bug.md/NB-18: مسیرهای محلیِ تازهٔ آیکون‌های بازنویسی‌شده
+                            iconPaths = writtenIconPaths
+                        )
+                    } else {
+                        repository.mergeFromBackup(
+                            users = data.users,
+                            loans = data.loans,
+                            shares = data.shares,
+                            records = data.records,
+                            installments = data.installments,
+                            iconPaths = writtenIconPaths,
+                            updateDuplicates = mode == ImportMode.MERGE_UPDATE_DUPLICATES
+                        )
+                    }
+                }
+                if (restoreResult.isFailure) {
+                    writtenIconPaths.values.forEach { com.aistudio.vamyar.util.LoanIconHelper.deleteCustomIconFile(it) }
+                    return@withContext Result.failure(restoreResult.exceptionOrNull() ?: Exception("بازیابی ناموفق بود."))
+                }
+
+                // Restore preferences
+                // فیکس bug.md/P2-12: تنظیماتِ بازیابی‌شده قبلاً فقط در StateFlowها نوشته می‌شد
+                // و در AppPreferences ذخیره نمی‌شد؛ بعد از restart به حالت قبل برمی‌گشت. اکنون
+                // همان setterهای دائمی (که هم StateFlow و هم AppPreferences را می‌نویسند)
+                // فراخوانی می‌شوند. enumها هم دفاعی parse می‌شوند تا مقدار نامعتبر در فایل
+                // بکاپ، بازیابی بقیهٔ تنظیمات را نیمه‌کاره رها نکند (قبلاً یک رشتهٔ خرابِ
+                // themeMode، ارقام و فشرده‌سازی را هم از پا درمی‌آورد).
+                try {
+                    setThemeMode(runCatching { AppThemeMode.valueOf(data.preferences.themeMode) }.getOrDefault(_themeMode.value))
+                    setThemePreset(runCatching { ThemePreset.valueOf(data.preferences.themePreset) }.getOrDefault(_themePreset.value))
+                    setUsePersianDigits(data.preferences.usePersianDigits)
+                    setCompactThousands(data.preferences.compactThousands)
+
+                    if (data.preferences.isCustomDateEnabled) {
+                        setCustomShamsiDate(ShamsiDate(data.preferences.customYear, data.preferences.customMonth, data.preferences.customDay))
+                    } else {
+                        syncDateWithSystem()
+                    }
+                } catch (_: Exception) {}
+
+
+                // فیکس bug.md/NB-34: پیام موفقیت بر اساس حالتِ انتخابی کاربر —
+                // در ادغام، خلاصهٔ MergeSummary (جدید/به‌روزرسانی/رد) گزارش می‌شود
+                val summary = if (mode == ImportMode.REPLACE_ALL) {
+                    "پشتیبان با موفقیت بازیابی شد: ${data.loans.size} وام، ${data.users.size} کاربر، ${data.shares.size} سهم شراکت."
+                } else {
+                    val ms = restoreResult.getOrNull() as? com.aistudio.vamyar.data.LoanRepository.MergeSummary
+                    if (ms != null) {
+                        "ادغام انجام شد — کاربران: ${ms.newUsers} جدید، ${ms.updatedUsers} به‌روزرسانی، ${ms.skippedUsers} رد؛ وام‌ها: ${ms.newLoans} جدید، ${ms.updatedLoans} به‌روزرسانی، ${ms.skippedLoans} رد؛ سهم‌ها: ${ms.newShares} جدید، ${ms.updatedShares} به‌روزرسانی، ${ms.skippedShares} رد."
+                    } else {
+                        "ادغام انجام شد."
+                    }
+                }
+                Result.success(summary)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-            Result.success(summary)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
