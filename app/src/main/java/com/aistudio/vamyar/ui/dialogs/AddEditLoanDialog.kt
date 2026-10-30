@@ -361,8 +361,18 @@ fun AddEditLoanDialog(
                                             )
                                         },
                                         onDeleteCustomIcon = {
-                                            LoanIconHelper.deleteCustomIconFile(customIconPath)
+                                            // فیکس bug.md/SB-05: حذف فایل آیکون از دیسک نباید روی
+                                            // main thread انجام شود (StrictMode DiskWrite) — اول state
+                                            // فوری به‌روز می‌شود و حذف روی Dispatchers.IO می‌رود.
+                                            val pathToDelete = customIconPath
                                             customIconPath = null
+                                            if (pathToDelete != null) {
+                                                iconScope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        LoanIconHelper.deleteCustomIconFile(pathToDelete)
+                                                    }
+                                                }
+                                            }
                                         },
                                         selectedColor = selectedColor,
                                         onSelectColor = { selectedColor = it },
