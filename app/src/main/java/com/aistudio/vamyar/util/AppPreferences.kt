@@ -25,6 +25,7 @@ class AppPreferences(context: Context) {
         private const val KEY_REMINDER_HOUR = "key_reminder_hour" // فیکس bug.md/P2-7
         private const val KEY_REMINDER_MINUTE = "key_reminder_minute" // فیکس bug.md/P2-7
         private const val KEY_INITIAL_DATA_SEEDED = "key_initial_data_seeded" // فیکس bug.md/P3-10
+        private const val KEY_LAST_AUTO_BACKUP_AT = "key_last_auto_backup_at" // فیکس bug.md/SB-07
     }
 
     var loanViewMode: LoanViewMode
@@ -127,6 +128,14 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_INITIAL_DATA_SEEDED, false)
         set(value) {
             prefs.edit().putBoolean(KEY_INITIAL_DATA_SEEDED, value).apply()
+        }
+
+    // فیکس bug.md/SB-07: زمان آخرین بکاپ خودکار (۰ = هنوز هیچ). مبنای
+    // «بکاپ هفتگی در startup» است و فقط پس از نوشتن موفق فایل set می‌شود.
+    var lastAutoBackupAt: Long
+        get() = prefs.getLong(KEY_LAST_AUTO_BACKUP_AT, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_LAST_AUTO_BACKUP_AT, value).apply()
         }
 
     fun setCustomDate(year: Int, month: Int, day: Int) {

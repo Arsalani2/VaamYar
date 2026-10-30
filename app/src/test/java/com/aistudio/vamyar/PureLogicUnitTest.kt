@@ -5,6 +5,7 @@ import com.aistudio.vamyar.model.Loan
 import com.aistudio.vamyar.model.LoanInstallment
 import com.aistudio.vamyar.model.LoanShareCalculator
 import com.aistudio.vamyar.model.UserProfile
+import com.aistudio.vamyar.util.AutoBackupHelper
 import com.aistudio.vamyar.util.BackupHelper
 import com.aistudio.vamyar.util.BackupIcon
 import com.aistudio.vamyar.util.BackupPreferences
@@ -1115,5 +1116,55 @@ class PureLogicUnitTest {
         assertTrue("تجمیع داشبورد کند شد: ${overviewMs}ms", overviewMs < 2_000)
         assertTrue("نودهای اقساط کند شدند: ${nodesMs}ms", nodesMs < 2_000)
         println("SB-06 benchmark (200 loans × 120 installments): liquidity=${liquidityMs}ms, overview=${overviewMs}ms, nodes=${nodesMs}ms")
+    }
+
+    // ---------------------------------------------------------------- SB-07 (بکاپ خودکار هفتگی)
+    /** فیکس bug.md/SB-07: فاصلهٔ هفتگی — اولین اجرا بکاپ می‌سازد؛ قبل از ۷ روز نه. */
+    @Test
+    fun sb07_shouldAutoBackupUsesSevenDayInterval() {
+        val now = 1_777_000_000_000L
+        // هرگز نشده → اولین اجرای اپ هم بکاپ پایه می‌سازد
+        assertTrue(AutoBackupHelper.shouldAutoBackup(0L, now))
+        // ۶ روز و ۲۳ ساعت و ۵۹ ثانیه گذشته → نه
+        assertFalse(AutoBackupHelper.shouldAutoBackup(now - AutoBackupHelper.AUTO_BACKUP_INTERVAL_MS + 1, now))
+        // دقیقاً ۷ روز گذشته → بله
+        assertTrue(AutoBackupHelper.shouldAutoBackup(now - AutoBackupHelper.AUTO_BACKUP_INTERVAL_MS, now))
+    }
+
+    /** فیکس bug.md/SB-07: چرخش — چهارمین بکاپ قدیمی‌ترین را حذف می‌کند (۳ نسخه می‌ماند). */
+    @Test
+    fun sb07_rotationKeepsNewestThreeFiles() {
+        val dir = java.nio.file.Files.createTempDirectory("sb07_cap").toFile()
+        val base = 2_000_000_000_000L
+        for (i in 1..4) {
+            val file = AutoBackupHelper.writeAutoBackupToDir(dir, "backup-$i", timestampMillis = base + i)
+            assertNotNull(file)
+            assertEquals("auto-${base + i}.json", file!!.name)
+        }
+        val files = AutoBackupHelper.listAutoBackups(dir)
+        assertEquals(AutoBackupHelper.MAX_AUTO_BACKUP_FILES, files.size)
+        // جدیدترین اول؛ قدیمی‌ترین (backup-1) حذف شده و سه تای آخر مانده‌اند
+        assertEquals("auto-${base + 4}.json", files.first().name)
+        val texts = files.map { it.readText() }.toSet()
+        assertFalse(texts.contains("backup-1"))
+        assertTrue(texts.contains("backup-2"))
+        assertTrue(texts.contains("backup-4"))
+        dir.deleteRecursively()
+    }
+
+    /** فیکس bug.md/SB-07: نام یکتا در همان میلی‌ثانیه + پارس timestamp از نام فایل. */
+    @Test
+    fun sb07_uniqueNamesAndTimestampParsing() {
+        val dir = java.nio.file.Files.createTempDirectory("sb07_uniq").toFile()
+        val ts = 1234L
+        AutoBackupHelper.writeAutoBackupToDir(dir, "a", timestampMillis = ts)
+        // همان میلی‌ثانیه → نام یکتا با پسوند شاخص
+        AutoBackupHelper.writeAutoBackupToDir(dir, "b", timestampMillis = ts)
+        val names = dir.listFiles()!!.map { it.name }.sorted()
+        assertEquals(listOf("auto-1234-1.json", "auto-1234.json"), names)
+        assertEquals(1234L, AutoBackupHelper.autoBackupTimestampFromFileName("auto-1234.json"))
+        assertEquals(1234L, AutoBackupHelper.autoBackupTimestampFromFileName("auto-1234-1.json"))
+        assertNull(AutoBackupHelper.autoBackupTimestampFromFileName("other.json"))
+        dir.deleteRecursively()
     }
 }

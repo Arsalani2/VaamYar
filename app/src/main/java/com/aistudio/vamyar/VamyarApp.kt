@@ -5,6 +5,7 @@ import com.aistudio.vamyar.data.AppDatabase
 import com.aistudio.vamyar.data.LoanRepository
 import com.aistudio.vamyar.notification.NotificationHelper
 import com.aistudio.vamyar.util.AppPreferences
+import com.aistudio.vamyar.util.AutoBackupHelper
 import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.MonthlyRolloverHelper
 import android.util.Log
@@ -54,6 +55,11 @@ class VamyarApp : Application() {
                 MonthlyRolloverHelper.rolloverIfNeeded(this@VamyarApp)
                 repository.checkAndSeedInitialData()
                 repository.backfillMissingPublicIds()
+                // فیکس bug.md/SB-07: بکاپ خودکار هفتگی محلی — اگر از آخرین بکاپ
+                // بیش از ۷ روز گذشته باشد، یک JSON کامل در filesDir/auto_backups
+                // نوشته می‌شود (۳ نسخهٔ آخر می‌ماند). شکست هرگز راه‌اندازی اپ
+                // را نمی‌شکند (مثل بقیهٔ این بلوک داخل runCatching است).
+                AutoBackupHelper.performAutoBackupIfNeeded(this@VamyarApp, repository)
             }.onFailure { e ->
                 Log.e("VamyarApp", "Startup initialization failed", e)
             }
