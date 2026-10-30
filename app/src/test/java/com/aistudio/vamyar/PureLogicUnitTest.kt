@@ -8,6 +8,7 @@ import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.util.BackupHelper
 import com.aistudio.vamyar.util.BackupIcon
 import com.aistudio.vamyar.util.BackupPreferences
+import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.InputLimits
 import com.aistudio.vamyar.util.LoanIconHelper
 import com.aistudio.vamyar.util.LiquidityLoanInput
@@ -920,5 +921,71 @@ class PureLogicUnitTest {
         assertEquals(1, data.loans.size)
         assertTrue(data.installments.isEmpty())
         assertTrue(data.icons.isEmpty())
+    }
+
+    // ---------------------------------------------------------------- SB-04 (کرش‌لاگ محلی)
+
+    /** فیکس bug.md/SB-04: کرش مصنوعی → فایل لاگ کامل با محیط دستگاه + stacktrace. */
+    @Test
+    fun sb04_crashLogContainsEnvironmentAndStacktrace() {
+        val dir = java.nio.file.Files.createTempDirectory("sb04_env").toFile()
+        val timestamp = 1_777_000_000_000L
+        val content = CrashLogHelper.buildCrashLogContent(
+            thread = Thread.currentThread(),
+            throwable = IllegalStateException("sb04 boom"),
+            timestampMillis = timestamp
+        )
+        val file = CrashLogHelper.writeCrashLogToDir(dir, content, timestamp)
+        assertNotNull(file)
+        val written = file!!.readText()
+        // سربرگ محیط: نسخهٔ اپ، Android API، رشتهٔ اجرا و زمان شمسی
+        assertTrue(written.contains("نسخهٔ اپ"))
+        assertTrue(written.contains("Android API"))
+        assertTrue(written.contains("رشتهٔ اجرا"))
+        assertTrue(written.contains(Thread.currentThread().name))
+        // stacktrace کامل: نوع استثنا + پیام + فریم اول
+        assertTrue(written.contains("IllegalStateException"))
+        assertTrue(written.contains("sb04 boom"))
+        assertTrue(written.contains("sb04_crashLogContainsEnvironmentAndStacktrace"))
+        // نام فایل از timestamp ساخته می‌شود
+        assertEquals("crash-1777000000000.txt", file.name)
+        dir.deleteRecursively()
+    }
+
+    /** فیکس bug.md/SB-04: کپ ۵ فایل — کرش ششم، قدیمی‌ترین لاگ را حذف می‌کند. */
+    @Test
+    fun sb04_crashLogRotationKeepsNewestFiveFiles() {
+        val dir = java.nio.file.Files.createTempDirectory("sb04_cap").toFile()
+        val base = 1_000_000_000_000L
+        for (i in 1..6) {
+            val file = CrashLogHelper.writeCrashLogToDir(dir, "log-$i", timestampMillis = base + i)
+            assertNotNull(file)
+        }
+        val files = dir.listFiles { f -> f.name.startsWith(CrashLogHelper.CRASH_LOG_FILE_PREFIX) }!!
+            .sorted()
+        assertEquals(CrashLogHelper.MAX_CRASH_LOG_FILES, files.size)
+        // قدیمی‌ترین (log-1) حذف شده؛ پنج تای جدیدتر مانده‌اند
+        val texts = files.map { it.readText() }.toSet()
+        assertFalse(texts.contains("log-1"))
+        assertTrue(texts.contains("log-2"))
+        assertTrue(texts.contains("log-6"))
+        dir.deleteRecursively()
+    }
+
+    /** فیکس bug.md/SB-04: نام یکتا در همان میلی‌ثانیه + پارس timestamp از نام فایل + پاک‌کردن. */
+    @Test
+    fun sb04_uniqueNamesTimestampParsingAndClear() {
+        val dir = java.nio.file.Files.createTempDirectory("sb04_clear").toFile()
+        CrashLogHelper.writeCrashLogToDir(dir, "a", timestampMillis = 1234L)
+        CrashLogHelper.writeCrashLogToDir(dir, "b", timestampMillis = 1234L) // همان میلی‌ثانیه → پسوند شاخص
+        val names = dir.listFiles()!!.map { it.name }.sorted()
+        assertEquals(listOf("crash-1234-1.txt", "crash-1234.txt"), names)
+        assertEquals(1234L, CrashLogHelper.crashTimestampFromFileName("crash-1234.txt"))
+        assertEquals(1234L, CrashLogHelper.crashTimestampFromFileName("crash-1234-1.txt"))
+        assertNull(CrashLogHelper.crashTimestampFromFileName("other.txt"))
+        // پاک‌کردن همهٔ لاگ‌ها (همان کاری که clearCrashLogs روی Context انجام می‌دهد)
+        CrashLogHelper.enforceMaxFiles(dir, maxFiles = 0)
+        assertEquals(0, dir.listFiles()?.size)
+        dir.deleteRecursively()
     }
 }

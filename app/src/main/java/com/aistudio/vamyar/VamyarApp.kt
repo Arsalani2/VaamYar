@@ -5,6 +5,7 @@ import com.aistudio.vamyar.data.AppDatabase
 import com.aistudio.vamyar.data.LoanRepository
 import com.aistudio.vamyar.notification.NotificationHelper
 import com.aistudio.vamyar.util.AppPreferences
+import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.MonthlyRolloverHelper
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,10 @@ class VamyarApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // فیکس bug.md/SB-04: کرش‌لاگ محلی — اولین کار قبل از هر چیز دیگر، تا حتی
+        // کرش‌های اولیهٔ راه‌اندازی هم لاگ شوند؛ delegate به handler قبلی در پایان.
+        CrashLogHelper.installDefaultHandler(this)
 
         val database = AppDatabase.getDatabase(this)
         repository = LoanRepository(

@@ -49,6 +49,7 @@ import com.aistudio.vamyar.ui.dialogs.ShamsiDatePickerDialog
 import com.aistudio.vamyar.ui.theme.AppThemeMode
 import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.theme.ThemePreset
+import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
 
@@ -111,6 +112,10 @@ fun SettingsScreen(
     // واقعاً Job را cancel می‌کند.
     var importPreviewInProgress by remember { mutableStateOf(false) }
     var previewJob by remember { mutableStateOf<Job?>(null) }
+
+    // فیکس bug.md/SB-04: عیب‌یابی — تعداد لاگ‌های کرش محلی برای فعال/غیرفعال‌شدن
+    // دکمه‌های «اشتراک گزارش خطا» و «پاک‌کردن لاگ‌ها» در تب «داده‌ها».
+    var crashLogCount by remember { mutableStateOf(CrashLogHelper.listCrashLogs(context).size) }
 
     val coroutineScope = rememberCoroutineScope()
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
@@ -1115,6 +1120,161 @@ fun SettingsScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = "بازنشانی کامل (شامل کاربران)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 2.5: عیب‌یابی و گزارش خطا (فیکس bug.md/SB-04)
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_troubleshooting"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "عیب‌یابی و گزارش خطا",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.outlineVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.BugReport,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // خلاصهٔ آخرین کرش (یا «هیچ خطایی ثبت نشده است.»)
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = if (crashLogCount > 0) {
+                                            CrashLogHelper.latestCrashSummary(context, usePersianDigits)
+                                        } else {
+                                            CrashLogHelper.NO_CRASH_RECORDED_TEXT
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+
+                                // اشتراک آخرین گزارش خطا — فقط با خواست کاربر و از طریق
+                                // FileProvider (متن لاگ هرگز خودکار به بیرون ارسال نمی‌شود).
+                                Surface(
+                                    onClick = {
+                                        val latest = CrashLogHelper.latestCrashLog(context)
+                                        if (latest != null) {
+                                            val shareUri = FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                latest
+                                            )
+                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(Intent.EXTRA_STREAM, shareUri)
+                                                putExtra(Intent.EXTRA_SUBJECT, "گزارش خطای وام‌یار")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(shareIntent, "اشتراک گزارش خطا"))
+                                        } else {
+                                            Toast.makeText(context, CrashLogHelper.NO_CRASH_RECORDED_TEXT, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    enabled = crashLogCount > 0,
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = brandViolet.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, brandViolet.copy(alpha = 0.25f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = null,
+                                            tint = brandViolet,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "اشتراک گزارش خطا",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = brandViolet
+                                        )
+                                    }
+                                }
+
+                                // پاک‌کردن لاگ‌ها
+                                Surface(
+                                    onClick = {
+                                        if (CrashLogHelper.clearCrashLogs(context)) {
+                                            crashLogCount = 0
+                                            Toast.makeText(context, "لاگ‌های خطا پاک شدند", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    enabled = crashLogCount > 0,
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "پاک‌کردن لاگ‌ها",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
