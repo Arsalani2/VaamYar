@@ -442,33 +442,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        // فیکس bug.md/F7 (تأیید کاربر — بازبینی ۴.۵): پیش‌بینی نقدینگی ۳ و ۶ ماه آینده —
-        // مجموع اقساطِ سهم کاربر (از ماه جاری؛ قسطِ پرداخت‌شده حساب نمی‌شود) + مقایسه با
-        // میانگین پرداخت‌های خودِ او از تاریخچهٔ واقعی. بدون فیلد درآمد (تصمیم کاربر).
+        // فیکس bug.md/SB-09 (= NB-39): ساده‌سازی «پیش‌بینی نقدینگی» (گزارش کاربر:
+        // «الکی پیچیده است») — نکته فقط یک خط کوتاه است؛ جزئیات در دیالوگ جدول
+        // سادهٔ ماه‌ها (HomeScreen). میانگین/مقایسهٔ تاریخچه حذف شد.
         if (forecast != null && activeLoans.isNotEmpty()) {
             val f3 = NumberFormatter.formatPrice(forecast.next3MonthsTotal, usePersian = usePersian, compactThousands = compact)
             val f6 = NumberFormatter.formatPrice(forecast.next6MonthsTotal, usePersian = usePersian, compactThousands = compact)
-            val avg = forecast.historyMonthlyAverage
-            val historyText = if (avg != null && forecast.historyMonthsCount > 0) {
-                val avgFormatted = NumberFormatter.formatPrice(avg, usePersian = usePersian, compactThousands = compact)
-                val monthsCountFormatted = NumberFormatter.formatNumber(forecast.historyMonthsCount, usePersian)
-                val diff3 = forecast.next3MonthsTotal - avg * 3
-                val comparison = when {
-                    diff3 > 0 -> "بار ۳ماههٔ آینده ${NumberFormatter.formatPrice(diff3, usePersian = usePersian, compactThousands = compact)} بیشتر از میانگین پرداخت‌های شماست."
-                    diff3 < 0 -> "بار ۳ماههٔ آینده ${NumberFormatter.formatPrice(-diff3, usePersian = usePersian, compactThousands = compact)} کمتر از میانگین پرداخت‌های شماست."
-                    else -> "بار ۳ماههٔ آینده هم‌تراز میانگین پرداخت‌های شماست."
-                }
-                "میانگین پرداخت ماهانهٔ شما (از $monthsCountFormatted ماه تاریخچهٔ واقعی): $avgFormatted • $comparison"
-            } else {
-                "هنوز تاریخچهٔ پرداختی واقعی ثبت نشده است تا میانگین با آن مقایسه شود."
-            }
-
             tips.add(
                 SmartFinancialTip(
-                    title = "پیش‌بینی نقدینگی ۳ و ۶ ماه آینده",
-                    description = "مجموع اقساط سهم شما در ۳ ماه آینده (شامل این ماه): $f3 • در ۶ ماه آینده: $f6 • $historyText",
+                    title = "پیش‌بینی نقدینگی",
+                    description = "اقساط سهم شما: ۳ ماه آینده $f3 • ۶ ماه آینده $f6.",
                     type = TipType.LIQUIDITY_FORECAST,
-                    actionText = "جزئیات ماه‌ها"
+                    actionText = "جدول ماه‌ها"
                 )
             )
         }
