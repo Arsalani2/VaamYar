@@ -54,6 +54,7 @@ import com.aistudio.vamyar.util.AutoBackupHelper
 import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
+import com.aistudio.vamyar.util.ShamsiDateHelper
 
 enum class SettingsCategory(val titleFa: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     USERS("کاربران", Icons.Default.People),
