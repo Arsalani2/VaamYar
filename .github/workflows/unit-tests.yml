@@ -1,6 +1,7 @@
 name: Unit Tests (no release)
 
 # فقط تست اجرا می‌کند؛ هیچ نسخه‌ای bump یا منتشر نمی‌شود. جزئیات شکست به‌صورت کامنت روی issue #3 می‌آید.
+# (برنچ تشخیصی ci/sb-3-diag: نسخهٔ موقتی که خطاها را به‌صورت annotation عمومی هم منتشر می‌کند)
 on:
   workflow_dispatch:
   pull_request:
@@ -90,6 +91,15 @@ jobs:
             echo "" >> "$REPORT"
             echo "### تست‌های شکست‌خورده (JUnit):" >> "$REPORT"
             cat junit-failures.txt >> "$REPORT"
+          fi
+          # نسخهٔ تشخیصی: خطاها را به‌صورت annotation عمومی هم منتشر کن
+          grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$| tests completed|OutOfMemory|disappeared|Daemon" gradle-test.log 2>/dev/null | head -35 | while IFS= read -r line; do
+            echo "::error::$(echo "$line" | cut -c1-900)"
+          done
+          if [ -s junit-failures.txt ]; then
+            head -15 junit-failures.txt | while IFS= read -r line; do
+              echo "::error::$(echo "$line" | cut -c1-900)"
+            done
           fi
           gh issue comment 3 --repo "$GITHUB_REPOSITORY" --body-file "$REPORT" || echo "::warning::کامنت روی issue نشست"
 
