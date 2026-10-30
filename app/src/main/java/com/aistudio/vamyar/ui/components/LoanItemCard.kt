@@ -387,7 +387,7 @@ fun LoanItemCard(
                                 )
                             },
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            modifier = Modifier.height(36.dp)
+                            modifier = Modifier.heightIn(min = 36.dp)
                         ) {
                             Icon(
                                 imageVector = if (loan.isCurrentMonthPaid) Icons.Default.Check else Icons.Default.Add,

@@ -113,7 +113,7 @@ fun AppGuideDialog(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .heightIn(min = 50.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(

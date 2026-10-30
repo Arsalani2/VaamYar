@@ -433,7 +433,7 @@ fun AddEditLoanDialog(
                                 onClick = onDismiss,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("انصراف و خروج")
@@ -444,7 +444,7 @@ fun AddEditLoanDialog(
                                 enabled = rawMonthlyAmount > 0L && durationError == null,
                                 modifier = Modifier
                                     .weight(1.5f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("مرحله بعد", fontWeight = FontWeight.Bold)
@@ -461,7 +461,7 @@ fun AddEditLoanDialog(
                                 onClick = { currentStep = 1 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
@@ -478,7 +478,7 @@ fun AddEditLoanDialog(
                                 enabled = titleError == null && title.trim().isNotBlank(),
                                 modifier = Modifier
                                     .weight(1.5f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("مرحله بعد", fontWeight = FontWeight.Bold)
@@ -495,7 +495,7 @@ fun AddEditLoanDialog(
                                 onClick = { currentStep = 2 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
@@ -540,7 +540,7 @@ fun AddEditLoanDialog(
                                 },
                                 modifier = Modifier
                                     .weight(1.8f)
-                                    .height(48.dp),
+                                    .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
@@ -927,7 +927,7 @@ private fun StepOneFinancialContent(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp)
+                                .heightIn(min = 46.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { onTotalMonthsTextChange(duration.toString()) },
                             shape = RoundedCornerShape(12.dp),
@@ -1510,7 +1510,7 @@ private fun StepThreeConfirmationContent(
                                 onClick = onAddPartnerClick,
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
+                                modifier = Modifier.heightIn(min = 32.dp)
                             ) {
                                 Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
