@@ -380,10 +380,15 @@ fun VamyarMainApp(viewModel: MainViewModel) {
             existingUsers = allUsers,
             onDismiss = { showAddUserFromSwitcher = false },
             onSave = { newUser ->
+<<<<<<< HEAD
                 // فیکس bug.md/NB-49: کاربر جدید با isPrimary = true ذخیره می‌شود تا اتمیک در
                 // تراکنش دیتابیس به عنوان مبنا ثبت شود؛ فراخوانی قبلی setPrimaryUser(newUser.id)
                 // با شناسه 0 پرچم‌های مبنا را پاک می‌کرد.
                 viewModel.saveUser(newUser.copy(isPrimary = true))
+=======
+                viewModel.saveUser(newUser)
+                viewModel.setPrimaryUser(newUser.id)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 showAddUserFromSwitcher = false
             }
         )

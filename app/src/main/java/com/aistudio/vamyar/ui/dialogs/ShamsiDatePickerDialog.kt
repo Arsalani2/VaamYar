@@ -138,9 +138,14 @@ fun ShamsiDatePickerDialog(
                         ) {
                             IconButton(
                                 onClick = {
+<<<<<<< HEAD
                                     // فیکس bug.md/NB-54: گارد و کلمپ بازه مجاز سال (۱۳۰۰..۱۵۰۰)
                                     if (selectedMonth > 1) selectedMonth--
                                     else if (selectedYear > 1300) {
+=======
+                                    if (selectedMonth > 1) selectedMonth--
+                                    else {
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         selectedMonth = 12
                                         selectedYear--
                                     }
@@ -159,9 +164,14 @@ fun ShamsiDatePickerDialog(
 
                             IconButton(
                                 onClick = {
+<<<<<<< HEAD
                                     // فیکس bug.md/NB-54: گارد و کلمپ بازه مجاز سال (۱۳۰۰..۱۵۰۰)
                                     if (selectedMonth < 12) selectedMonth++
                                     else if (selectedYear < 1500) {
+=======
+                                    if (selectedMonth < 12) selectedMonth++
+                                    else {
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                         selectedMonth = 1
                                         selectedYear++
                                     }
@@ -188,7 +198,11 @@ fun ShamsiDatePickerDialog(
                                 .padding(horizontal = 4.dp, vertical = 4.dp)
                         ) {
                             IconButton(
+<<<<<<< HEAD
                                 onClick = { if (selectedYear > 1300) selectedYear-- },
+=======
+                                onClick = { selectedYear-- },
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(Icons.Default.ChevronRight, contentDescription = "سال قبل", modifier = Modifier.size(18.dp))
@@ -202,7 +216,11 @@ fun ShamsiDatePickerDialog(
                             )
 
                             IconButton(
+<<<<<<< HEAD
                                 onClick = { if (selectedYear < 1500) selectedYear++ },
+=======
+                                onClick = { selectedYear++ },
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(Icons.Default.ChevronLeft, contentDescription = "سال بعد", modifier = Modifier.size(18.dp))
@@ -232,12 +250,16 @@ fun ShamsiDatePickerDialog(
                     }
                 }
 
+<<<<<<< HEAD
                 // فیکس bug.md/NB-51: محاسبه افست روز اول ماه تا روزهای ماه دقیقاً زیر ستون روز هفته واقعی قرار گیرند
                 val firstDayOffset = remember(selectedYear, selectedMonth) {
                     ShamsiDateHelper.getShamsiDayOfWeekIndex(selectedYear, selectedMonth, 1)
                 }
 
                 // Days Grid (1 to 29/30/31) با احتساب روز شروع هفته
+=======
+                // Days Grid (1 to 29/30/31)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(7),
                     modifier = Modifier
@@ -246,17 +268,23 @@ fun ShamsiDatePickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+<<<<<<< HEAD
                     // خانه‌های خالی ابتدای ماه برای تراز با روز هفته
                     items(firstDayOffset) {
                         Box(modifier = Modifier.aspectRatio(1f))
                     }
 
+=======
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                     items(daysInMonth) { index ->
                         val dayNumber = index + 1
                         val isSelected = dayNumber == selectedDay
                         val isToday = dayNumber == systemDate.day && selectedMonth == systemDate.month && selectedYear == systemDate.year
+<<<<<<< HEAD
                         val dayOfWeekIndex = (firstDayOffset + index) % 7
                         val isFriday = dayOfWeekIndex == 6
+=======
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 
                         Box(
                             modifier = Modifier
@@ -283,7 +311,10 @@ fun ShamsiDatePickerDialog(
                                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) MaterialTheme.colorScheme.onPrimary
                                 else if (isToday) MaterialTheme.colorScheme.primary
+<<<<<<< HEAD
                                 else if (isFriday) MaterialTheme.colorScheme.error
+=======
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 else MaterialTheme.colorScheme.onSurface,
                                 fontSize = 12.sp
                             )

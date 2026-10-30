@@ -40,8 +40,12 @@ fun InstallmentNodesView(
     onNodeClick: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+<<<<<<< HEAD
     // فیکس bug.md/NB-52: استفاده از تم به جای رنگ هاردکد
     val brandViolet = MaterialTheme.colorScheme.primary
+=======
+    val brandViolet = Color(0xFF6C27DF)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 
     // Current month installment index
     val currentMonthIndex = currentYearMonth?.let { (cy, cm) ->
@@ -81,21 +85,34 @@ fun InstallmentNodesView(
                 text = "تقویم ماه‌های اقساط",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
+<<<<<<< HEAD
                 color = MaterialTheme.colorScheme.onSurface
+=======
+                color = Color(0xFF0F172A)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
             )
             Text(
                 text = "(به تفکیک ماه شمسی)",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Normal,
+<<<<<<< HEAD
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+=======
+                color = Color(0xFF94A3B8)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
             )
         }
 
         // Visual Legend / Filter Guide Card matching Stitch prototype
         Surface(
             shape = RoundedCornerShape(16.dp),
+<<<<<<< HEAD
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+=======
+            color = Color(0xFFF8FAFC),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.7f)),
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -116,7 +133,11 @@ fun InstallmentNodesView(
                             .clip(CircleShape)
                             .background(accentColor)
                     )
+<<<<<<< HEAD
                     Text("پرداخت شده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+=======
+                    Text("پرداخت شده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 }
 
                 // Item 2: Upcoming
@@ -129,9 +150,15 @@ fun InstallmentNodesView(
                             .size(8.dp)
                             .clip(CircleShape)
                             .border(1.5.dp, brandViolet, CircleShape)
+<<<<<<< HEAD
                             .background(MaterialTheme.colorScheme.surface)
                     )
                     Text("قسط پیش‌رو", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+=======
+                            .background(Color.White)
+                    )
+                    Text("قسط پیش‌رو", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 }
 
                 // Item 3: Overdue
@@ -143,9 +170,15 @@ fun InstallmentNodesView(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
+<<<<<<< HEAD
                             .background(MaterialTheme.colorScheme.error)
                     )
                     Text("عقب‌افتاده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+=======
+                            .background(Color(0xFFE11D48))
+                    )
+                    Text("عقب‌افتاده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF334155))
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 }
 
                 // Item 4: Remaining
@@ -157,9 +190,15 @@ fun InstallmentNodesView(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
+<<<<<<< HEAD
                             .background(MaterialTheme.colorScheme.outlineVariant)
                     )
                     Text("مانده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+=======
+                            .background(Color(0xFFCBD5E1))
+                    )
+                    Text("مانده", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF94A3B8))
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                 }
             }
         }
@@ -183,9 +222,15 @@ fun InstallmentNodesView(
                 val nodeBgColor by animateColorAsState(
                     targetValue = when {
                         isPaid -> accentColor
+<<<<<<< HEAD
                         isOverdue -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
                         isCurrent -> MaterialTheme.colorScheme.surface
                         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+=======
+                        isOverdue -> Color(0xFFFFF1F2)
+                        isCurrent -> Color.White
+                        else -> Color(0xFFF8FAFC)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                     },
                     label = "nodeColor_$k"
                 )
@@ -202,12 +247,20 @@ fun InstallmentNodesView(
                             )
                             else if (isOverdue) Modifier.border(
                                 width = 1.dp,
+<<<<<<< HEAD
                                 color = MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
+=======
+                                color = Color(0xFFFECDD3),
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 shape = RoundedCornerShape(12.dp)
                             )
                             else if (!isPaid) Modifier.border(
                                 width = 1.dp,
+<<<<<<< HEAD
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+=======
+                                color = Color(0xFFE2E8F0),
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 shape = RoundedCornerShape(12.dp)
                             )
                             else Modifier
@@ -250,9 +303,15 @@ fun InstallmentNodesView(
                                 fontWeight = if (isCurrent || isPaid || isOverdue) FontWeight.Bold else FontWeight.Medium,
                                 color = when {
                                     isPaid -> Color.White
+<<<<<<< HEAD
                                     isOverdue -> MaterialTheme.colorScheme.error
                                     isCurrent -> brandViolet
                                     else -> MaterialTheme.colorScheme.onSurface
+=======
+                                    isOverdue -> Color(0xFFBE123C)
+                                    isCurrent -> brandViolet
+                                    else -> Color(0xFF475569)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                                 }
                             )
                         }
@@ -263,9 +322,15 @@ fun InstallmentNodesView(
                             fontWeight = FontWeight.Normal,
                             color = when {
                                 isPaid -> Color.White.copy(alpha = 0.85f)
+<<<<<<< HEAD
                                 isOverdue -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                                 isCurrent -> brandViolet.copy(alpha = 0.8f)
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
+=======
+                                isOverdue -> Color(0xFFE11D48).copy(alpha = 0.8f)
+                                isCurrent -> brandViolet.copy(alpha = 0.8f)
+                                else -> Color(0xFF94A3B8)
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             }
                         )
                     }

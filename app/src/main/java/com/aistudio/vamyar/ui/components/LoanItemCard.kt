@@ -613,12 +613,16 @@ fun LoanItemCard(
                                 usePersianDigits = usePersianDigits,
                                 paidYearMonths = paidYearMonths,
                                 overdueYearMonths = overdueYearMonths,
+<<<<<<< HEAD
                                 currentYearMonth = currentYearMonth,
                                 onNodeClick = { clickedInstallment ->
                                     // فیکس bug.md/NB-53: فعال‌سازی کلیک نودها در حالت مربعی
                                     val m = ShamsiDateHelper.installmentMonth(loan.startYear, loan.startMonth, clickedInstallment)
                                     onToggleInstallmentMonth(m.year, m.month)
                                 }
+=======
+                                currentYearMonth = currentYearMonth
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             )
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
@@ -787,12 +791,16 @@ fun LoanItemCard(
                                 usePersianDigits = usePersianDigits,
                                 paidYearMonths = paidYearMonths,
                                 overdueYearMonths = overdueYearMonths,
+<<<<<<< HEAD
                                 currentYearMonth = currentYearMonth,
                                 onNodeClick = { clickedInstallment ->
                                     // فیکس bug.md/NB-53: فعال‌سازی کلیک نودها در حالت مربعی
                                     val m = ShamsiDateHelper.installmentMonth(loan.startYear, loan.startMonth, clickedInstallment)
                                     onToggleInstallmentMonth(m.year, m.month)
                                 }
+=======
+                                currentYearMonth = currentYearMonth
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
                             )
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = onEdit) {

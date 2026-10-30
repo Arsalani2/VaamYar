@@ -1193,6 +1193,7 @@ class PureLogicUnitTest {
             assertTrue(paths.any { it.contains("بهینه‌سازی باتری") })
         }
     }
+<<<<<<< HEAD
 
     // ---------------------------------------------------------------- NB-51 (تقویم شمسی و روزهای هفته)
 
@@ -1221,4 +1222,6 @@ class PureLogicUnitTest {
         assertEquals(6, ShamsiDateHelper.getShamsiDayOfWeekIndex(1405, 8, 8))
         assertEquals("جمعه", ShamsiDateHelper.getShamsiDayOfWeek(1405, 8, 8))
     }
+=======
+>>>>>>> 3da3727fef15b2c864397fa3676270f89faa1dff
 }
