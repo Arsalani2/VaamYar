@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- فیکس bug.md/NB-15: مسیرهای قابل‌اشتراک FileProvider — فایل بکاپ موقت در
+     cacheDir/backup نوشته می‌شود و فقط همین زیرمسیر به بیرون expose می‌شود. -->
+<!-- فیکس bug.md/SB-04: لاگ‌های کرش محلی در filesDir/crash_logs — «اشتراک گزارش
+     خطا» از تنظیمات همین مسیر را فقط با اجازهٔ خواندن به بیرون expose می‌کند. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="vaamyar_backups"
+        path="backup/" />
+
+    <files-path
+        name="vaamyar_crash_logs"
+        path="crash_logs/" />
+</paths>

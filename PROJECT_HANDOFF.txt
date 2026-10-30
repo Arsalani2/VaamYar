@@ -1,0 +1,152 @@
+=====================================================================
+PROJECT_HANDOFF.txt — پروژه VaamYar (وام‌یار)
+=====================================================================
+
+۱. هدف و معماری پروژه
+---------------------
+- اپلیکیشن اندروید «وام‌یار» (Kotlin + Jetpack Compose، Room، Retrofit/Moshi، Firebase AI).
+- ماژول: :app  |  applicationId: com.aistudio.vamyar.zqnmxk
+- نسخه‌ها از فایل version.properties خوانده می‌شوند (VERSION_CODE / VERSION_NAME).
+- ورک‌فلو انتشار: .github/workflows/android-release.yml
+  (با push به main، تگ v*.*.* یا workflow_dispatch اجرا می‌شود؛ نسخه را افزایش می‌دهد،
+  AAB/APK امضاشده می‌سازد، تگ می‌زند و GitHub Release منتشر می‌کند.)
+- نسخه‌های کلیدی (gradle/libs.versions.toml): AGP 9.1.1، Kotlin 2.2.10، KSP 2.3.5، Room 2.7.0
+- Gradle پین‌شده در gradle/wrapper/gradle-wrapper.properties: 9.3.1
+
+۲. ورودی‌های ثبت‌شده (تاریخ‌ها به وقت UTC طبق ساعت محیط اجرا)
+---------------------------------------------------------------
+
+[2026-10-24 ~10:00 UTC] — مدل/عامل: Claude Sonnet 5.5 (claude-sonnet-5-5)
+اقدام: بررسی خطای ورک‌فلو «Android Build & Release» (run شماره 40083693731، commit 32a4dcf).
+یافته‌ها:
+  - مرحله‌ی شکست‌خورده: «Build Android App (AAB & APK)» (مرحله‌های قبل از آن موفق بودند).
+  - خطای Annotation در GitHub:
+      Cannot invoke "ksp.com.intellij.openapi.application.Application.getService(java.lang.Class)"
+      because the return value of "ksp.com.intellij.openapi.application.ApplicationManager.getApplication()" is null
+  - فایل gradlew و gradle-wrapper.jar در ریپو commit نشده بودند (فقط gradle-wrapper.properties بود).
+    مرحله‌ی «Grant Execute Permission to Gradlew» در این حالت دستور `gradle wrapper` را اجرا می‌کرد
+    و Wrapper را با Gradle نصب‌شده روی runner می‌ساخت. طبق Annotation کش، نسخه‌ی استفاده‌شده
+    Gradle 9.8.1 بود، نه 9.3.1 که در پروژه پین شده است.
+  - لاگ کامل job از محیط من قابل دریافت نبود (Forbidden از سمت results-receiver)؛ فقط Annotationها خوانده شد.
+  - هشدارهای «Failed to save cache entry … Our services aren't available» مربوط به قطعی سرویس کش GitHub است
+    و علت شکست نیست.
+تغییرات انجام‌شده:
+  1) افزودن gradlew، gradlew.bat و gradle/wrapper/gradle-wrapper.jar (ساخته‌شده با
+     `gradle wrapper --gradle-version 9.3.1 --distribution-type bin` در یک پوشه‌ی تمیز).
+  2) .github/workflows/android-release.yml:
+     - حذف fallback مربوط به `gradle wrapper`؛ اگر gradlew/jar وجود نداشته باشد، job با پیام واضح fail می‌شود.
+     - افزودن `./gradlew --version` برای ثبت نسخه‌ی واقعی Gradle در لاگ.
+     - رفع باگ جزئی: `$(date ...)` داخل body ریلیز اجرا نمی‌شد؛ حالا با env.RELEASE_DATE مقداردهی می‌شود.
+  3) افزودن همین فایل (PROJECT_HANDOFF.txt).
+وضعیت راستی‌آزمایی:
+  - بیلد محلی ممکن نبود (شبکه به services.gradle.org و Android SDK در محیط من نیست)؛
+    همه‌ی راستی‌آزمایی‌ها با اجرای واقعی workflow روی GitHub انجام شد (ادامه در ورودی‌های بعدی).
+
+[2026-10-24 ~10:05 UTC] — Claude Sonnet 5.5
+اقدام: push کامیت 6158fa3 (wrapper 9.3.1 + سخت‌سازی workflow) → run 40084196256.
+نتیجه: Gradle 9.3.1 استفاده شد (طبق Annotation کش) و خطای KSP دیگر دیده نشد، اما مرحله Build همچنان fail شد.
+  لاگ کامل قابل دریافت نبود (403 از blob لاگ‌ها) و Annotation دقیقی نبود.
+
+[2026-10-24 ~10:10 UTC] — Claude Sonnet 5.5
+اقدام: کامیت 0a7b249 — افزودن مرحله «Summarize Build Failure» که خطوط مهم گریدل را با ::error:: به Annotation تبدیل می‌کند
+  (و tee به gradle-build.log). → run 40084497108.
+نتیجه (علت اصلی واقعی):
+  Execution failed for task ':app:validateSigningRelease'.
+  Keystore file '.../app/***.jks' not found for signing config 'release'.
+  دلیل: KEYSTORE_FILE=VaamYar.jks مسیر نسبی بود؛ app/build.gradle.kts آن را نسبت به پوشه app/ حل می‌کند
+  ولی فایل در ریشه ریپو decode شده بود.
+
+[2026-10-24 ~10:15 UTC] — Claude Sonnet 5.5
+اقدام: کامیت ea5d553 — KEYSTORE_FILE اکنون مسیر مطلق ${{ github.workspace }}/VaamYar.jks است. → run 40084737490.
+نتیجه: موفق. همه مراحل (Build، Upload، Commit version bump، Tag، GitHub Release) success شدند.
+  ربات کامیت 0708ba0 (bump به 1.0.1، VERSION_CODE=2) را push کرد و تگ v1.0.1 ساخته شد.
+  Release v1.0.1 شامل app-release.apk (~16.7MB) و app-release.aab (~16.2MB) است.
+  (mapping.txt وجود ندارد چون isMinifyEnabled=false.)
+تأیید: بررسی با gh (وضعیت steps و لیست assets ریلیز).
+
+
+[2026-10-25 ~11:00 UTC] — مهندس DevOps / Android
+اقدام: پیاده‌سازی کامل درخواست‌های کاربر در خصوص بکاپ، باگ‌های حیاتی و دیزاین:
+۱) رفع باگ حیاتی تفکیک سهم شرکا (وام ۸۰۰ تومانی شریک b دیگر در حساب a و b همزمان نمی‌آید؛ سهم a صفر می‌شود).
+۲) بازطراحی کامل PriceInputField: حذف VisualTransformation مسبب پرش کرسر و به‌هم‌ریختگی چینش در RTL، ورودی LTR خالص و نمایش زنده به حروف و ارقام جداشده.
+۳) اصلاح تشخیص خودکار اقساط سپری‌شده هنگام انتخاب تاریخ‌های گذشته (نظیر ۱۴۰۴).
+۴) ارتقای دیزاین آیکون وام‌ها: افزودن ۱۷ آیکون برداری جدید، پشتیبانی از دو فرمت «مربع دور گرد مینیمال» و «دایره مینیمال»، امکان افزودن/حذف لوگو و عکس از گالری.
+۵) اصلاح باگ بصری پرداخت قسط (حذف علامت تیک تکراری [تیک] پرداخت شد [تیک]).
+۶) حذف پرانتزهای زائد نظیر (من) در کنار اسامی.
+۷) ایجاد سند جامع «Structure Backup and import.md» و فایل انتشار «Update.md».
+
+[2026-10-25 ~12:45 UTC] — Claude Sonnet 5.5 (claude-sonnet-5-5)
+اقدام: رفع دو باگ بحرانی P1-3 و P1-4 از فایل bug.md (روی شاخه‌ی fix/p1-3-p1-4، کامیت 6ccaf77).
+نکته: P1-1 و P1-2 پیش‌تر (کامیت‌های 2fa03bf و 77018be) توسط عامل قبلی رفع شده‌اند و در bug.md تیک خورده‌اند؛
+  ورودی مربوط به آن‌ها در این فایل ثبت نشده بود (فقط در bug.md و Update.md هست).
+دلیل و جزئیات:
+  P1-3 (آلوده شدن تاریخچه پرداخت):
+    - toggleCurrentMonthPaid موقع برداشتن تیک رکورد PaymentRecord را حذف نمی‌کرد؛ recordInstallmentPayment
+      (دکمه‌ی −) هم همین‌طور. تیک دوباره = رکورد تکراری.
+    - مبلغ ناسازگار بود: مسیر تیک effectiveMyShare و مسیر +/− monthlyAmount ثبت می‌کرد.
+    - اصلاح: PaymentRecordDao.deleteRecordsForInstallment(loanId, installmentNumber)؛
+      LoanDao.getLoanByIdOnce(id)؛ در LoanRepository توابع خصوصی buildPaymentRecord (منبع واحد مبلغ = monthlyAmount،
+      هم‌خوان با Loan.totalPaidAmount) و upsertInstallmentRecord (ابتدا حذف رکورد هم‌شماره، سپس درج).
+      هر دو تابع پرداخت داخل database.withTransaction اجرا می‌شوند و وضعیت وام را از DB می‌خوانند نه از نسخه‌ی کهنه‌ی UI.
+      در وام تسویه‌شده (clamp شمارنده) رکورد جدید ثبت نمی‌شود.
+    - تصمیم طراحی (قابل برگشت): مبلغ تاریخچه = کل قسط ماهانه. فقط در buildPaymentRecord تغییر می‌کند.
+  P1-4 (restore غیرتراکنشی):
+    - restoreDatabaseSnapshot اکنون داخل RoomDatabase.withTransaction است (rollback کامل در صورت خطا).
+    - همین اتمیک‌سازی برای saveLoanWithShares، deleteLoan، clearAllLoansAndReset و clearAllDataAndReset (هم‌ریشه، کم‌ریسک).
+    - LoanRepository پارامتر سازنده‌ی جدید `database: RoomDatabase` گرفت؛ VamyarApp.kt و ExampleRobolectricTest.kt به‌روز شدند.
+  فایل‌های تغییر کرده: app/src/main/java/com/example/data/{LoanRepository,LoanDao,PaymentRecordDao}.kt،
+    app/src/main/java/com/example/VamyarApp.kt، app/src/test/java/com/example/ExampleRobolectricTest.kt،
+    فایل جدید app/src/test/java/com/example/LoanRepositoryIntegrityTest.kt (8 تست)، و مستندات bug.md و Update.md.
+وضعیت راستی‌آزمایی:
+  - بیلد و اجرای تست انجام نشد: در محیط این نشست به services.gradle.org و dl.google.com دسترسی شبکه نبود (curl کد 000)
+    و Android SDK / kotlinc نصب نبود. بنابراین کد فقط با مرور دستی بررسی شد و «تأییدنشده توسط کامپایلر» است.
+  - ریسک کامپایل شناخته‌شده: استفاده از database.withTransaction<Unit> { ... return@withTransaction } و
+    androidx.room.withTransaction (از room-ktx که در app/build.gradle.kts هست).
+  - ورک‌فلو CI تست اجرا نمی‌کند (bug.md/P4-1)، پس merge به main بدون اجرای دستی `./gradlew testDebugUnitTest` تأییدی ندارد.
+  - برای جلوگیری از ریلیز عمومی تأییدنشده، تغییرات روی شاخه‌ی جدا push شد نه main (هر push به main ریلیز می‌سازد).
+محدودیت‌ها: رکوردهای تکراری ازقبل‌موجود در دیتابیس کاربران پاک‌سازی نمی‌شوند (نیازمند Migration نسخه 4؛ موکول به F1).
+
+[2026-10-26 (ساعت دقیق در دسترس نبود) — Claude Sonnet 5.5 (claude-sonnet-5-5)]
+اقدام: بررسی شکست ریلیز 1.0.5 (run 40374838798، commit b7d35b7 روی main).
+یافته‌ها (از وضعیت steps با gh):
+  - همه‌ی مراحل Unit Tests، Build (AAB/APK) و Upload موفق بودند؛ فقط مرحله‌ی «Commit and Push Version Bump»
+    با «Process completed with exit code 128» شکست خورد و مراحل Tag و Release رد شدند (skipped).
+  - دو Annotation مربوط به KSP (ApplicationManager.getApplication() is null) در همین run دیده شد، ولی چون
+    مرحله‌ی Build موفق بود، علت شکست نیست.
+  - لاگ کامل در دسترس نبود (403)، بنابراین علت زیر «استنباط قوی» است نه مشاهده‌ی مستقیم پیام git:
+    gradlew در ایندکس با mode 100644 ثبت شده؛ مرحله‌ی «Grant Execute Permission» با chmod +x آن را تغییر می‌دهد،
+    و `git pull --rebase origin main` با تغییر ردیابی‌شده‌ی commitنشده خطای
+    «cannot pull with rebase: You have unstaged changes» با exit code 128 می‌دهد.
+تغییرات:
+  1) .github/workflows/android-release.yml: `git pull --rebase --autostash origin main`.
+  2) `git update-index --chmod=+x gradlew` (mode در ریپو 100755 شد).
+نتیجه (راستی‌آزمایی‌شده با gh): کامیت f1ec589 → run 40378239145 کاملاً موفق شد (Commit and Push Version Bump، Tag و
+  GitHub Release همگی success). ربات کامیت 68f92b6 (bump به 1.0.5) را push کرد و ریلیز v1.0.5 با app-release.apk و
+  app-release.aab منتشر شد. نتیجه‌ی موفق، استنباط علت (mode گیرِ gradlew + pull --rebase) را تأیید عملی می‌کند.
+  گام بعدی: همچنان P1-5 تا P1-9 در bug.md؛ هشدارهای deprecation اکشن‌ها (setup-java@v5 و ...) غیرمسدودکننده‌اند.
+
+۳. رویکردهای موفق / ناموفق
+--------------------------
+- موفق: مسیر مطلق keystore؛ commit کردن wrapper پین‌شده؛ نمایش خطای Gradle با ::error:: در Annotation.
+- موفق: بازطراحی فیلد عددی با LTR خالص و پیش‌نمایش به حروف فارسی جهت حذف کامل پرش کرسر.
+- نامشخص: خطای اولیه KSP (ApplicationManager.getApplication() is null) در run اول دیده شد و پس از پین شدن Gradle روی 9.3.1
+  دیگر ظاهر نشد؛ احتمالاً به Gradle 9.8.1 مربوط بود ولی علت قطعی آن اثبات نشده است.
+- ناموفق: `gradle wrapper --offline` داخل ریپو (resolve پلاگین‌ها نشد) → تولید در پوشه موقت تمیز.
+- ناموفق: `gh run view --log-failed` و `gh api .../logs` (403). جایگزین: `gh api repos/.../check-runs/<id>/annotations`.
+- موفق (طراحی، تأییدنشده با بیلد): تراکنش اتمیک برای restore و ثبت پرداخت؛ حذف رکورد هم‌شماره پیش از درج برای جلوگیری از تکراری.
+- ناموفق/غیرممکن در این نشست: بیلد و اجرای تست محلی (نبود شبکه به Gradle/Google Maven و نبود Android SDK). تکرار بدون دسترسی شبکه بی‌فایده است.
+
+۴. وضعیت فعلی و گام‌های بعدی
+----------------------------
+- آخرین عملیات موفق: ارتقای نسخه به 1.0.2، آماده‌سازی فایل‌های مستندات و تست‌های محلی.
+- آخرین وضعیت (2026-10-25 ~12:45 UTC): P1-1 و P1-2 روی main رفع شده‌اند؛ P1-3 و P1-4 روی شاخه‌ی fix/p1-3-p1-4
+  (کامیت 6ccaf77 + کامیت مستندات) هستند و منتظر بیلد/تست و merge. باقی‌مانده‌ی بحرانی‌ها: P1-5 تا P1-9 در bug.md.
+- گام بعدی پیشنهادی: ۱) اجرای `./gradlew testDebugUnitTest` روی شاخه‌ی fix/p1-3-p1-4 و رفع هر خطای کامپایل؛
+  ۲) merge به main (توجه: merge باعث ریلیز و bump نسخه می‌شود)؛ ۳) سپس P1-5 (جدا کردن dueMonths از paidMonths) و ادامه‌ی لیست.
+- فایل مرجع بکاپ: Structure Backup and import.md
+- فایل گزارش تغییرات: Update.md
+- مسائل شناخته‌شده/پیشنهادی (غیرمسدودکننده): هشدار deprecation برای checkout@v4 و setup-java@v4 (Node 20)؛
+  هشدارهای ذخیره کش GitHub (قطعی سرویس کش، ناشی از GitHub)؛ نبود mapping.txt چون minify خاموش است
+  (بدنه ریلیز آن را ذکر می‌کند و upload با if-no-files-found: warn عبور می‌کند).
+- هر push به main یک نسخه جدید می‌سازد و کامیت bump (با [skip ci]) می‌زند؛ قبل از push محلی ابتدا git pull/fetch کنید.
+- هیچ secret‌ای در این فایل ثبت نشده است.

@@ -1,0 +1,211 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Bump Version (version.properties)
+        id: version_bump
+        run: |
+          PROPS_FILE="version.properties"
+          if [ ! -f "$PROPS_FILE" ]; then
+            echo "VERSION_CODE=1" > "$PROPS_FILE"
+            echo "VERSION_NAME=1.0.0" >> "$PROPS_FILE"
+          fi
+
+          # Read current values
+          CURRENT_CODE=$(grep "^VERSION_CODE=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '\r')
+          CURRENT_NAME=$(grep "^VERSION_NAME=" "$PROPS_FILE" | cut -d'=' -f2 | tr -d '\r')
+
+          CURRENT_CODE=${CURRENT_CODE:-0}
+          CURRENT_NAME=${CURRENT_NAME:-1.0.0}
+
+          # If triggered by a direct tag push (e.g. v1.0.7), align version with tag
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            NEW_VERSION_NAME="$TAG_VERSION"
+            NEW_VERSION_CODE=$((CURRENT_CODE + 1))
+          else
+            # Increment VERSION_CODE
+            NEW_VERSION_CODE=$((CURRENT_CODE + 1))
+
+            # Increment patch in VERSION_NAME (e.g. 1.0.5 -> 1.0.6)
+            MAJOR_MINOR=$(echo "$CURRENT_NAME" | sed -E 's/\.[0-9]+$//')
+            PATCH=$(echo "$CURRENT_NAME" | awk -F. '{print $NF}')
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION_NAME="${MAJOR_MINOR}.${NEW_PATCH}"
+          fi
+
+          # Update version.properties file
+          echo "VERSION_CODE=${NEW_VERSION_CODE}" > "$PROPS_FILE"
+          echo "VERSION_NAME=${NEW_VERSION_NAME}" >> "$PROPS_FILE"
+
+          echo "Bumping version from ${CURRENT_NAME} (${CURRENT_CODE}) to ${NEW_VERSION_NAME} (${NEW_VERSION_CODE})"
+
+          # Export environment variables for subsequent steps
+          echo "NEW_VERSION_CODE=${NEW_VERSION_CODE}" >> $GITHUB_ENV
+          echo "NEW_VERSION_NAME=${NEW_VERSION_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=v${NEW_VERSION_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_DATE=$(date '+%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: Decode Keystore File
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Error: KEYSTORE_BASE64 secret is not set!"
+            exit 1
+          fi
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > VaamYar.jks
+          if [ ! -s VaamYar.jks ]; then
+            echo "Error: Decoded VaamYar.jks is empty!"
+            exit 1
+          fi
+          echo "Keystore successfully decoded to VaamYar.jks"
+
+      - name: Grant Execute Permission to Gradlew
+        run: |
+          # The Gradle wrapper must be committed so the build uses the pinned
+          # Gradle version (gradle/wrapper/gradle-wrapper.properties) instead of
+          # whatever Gradle happens to be installed on the runner.
+          if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Error: gradlew / gradle-wrapper.jar is missing from the repository!"
+            exit 1
+          fi
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Warn on Oversized Kotlin Files (P4-6)
+        run: |
+          # فیکس bug.md/P4-6: هشدار غیرمسدودکننده (warning) برای فایل‌های Kotlin بلند؛
+          # تفکیکِ تدریجی هنگام لمسِ هر فایل انجام می‌شود، نه refactor یکجا.
+          THRESHOLD=700
+          LONG_FILES=$(find app/src -name "*.kt" -exec awk -v t="$THRESHOLD" "END { if (NR > t) print FILENAME }" {} \;)
+          if [ -n "$LONG_FILES" ]; then
+            echo "::warning::فایل‌های Kotlin بلندتر از ${THRESHOLD} خط — کاندید تفکیک تدریجی (P4-6):"
+            echo "$LONG_FILES" | while IFS= read -r f; do echo "  - $f ($(wc -l < "$f") خط)"; done
+          else
+            echo "هیچ فایل Kotlin بلندتر از ${THRESHOLD} خط نیست ✓"
+          fi
+
+      - name: Run Unit Tests
+        run: |
+          ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Build Android App (AAB & APK)
+        env:
+          # Absolute path: app/build.gradle.kts resolves relative paths against the app/ module dir.
+          KEYSTORE_FILE: ${{ github.workspace }}/VaamYar.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          ./gradlew bundleRelease assembleRelease --stacktrace 2>&1 | tee gradle-build.log
+
+      - name: Summarize Build Failure
+        if: failure()
+        run: |
+          # Surface the real Gradle error as workflow annotations so it is visible
+          # without opening the full raw log.
+          if [ -f gradle-build.log ]; then
+            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:" gradle-build.log | head -25 \
+              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+            sed -n '/What went wrong/,/Try:/p' gradle-build.log | head -25 | tr '\n' ' ' | cut -c1-1800 \
+              | while IFS= read -r line; do echo "::error title=Gradle failure::${line}"; done
+          fi
+
+      - name: Upload Build Artifacts to Actions
+        uses: actions/upload-artifact@v7
+        with:
+          name: vaamyar-release-${{ env.NEW_VERSION_NAME }}
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit and Push Version Bump
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "chore: bump version to ${{ env.NEW_VERSION_NAME }} [skip ci]"
+          # فیکس bug.md/P4-7: اگر وسط بیلد کامیتی روی main بنشیند، بدون rebase پوش non-fast-forward رد می‌شود (شکست اجرای #۹)
+          # --autostash: تغییرات ردیابی‌شده‌ی غیرکامیت‌شده (مثل chmod +x روی gradlew) باعث خطای
+          # "cannot pull with rebase: You have unstaged changes" با exit code 128 می‌شد.
+          git pull --rebase --autostash origin main
+          git push origin HEAD:main
+
+      - name: Create and Push Git Tag
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: |
+          git tag "${{ env.RELEASE_TAG }}"
+          git push origin "${{ env.RELEASE_TAG }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
+          body: |
+            ## 🚀 انتشار نسخه جدید وام‌یار ${{ env.RELEASE_TAG }}
+
+            - **شماره نسخه (Version Name):** `${{ env.NEW_VERSION_NAME }}`
+            - **کد نسخه (Version Code):** `${{ env.NEW_VERSION_CODE }}`
+            - **تاریخ انتشار:** ${{ env.RELEASE_DATE }}
+
+            ### 📦 فایل‌های پیوست این انتشار:
+            1. **`app-release.apk`**: فایل نصبی مستقیم جهت نصب و تست روی دستگاه‌های اندرویدی.
+            2. **`app-release.aab`**: بسته Android App Bundle جهت انتشار در گوگل پلی (Google Play Console).
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Secure Cleanup of Keystore
+        if: always()
+        run: |
+          if [ -f VaamYar.jks ]; then
+            rm -f VaamYar.jks
+            echo "VaamYar.jks was securely deleted."
+          else
+            echo "Keystore file does not exist or was already deleted."
+          fi
