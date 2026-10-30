@@ -902,6 +902,7 @@ class LoanRepositoryIntegrityTest {
     /** فیکس bug.md/NB-49: شناسهٔ نامعتبر نباید پرچم مبنای کاربران را پاک کند */
     @Test
     fun nb49_setPrimaryUserWithInvalidIdDoesNotClearPrimaryFlags() = runBlocking {
+        val primaryId = db.userProfileDao().insertUser(UserProfile(name = "کاربر اصلی", isPrimary = true))
         val primaryBefore = repository.primaryUser.first()
         assertNotNull(primaryBefore)
         assertTrue(primaryBefore!!.isPrimary)
@@ -910,29 +911,30 @@ class LoanRepositoryIntegrityTest {
         repository.setPrimaryUser(0L)
         val primaryAfterZero = repository.primaryUser.first()
         assertNotNull(primaryAfterZero)
-        assertEquals(primaryBefore.id, primaryAfterZero!!.id)
+        assertEquals(primaryId, primaryAfterZero!!.id)
         assertTrue(primaryAfterZero.isPrimary)
 
         repository.setPrimaryUser(-1L)
         val primaryAfterNeg = repository.primaryUser.first()
         assertNotNull(primaryAfterNeg)
-        assertEquals(primaryBefore.id, primaryAfterNeg!!.id)
+        assertEquals(primaryId, primaryAfterNeg!!.id)
     }
 
     /** فیکس bug.md/NB-50: کاربر مبنا تحت هیچ شرایطی از ریپازیتوری قابل حذف نیست */
     @Test
     fun nb50_cannotDeletePrimaryUser() = runBlocking {
+        val primaryId = db.userProfileDao().insertUser(UserProfile(name = "کاربر اصلی", isPrimary = true))
         val primary = repository.primaryUser.first()
         assertNotNull(primary)
 
-        val check = repository.checkCanDeleteUser(primary!!.id)
+        val check = repository.checkCanDeleteUser(primaryId)
         assertFalse(check.canDelete)
         assertTrue(check.blockingLoanTitles.isNotEmpty())
 
-        repository.deleteUser(primary.id)
+        repository.deleteUser(primaryId)
         val primaryAfter = repository.primaryUser.first()
         assertNotNull(primaryAfter)
-        assertEquals(primary.id, primaryAfter!!.id)
+        assertEquals(primaryId, primaryAfter!!.id)
     }
 
 }
