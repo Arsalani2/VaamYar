@@ -49,6 +49,7 @@ import com.aistudio.vamyar.ui.dialogs.ShamsiDatePickerDialog
 import com.aistudio.vamyar.ui.theme.AppThemeMode
 import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.theme.ThemePreset
+import com.aistudio.vamyar.util.AutoBackupHelper
 import com.aistudio.vamyar.util.CrashLogHelper
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
@@ -1130,6 +1131,78 @@ fun SettingsScreen(
                         }
                     }
 
+                    // Card 2.6: بکاپ خودکار هفتگی (فیکس bug.md/SB-07)
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("card_auto_backup"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "بکاپ خودکار هفتگی",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.outlineVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Backup,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = AutoBackupHelper.latestAutoBackupSummary(context, usePersianDigits),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "هر هفته که برنامه را باز کنید، یک نسخهٔ پشتیبان کامل در حافظهٔ خودِ برنامه ذخیره می‌شود (۳ نسخهٔ آخر می‌ماند).",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "⚠️ هشدار صادقانه: بکاپ‌های خودکار فقط روی همین گوشی و داخل حافظهٔ برنامه‌اند؛ با حذف نصب برنامه همگی پاک می‌شوند. برای داده‌های مهم، هر چند وقت یک‌بار با دکمهٔ «ذخیره پشتیبان» در همین صفحه خروجی بگیرید و جای امنی خارج از گوشی نگه دارید.",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Card 2.5: عیب‌یابی و گزارش خطا (فیکس bug.md/SB-04)
                     item {
                         Card(
@@ -1359,6 +1432,8 @@ fun SettingsScreen(
                                             color = Color.White
                                         )
                                     }
+                                }
+
                                 }
 
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
