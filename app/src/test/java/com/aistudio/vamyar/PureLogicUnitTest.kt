@@ -988,4 +988,132 @@ class PureLogicUnitTest {
         assertEquals(0, dir.listFiles()?.size)
         dir.deleteRecursively()
     }
+
+    // ---------------------------------------------------------------- SB-06 (benchmark seed درشت)
+
+    /**
+     * فیکس bug.md/SB-06 (گام ۱): benchmark محاسبات سنگین داشبورد با seed درشت —
+     * ۲۰۰ وام × ۱۲۰ قسط. سه محاسبهٔ اصلی که در هر تغییر داده دوباره اجرا
+     * می‌شوند اندازه‌گیری می‌شود: LiquidityForecast، تجمیع FinancialOverview
+     * (همان محاسباتِ بدنهٔ combine در MainViewModel) و نودهای اقساط هر وام
+     * (installmentMonth/overdue مثل LoanItemCard و دیالوگ). بودجهٔ assertion
+     * سخاوتمندانه است — فقط برای گیرانداختن رگرسیون جدی؛ زمان واقعی در لاگ CI
+     * چاپ می‌شود و در Update.md ثبت می‌شود.
+     */
+    @Test
+    fun sb06_dashboardHeavySeedBenchmark() {
+        val loanCount = 200
+        val monthsPerLoan = 120
+
+        // seed درشت: ۲۰۰ وام فعال (نیمی شراکتی)، ~۲۰۰ سهم و تا ۱۱۹ قسط پرداخت‌شده در هر وام
+        val loans = (1..loanCount).map { i ->
+            Loan(
+                id = i.toLong(),
+                title = "وام سنگین $i",
+                dueDay = (i % 28) + 1,
+                monthlyAmount = 1_000_000L + i,
+                totalMonths = monthsPerLoan,
+                paidMonths = i % monthsPerLoan,
+                hasPartners = (i % 2 == 0)
+            )
+        }
+        val paidCounts = (1..loanCount).map { it % monthsPerLoan }
+        val shares = loans.filter { it.hasPartners }.flatMap { loan ->
+            listOf(
+                DebtorShare(loanId = loan.id, loanTitle = loan.title, personName = "شریک ${loan.id}", shareAmount = loan.monthlyAmount / 3L),
+                DebtorShare(loanId = loan.id, loanTitle = loan.title, personName = "همکار ${loan.id}", shareAmount = loan.monthlyAmount / 4L)
+            )
+        }
+        val loanShares = shares.groupBy { it.loanId }
+        val startOf: (Long) -> ShamsiDate = { id ->
+            ShamsiDateHelper.installmentMonth(1400 + (id.toInt() % 5), (id.toInt() % 12) + 1, 1)
+        }
+
+        // ۱) LiquidityForecast — پیش‌بینی نقدینگی ۳/۶ماهه روی ۲۰۰ وام فعال
+        val liquidityInputs = loans.map { loan ->
+            val start = startOf(loan.id)
+            LiquidityLoanInput(
+                loanId = loan.id,
+                startYear = start.year,
+                startMonth = start.month,
+                totalMonths = loan.totalMonths,
+                myMonthlyShare = LoanShareCalculator.computeMyShare(loan, loanShares[loan.id] ?: emptyList())
+            )
+        }
+        val myShareByLoan = liquidityInputs.associate { it.loanId to it.myMonthlyShare }
+        val paidMonthsByLoan: Map<Long, Set<Pair<Int, Int>>> = loans.mapIndexed { index, loan ->
+            val start = startOf(loan.id)
+            loan.id to (1..paidCounts[index]).map { k ->
+                val m = ShamsiDateHelper.installmentMonth(start.year, start.month, k)
+                m.year to m.month
+            }.toSet()
+        }.toMap()
+        val paidRecords = paidMonthsByLoan.flatMap { (loanId, months) ->
+            months.map { (y, m) -> LiquidityPaidRecord(loanId = loanId, year = y, month = m) }
+        }
+
+        val t0 = System.nanoTime()
+        val forecast = computeLiquidityForecast(
+            currentYear = 1405,
+            currentMonth = 8,
+            loans = liquidityInputs,
+            paidMonthsByLoan = paidMonthsByLoan,
+            myShareByLoan = myShareByLoan,
+            paidRecords = paidRecords
+        )
+        val liquidityMs = (System.nanoTime() - t0) / 1_000_000
+
+        // ۲) تجمیع FinancialOverview — همان محاسبات بدنهٔ combine در MainViewModel
+        val t1 = System.nanoTime()
+        val activeUserName = "کاربر من"
+        val activeLoans = loans.filter { !it.isCompleted }
+        val activeLoanIds = activeLoans.map { it.id }.toSet()
+        val totalMonthlyDue = activeLoans.sumOf { it.monthlyAmount }
+        val userMonthlyShare = activeLoans.sumOf { loan ->
+            LoanShareCalculator.computeMyShare(loan, loanShares[loan.id] ?: emptyList())
+        }
+        val relevantShares = shares.filter {
+            it.loanId in activeLoanIds && !PersianNameNormalizer.namesMatch(it.personName, activeUserName)
+        }
+        val othersMonthlyReceivables = relevantShares.sumOf { it.shareAmount }
+        val userDebtRemaining = activeLoans.sumOf { loan ->
+            loan.remainingMonths.toLong() * LoanShareCalculator.computeMyShare(loan, loanShares[loan.id] ?: emptyList())
+        }
+        val totalPaidSoFar = loans.sumOf { it.totalPaidAmount }
+        val overviewMs = (System.nanoTime() - t1) / 1_000_000
+
+        // ۳) نودهای اقساط هر وام — installmentMonth + تشخیص overdue برای ۲۰۰×۱۲۰ ماه
+        val t2 = System.nanoTime()
+        var nodeCount = 0
+        var overdueCount = 0
+        val curTotal = 1405 * 12 + (8 - 1)
+        loans.forEach { loan ->
+            val start = startOf(loan.id)
+            val paidSet = paidMonthsByLoan[loan.id] ?: emptySet()
+            (1..loan.totalMonths).forEach { k ->
+                val m = ShamsiDateHelper.installmentMonth(start.year, start.month, k)
+                val key = m.year to m.month
+                nodeCount++
+                // همان الگوی overdueYearMonths در UI: ماهِ رسیدهٔ پرداخت‌نشده
+                if (m.year * 12 + (m.month - 1) < curTotal && key !in paidSet) overdueCount++
+            }
+        }
+        val nodesMs = (System.nanoTime() - t2) / 1_000_000
+
+        // صحت خروجی‌ها (نه فقط سرعت) — سبک
+        assertNotNull(forecast)
+        assertTrue(totalMonthlyDue > 0L)
+        assertTrue(userMonthlyShare > 0L)
+        assertTrue(othersMonthlyReceivables > 0L)
+        assertTrue(userDebtRemaining > 0L)
+        assertTrue(totalPaidSoFar >= 0L)
+        assertEquals(loanCount * monthsPerLoan, nodeCount)
+        assertTrue(overdueCount > 0)
+
+        // بودجهٔ سخاوتمندانه — JVM CI کند هم باید راحت رد شود؛ فقط رگرسیون جدی گیر می‌افتد
+        assertTrue("LiquidityForecast کند شد: ${liquidityMs}ms", liquidityMs < 2_000)
+        assertTrue("تجمیع داشبورد کند شد: ${overviewMs}ms", overviewMs < 2_000)
+        assertTrue("نودهای اقساط کند شدند: ${nodesMs}ms", nodesMs < 2_000)
+        println("SB-06 benchmark (200 loans × 120 installments): liquidity=${liquidityMs}ms, overview=${overviewMs}ms, nodes=${nodesMs}ms")
+    }
 }
