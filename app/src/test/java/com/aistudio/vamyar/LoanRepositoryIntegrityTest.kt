@@ -420,24 +420,10 @@ class LoanRepositoryIntegrityTest {
         assertTrue(repository.allLoans.first().isEmpty())
     }
 
-    // ---------------------------------------------------------------- NB-14
-
-    @Test
-    fun nb_14_clearAllLoansLeavesNoOrphanPaymentRecords() = runBlocking {
-        // وام با تاریخچهٔ پرداخت واقعی
-        val loan = insertSharedLoan(paidMonths = 3)
-        repository.recordInstallmentPayment(currentLoan(loan.id), isIncrement = true, currentDate = ShamsiDate(1405, 8, 15))
-        assertTrue(repository.allRecords.first().isNotEmpty())
-
-        repository.clearAllLoansAndReset()
-
-        assertTrue(repository.allLoans.first().isEmpty())
-        assertTrue(repository.allShares.first().isEmpty())
-        assertTrue(
-            "«پاکسازی تمام وام‌ها» نباید رکورد تاریخچهٔ یتیم به جا بگذارد",
-            repository.allRecords.first().isEmpty()
-        )
-    }
+    // ---------------------------------------------------------------- NB-14 (حذف NB-66)
+    // تستِ «پاکسازی تمام وام‌ها» همراه با خود مسیر مرده (clearAllLoansAndReset) حذف شد —
+    // فیکس bug.md/NB-66: تنها گزینهٔ بازنشانی، «بازنشانی کامل» است؛ اینوارینتِ
+    // «رکورد تاریخچهٔ یتیم نمی‌ماند» همچنان در تست NB-41 زیر پوشش است.
 
     // ---------------------------------------------------------------- NB-41
 
@@ -465,15 +451,7 @@ class LoanRepositoryIntegrityTest {
         assertTrue(repository.allRecords.first().isEmpty())
         assertTrue(repository.allInstallments.first().isEmpty())
 
-        // گزینهٔ قبلی («فقط پاکسازی تمام وام‌ها») همچنان کاربران را نگه می‌دارد
-        repository.saveUser(UserProfile(name = "رضا", publicId = "U-tst567"))
-        insertSharedLoan(paidMonths = 1)
-        repository.clearAllLoansAndReset()
-        assertTrue(repository.allLoans.first().isEmpty())
-        assertTrue(
-            "«پاکسازی تمام وام‌ها» برخلاف بازنشانی کامل، کاربران را نگه می‌دارد",
-            db.userProfileDao().getAllUsersOnce().size >= 2
-        )
+        // (بخش «فقط پاکسازی تمام وام‌ها» حذف شد — فیکس bug.md/NB-66: مسیر مرده)
     }
 
     // ---------------------------------------------------------------- F6 (شناسهٔ یکتای عمومی)
