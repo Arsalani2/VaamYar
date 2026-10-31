@@ -81,7 +81,7 @@ fun SettingsScreen(
     onConfirmDeleteUser: (Long) -> Unit,
     onSyncDateWithSystem: () -> Unit,
     onSetCustomDate: (ShamsiDate) -> Unit,
-    onClearAllLoans: () -> Unit,
+    // فیکس bug.md/NB-66: onClearAllLoans حذف شد — تنها مسیر «بازنشانی کامل» است
     onFullReset: () -> Unit = {},
     onTestNotification: () -> Unit,
     reminderHour: Int = 10,
@@ -98,7 +98,7 @@ fun SettingsScreen(
     var userToEdit by remember { mutableStateOf<UserProfile?>(null) }
     var showAddUserDialog by remember { mutableStateOf(false) }
 
-    var showClearLoansConfirmDialog by remember { mutableStateOf(false) }
+    // فیکس bug.md/NB-66: دیالوگ «پاکسازی کامل وام‌ها» و state آن حذف شدند.
     var showFullResetConfirmDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var showReminderTimePicker by remember { mutableStateOf(false) }
@@ -121,6 +121,10 @@ fun SettingsScreen(
     // فیکس bug.md/SB-04: عیب‌یابی — تعداد لاگ‌های کرش محلی برای فعال/غیرفعال‌شدن
     // دکمه‌های «اشتراک گزارش خطا» و «پاک‌کردن لاگ‌ها» در تب «داده‌ها».
     var crashLogCount by remember { mutableStateOf(CrashLogHelper.listCrashLogs(context).size) }
+
+    // فیکس bug.md/NB-65: کارت «عیب‌یابی و گزارش خطا» پیش‌فرض بسته است و فقط با
+    // لمس هدر باز می‌شود تا تب «داده‌ها» شلوغ نشود.
+    var showTroubleshootingExpanded by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
     var userBlockedDeletionDialog by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
@@ -483,12 +487,15 @@ fun SettingsScreen(
                                             }
                                         }
 
+                                        // فیکس bug.md/NB-61: نوشتار تاریخ برنامه وسط‌چین
                                         Text(
                                             text = currentShamsiDate.formatted(usePersianDigits = usePersianDigits),
                                             fontSize = 28.sp,
                                             fontWeight = FontWeight.Black,
                                             color = brandViolet,
-                                            letterSpacing = (-0.5).sp
+                                            letterSpacing = (-0.5).sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
 
                                         Surface(
@@ -1022,6 +1029,40 @@ fun SettingsScreen(
                                         )
                                     }
                                 }
+
+                                // فیکس bug.md/NB-62: «پشتیبان‌گیری خودکار هفتگی» (SB-07) از
+                                // کارتِ جدا به همین کارتِ پشتیبان‌گیری ادغام شد؛ متن هشدار
+                                // صادقانه هم حذف شد چون طبق NB-63 پشتیبان‌های خودکار دیگر در
+                                // حافظهٔ خصوصی برنامه نیستند و با حذف برنامه از بین نمی‌روند.
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Backup,
+                                        contentDescription = null,
+                                        tint = brandViolet,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "پشتیبان‌گیری خودکار هفتگی",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = AutoBackupHelper.latestAutoBackupSummary(context, usePersianDigits),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "هر هفته که برنامه را باز کنید، یک نسخهٔ پشتیبان کامل در پوشهٔ Documents/VaamYar گوشی ذخیره می‌شود (۳ نسخهٔ آخر می‌ماند) و با حذف برنامه از بین نمی‌رود.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -1070,36 +1111,9 @@ fun SettingsScreen(
                                     }
                                 }
 
-                                // Soft Rose Clean Button for Clear Loans
-                                Surface(
-                                    onClick = { showClearLoansConfirmDialog = true },
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 12.dp),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.DeleteOutline,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "پاکسازی وام‌ها (شروع خام برنامه)",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                }
+                                // فیکس bug.md/NB-66: دکمهٔ «پاکسازی وام‌ها (شروع خام برنامه)»
+                                // حذف شد — تنها مسیر بازنشانیِ باقی‌مانده «بازنشانی کامل» است
+                                // و کل زنجیرهٔ مردهٔ onClearAllLoans پاک‌سازی شد.
 
                                 // Full Reset Button
                                 Surface(
@@ -1124,7 +1138,7 @@ fun SettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "بازنشانی کامل (شامل کاربران)",
+                                            text = "بازنشانی کامل",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1135,77 +1149,8 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Card 2.6: بکاپ خودکار هفتگی (فیکس bug.md/SB-07)
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("card_auto_backup"),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "بکاپ خودکار هفتگی",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.outlineVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Backup,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = AutoBackupHelper.latestAutoBackupSummary(context, usePersianDigits),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "هر هفته که برنامه را باز کنید، یک نسخهٔ پشتیبان کامل در حافظهٔ خودِ برنامه ذخیره می‌شود (۳ نسخهٔ آخر می‌ماند).",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.05f),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "⚠️ هشدار صادقانه: بکاپ‌های خودکار فقط روی همین گوشی و داخل حافظهٔ برنامه‌اند؛ با حذف نصب برنامه همگی پاک می‌شوند. برای داده‌های مهم، هر چند وقت یک‌بار با دکمهٔ «ذخیره پشتیبان» در همین صفحه خروجی بگیرید و جای امنی خارج از گوشی نگه دارید.",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(12.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    // فیکس bug.md/NB-66: کارت جداگانهٔ «بکاپ خودکار هفتگی» (Card 2.6)
+                    // حذف شد — محتوایش طبق NB-62 داخل کارت «پشتیبان‌گیری» ادغام شد.
 
                     // Card 2.5: عیب‌یابی و گزارش خطا (فیکس bug.md/SB-04)
                     item {
@@ -1224,32 +1169,52 @@ fun SettingsScreen(
                                     .padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
+                                // فیکس bug.md/NB-65: هدر کارت عیب‌یابی بازشو/بسته‌شو شد —
+                                // کل هدر لمس‌پذیر است و جهت chevron وضعیت را نشان می‌دهد.
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showTroubleshootingExpanded = !showTroubleshootingExpanded },
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "عیب‌یابی و گزارش خطا",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.outlineVariant),
-                                        contentAlignment = Alignment.Center
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.BugReport,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
+                                        Text(
+                                            text = "عیب‌یابی و گزارش خطا",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(30.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.outlineVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.BugReport,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
+                                    Icon(
+                                        imageVector = if (showTroubleshootingExpanded) Icons.Default.KeyboardArrowUp
+                                        else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
+
+                                // فیکس bug.md/NB-65: محتوای عیب‌یابی فقط در حالت باز دیده می‌شود
+                                AnimatedVisibility(visible = showTroubleshootingExpanded) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
                                 // خلاصهٔ آخرین کرش (یا «هیچ خطایی ثبت نشده است.»)
                                 Surface(
@@ -1356,6 +1321,8 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                    }
+                                }
                                     }
                                 }
                             }
@@ -1755,31 +1722,8 @@ fun SettingsScreen(
         )
     }
 
-    // Modal: Confirm Clear All Loans
-    if (showClearLoansConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearLoansConfirmDialog = false },
-            title = { Text("پاکسازی کامل وام‌ها") },
-            text = { Text("آیا مطمئن هستید؟ تمامی وام‌های ثبت‌شده پاک شده و برنامه برای ثبت وام‌های واقعی شما از صفر آغاز به کار خواهد کرد.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onClearAllLoans()
-                        showClearLoansConfirmDialog = false
-                        Toast.makeText(context, "تمام وام‌ها با موفقیت پاکسازی شدند", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("بله، پاکسازی شود")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearLoansConfirmDialog = false }) {
-                    Text("انصراف")
-                }
-            }
-        )
-    }
+    // Modal: Confirm Clear All Loans — فیکس bug.md/NB-66: کل این دیالوگ همراه با
+    // دکمهٔ «پاکسازی وام‌ها» از تب «داده‌ها» حذف شد (مسیر مرده پاک‌سازی‌شده).
 
     // Modal: Confirm Full Reset
     if (showFullResetConfirmDialog) {
@@ -2487,3 +2431,4 @@ private fun UserManagementItemCard(
         }
     }
 }
+

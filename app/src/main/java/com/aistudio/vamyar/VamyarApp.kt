@@ -55,10 +55,12 @@ class VamyarApp : Application() {
                 MonthlyRolloverHelper.rolloverIfNeeded(this@VamyarApp)
                 repository.checkAndSeedInitialData()
                 repository.backfillMissingPublicIds()
-                // فیکس bug.md/SB-07: بکاپ خودکار هفتگی محلی — اگر از آخرین بکاپ
-                // بیش از ۷ روز گذشته باشد، یک JSON کامل در filesDir/auto_backups
-                // نوشته می‌شود (۳ نسخهٔ آخر می‌ماند). شکست هرگز راه‌اندازی اپ
-                // را نمی‌شکند (مثل بقیهٔ این بلوک داخل runCatching است).
+                // فیکس bug.md/SB-07 + NB-63: پشتیبان خودکار هفتگی — اگر از آخرین
+                // پشتیبان بیش از ۷ روز گذشته باشد، یک JSON کامل نوشته می‌شود؛
+                // در Android 10+ در پوشهٔ عمومی Documents/VaamYar (تا با حذف نصب
+                // برنامه پشتیبان‌ها بمانند؛ در اندروید قدیمی‌تر fallback به حافظهٔ
+                // داخلی). ۳ نسخهٔ آخر می‌ماند و شکست هرگز راه‌اندازی اپ را
+                // نمی‌شکند (مثل بقیهٔ این بلوک داخل runCatching است).
                 AutoBackupHelper.performAutoBackupIfNeeded(this@VamyarApp, repository)
             }.onFailure { e ->
                 Log.e("VamyarApp", "Startup initialization failed", e)

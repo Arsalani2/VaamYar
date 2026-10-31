@@ -222,28 +222,13 @@ class LoanRepository(
         appPreferences.initialDataSeeded = true
     }
 
-    suspend fun clearAllLoansAndReset() = withContext(Dispatchers.IO) {
-        // فیکس bug.md/NB-19: مسیر آیکون‌های سفارشیِ موجود پیش از تراکنش جمع می‌شود و پس از
-        // commit موفق، فایل‌ها از دیسک پاک می‌شوند تا هیچ فایل آیکونِ یتیمی نماند
-        // (عیناً الگوی NB-6 در deleteLoan — فقط بعد از commit، تا در صورت rollback چیزی از دست نرود).
-        val orphanIconPaths = loanDao.getLoansWithCustomIcon().mapNotNull { it.customIconPath }
-        database.withTransaction {
-            // فیکس bug.md/NB-14: رکوردهای تاریخچهٔ پرداخت وابستهٔ وام‌ها هستند؛ پیش از حذفِ
-            // خودِ وام‌ها پاک می‌شوند تا هیچ رکورد یتیمی در دیتابیس — و در نتیجه در هر
-            // بکاپِ بعدی — باقی نماند («پاکسازی تمام وام‌ها» اکنون واقعاً کامل است).
-            paymentRecordDao.clearAllRecords()
-            loanDao.clearAllLoans()
-            debtorShareDao.clearAllShares()
-            // فیکس bug.md/F1+NB-31: رکوردهای اقساط واقعی هم یتیم نمانند
-            loanInstallmentDao.clearAllInstallments()
-        }
-        orphanIconPaths.forEach { LoanIconHelper.deleteCustomIconFile(it) }
-        appPreferences.initialDataSeeded = true
-    }
+    // فیکس bug.md/NB-66: clearAllLoansAndReset حذف شد — دکمهٔ «پاکسازی وام‌ها» از
+    // تنظیمات برداشته شد و این تابع فراخواننده‌ای نداشت (مسیر مرده)؛
+    // clearAllDataAndCreateDefaultBaseUser (NB-41) تنها مسیر بازنشانی است.
 
     /**
-     * فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — برخلاف clearAllLoansAndReset که
-     * کاربران را عمداً نگه می‌دارد، این عملیات واقعاً همه‌چیز را پاک می‌کند:
+     * فیکس bug.md/NB-41 + NB-66: «بازنشانی کامل برنامه» — تنها مسیر بازنشانیِ
+     * باقی‌مانده؛ این عملیات واقعاً همه‌چیز را پاک می‌کند:
      * وام‌ها، سهم‌های شرکا، رکوردهای تاریخچهٔ پرداخت، اقساط واقعی و همهٔ
      * کاربران (حتی کاربر مبنا)؛ سپس در همان تراکنش اتمیک یک کاربر مبنا
      * پیش‌فرض («من») می‌سازد تا اینوارینت NB-4 (دقیقاً یک کاربر مبنا) حتی
@@ -1349,3 +1334,4 @@ class LoanRepository(
         debtorShareDao.updatePaidStatus(shareId, isPaid, monthName)
     }
 }
+

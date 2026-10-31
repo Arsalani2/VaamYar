@@ -1258,4 +1258,21 @@ class PureLogicUnitTest {
         assertEquals(1.1f, FontScaleLock.clamp(1.1f))
         assertTrue(FontScaleLock.MIN_FONT_SCALE < FontScaleLock.MAX_FONT_SCALE)
     }
+
+    // ---------------------------------------------------------------- NB-63 (پشتیبان خودکار در پوشهٔ عمومی)
+
+    /** فیکس bug.md/NB-63: Android 10+ → پوشهٔ عمومی Documents/VaamYar؛ قدیمی‌تر → fallback حافظهٔ داخلی. */
+    @Test
+    fun nb63_publicBackupLocationAndNameFormat() {
+        // فقط Android 10+ (API 29) به پوشهٔ عمومی می‌رود
+        assertTrue(AutoBackupHelper.usesPublicStorage(sdkInt = 29))
+        assertTrue(AutoBackupHelper.usesPublicStorage(sdkInt = 36))
+        assertFalse(AutoBackupHelper.usesPublicStorage(sdkInt = 24))
+        assertFalse(AutoBackupHelper.usesPublicStorage(sdkInt = 28))
+        // مسیر نسبی MediaStore: زیر پوشهٔ Documents گوشی
+        assertEquals("Documents/VaamYar", AutoBackupHelper.AUTO_BACKUP_RELATIVE_PATH)
+        // نام فایل همان قالب auto-<millis>.json — پارس timestamp همچنان کار می‌کند
+        assertEquals(1234L, AutoBackupHelper.autoBackupTimestampFromFileName("auto-1234.json"))
+        assertEquals(1234L, AutoBackupHelper.autoBackupTimestampFromFileName("auto-1234-1.json"))
+    }
 }
