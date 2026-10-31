@@ -372,35 +372,32 @@ fun LoanItemCard(
                             color = brandViolet
                         )
 
-                        // Quick pay button
-                        Button(
-                            onClick = onTogglePaidThisMonth,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = if (loan.isCurrentMonthPaid) {
-                                ButtonDefaults.buttonColors(
-                                    containerColor = SuccessGreen.copy(alpha = 0.1f),
-                                    contentColor = SuccessGreen
-                                )
-                            } else {
-                                ButtonDefaults.buttonColors(
+                        // فیکس bug.md/NB-56: دکمهٔ تکراریِ وضعیتِ پرداخت از پایین کارت حذف شد —
+                        // پس از پرداختِ ماه جاری فقط بج «پرداخت شد» بالای کارت می‌ماند؛
+                        // برگاشت قسط از نودهای تقویم (NB-47) امکان‌پذیر است.
+                        if (!loan.isCurrentMonthPaid) {
+                            Button(
+                                onClick = onTogglePaidThisMonth,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
                                     containerColor = brandViolet,
                                     contentColor = Color.White
+                                ),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                modifier = Modifier.heightIn(min = 36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp)
                                 )
-                            },
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            modifier = Modifier.heightIn(min = 36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (loan.isCurrentMonthPaid) Icons.Default.Check else Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (loan.isCurrentMonthPaid) "پرداخت شد" else "پرداخت سریع قسط",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "پرداخت سریع قسط",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
@@ -576,28 +573,30 @@ fun LoanItemCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (loan.isCurrentMonthPaid) SuccessGreen
-                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                        // فیکس bug.md/NB-56: دکمهٔ دایره‌ایِ تکراریِ وضعیتِ پرداخت حذف شد —
+                        // پس از پرداخت فقط پیل «پرداخت شد» بالای کارت می‌ماند؛
+                        // برگاشت قسط از نودهای تقویم (NB-47) امکان‌پذیر است.
+                        if (!loan.isCurrentMonthPaid) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                        CircleShape
+                                    )
+                                    .clickable { onTogglePaidThisMonth() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = brandViolet,
+                                    modifier = Modifier.size(15.dp)
                                 )
-                                .border(
-                                    1.dp,
-                                    if (loan.isCurrentMonthPaid) SuccessGreen else MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                                    CircleShape
-                                )
-                                .clickable { onTogglePaidThisMonth() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (loan.isCurrentMonthPaid) Icons.Default.Check else Icons.Default.Add,
-                                contentDescription = null,
-                                tint = if (loan.isCurrentMonthPaid) Color.White else brandViolet,
-                                modifier = Modifier.size(15.dp)
-                            )
+                            }
                         }
                     }
 
