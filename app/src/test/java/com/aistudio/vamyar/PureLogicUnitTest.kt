@@ -10,6 +10,7 @@ import com.aistudio.vamyar.util.BackupHelper
 import com.aistudio.vamyar.util.BackupIcon
 import com.aistudio.vamyar.util.BackupPreferences
 import com.aistudio.vamyar.util.CrashLogHelper
+import com.aistudio.vamyar.util.FontScaleLock
 import com.aistudio.vamyar.util.InputLimits
 import com.aistudio.vamyar.util.LoanIconHelper
 import com.aistudio.vamyar.util.LiquidityLoanInput
@@ -1220,5 +1221,41 @@ class PureLogicUnitTest {
         assertEquals(Triple(2026, 10, 30), g3)
         assertEquals(6, ShamsiDateHelper.getShamsiDayOfWeekIndex(1405, 8, 8))
         assertEquals("جمعه", ShamsiDateHelper.getShamsiDayOfWeek(1405, 8, 8))
+    }
+
+    // ---------------------------------------------------------------- NB-59 (قالب حروفی پیل‌های سریع)
+
+    /** فیکس bug.md/NB-59: مبالغ پیل‌های سریع به قالب حروفی کوتاه (مثل «۵ میلیون») */
+    @Test
+    fun nb59_formatCompactWords_quickPillLabels() {
+        // پیل‌های پیش‌فرض دیالوگ ثبت وام
+        assertEquals("۱ میلیون", NumberFormatter.formatCompactWords(1_000_000L))
+        assertEquals("۲٫۵ میلیون", NumberFormatter.formatCompactWords(2_500_000L))
+        assertEquals("۵ میلیون", NumberFormatter.formatCompactWords(5_000_000L))
+        assertEquals("۱۰ میلیون", NumberFormatter.formatCompactWords(10_000_000L))
+        assertEquals("۲۰ میلیون", NumberFormatter.formatCompactWords(20_000_000L))
+        // مقیاس‌های دیگر
+        assertEquals("۸۰۰ هزار", NumberFormatter.formatCompactWords(800_000L))
+        assertEquals("۱٫۵ میلیارد", NumberFormatter.formatCompactWords(1_500_000_000L))
+        assertEquals("۰", NumberFormatter.formatCompactWords(0L))
+        assertEquals("۷۵۰", NumberFormatter.formatCompactWords(750L))
+        // ارقام انگلیسی هنگام خاموش بودن تنظیم ارقام فارسی
+        assertEquals("5 میلیون", NumberFormatter.formatCompactWords(5_000_000L, usePersian = false))
+        assertEquals("2.5 میلیون", NumberFormatter.formatCompactWords(2_500_000L, usePersian = false))
+    }
+
+    // ---------------------------------------------------------------- NB-60 (قفل مقیاس فونت)
+
+    /** فیکس bug.md/NB-60: فونت سیستمِ خیلی بزرگ/کوچک داخل بازهٔ مجاز قفل می‌شود */
+    @Test
+    fun nb60_fontScaleLock_clampsExtremeSystemFontScale() {
+        assertEquals(1.3f, FontScaleLock.clamp(2.0f))
+        assertEquals(1.3f, FontScaleLock.clamp(1.45f))
+        assertEquals(1.3f, FontScaleLock.clamp(1.3f))
+        assertEquals(0.9f, FontScaleLock.clamp(0.7f))
+        assertEquals(0.9f, FontScaleLock.clamp(0.9f))
+        // داخل بازه دست‌نخورده می‌ماند
+        assertEquals(1.1f, FontScaleLock.clamp(1.1f))
+        assertTrue(FontScaleLock.MIN_FONT_SCALE < FontScaleLock.MAX_FONT_SCALE)
     }
 }

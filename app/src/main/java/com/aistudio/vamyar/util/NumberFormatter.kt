@@ -109,6 +109,31 @@ object NumberFormatter {
     }
 
     /**
+     * فیکس bug.md/NB-59: قالب کوتاهِ حروفی مبالغ برای پیل‌های سریع
+     * (مثل 5,000,000 -> «۵ میلیون»، 2,500,000 -> «۲٫۵ میلیون»، 800,000 -> «۸۰۰ هزار»).
+     * واحد تومان عمداً آورده نمی‌شود؛ برچسب بخش مبلغ آن را مشخص می‌کند.
+     */
+    fun formatCompactWords(amount: Long, usePersian: Boolean = true): String {
+        val sign = if (amount < 0L) "-" else ""
+        val abs = kotlin.math.abs(amount)
+        fun render(value: Double, unit: String): String {
+            val s = if (value % 1.0 == 0.0) {
+                value.toLong().toString()
+            } else {
+                String.format(Locale.US, "%.1f", value).replace(".", "٫")
+            }
+            val digits = if (usePersian) toPersianDigits(s) else s
+            return if (unit.isEmpty()) digits else "$digits $unit"
+        }
+        return sign + when {
+            abs >= 1_000_000_000L -> render(abs / 1_000_000_000.0, "میلیارد")
+            abs >= 1_000_000L -> render(abs / 1_000_000.0, "میلیون")
+            abs >= 1_000L -> render(abs / 1_000.0, "هزار")
+            else -> render(abs.toDouble(), "")
+        }
+    }
+
+    /**
      * فیکس bug.md/P3-4: جلوگیری از سرریز به اعداد منفی برای مقادیر بزرگتر از Int.MAX_VALUE
      */
     fun parseIntStrict(input: String?): Int? {
