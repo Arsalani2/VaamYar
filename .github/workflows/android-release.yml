@@ -121,7 +121,9 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          ./gradlew testDebugUnitTest --stacktrace
+          # فیکس ران #37: شکستِ این استپ هیچ گزارشی نمی‌داد — مثل unit-tests.yml لاگ می‌گیریم
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace --continue 2>&1 | tee gradle-test.log
 
       - name: Build Android App (AAB & APK)
         env:
@@ -139,6 +141,12 @@ jobs:
         run: |
           # Surface the real Gradle error as workflow annotations so it is visible
           # without opening the full raw log.
+          # فیکس ران #37: شکست مرحلهٔ تست (مثل ریلیزِ workflow_dispatch که unit-tests.yml
+          # را تریگر نمی‌کند) کاملاً کور بود — همان الگوی grep روی gradle-test.log اضافه شد.
+          if [ -f gradle-test.log ]; then
+            grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED$|OutOfMemory|disappeared|Daemon" gradle-test.log | head -25 \
+              | while IFS= read -r line; do echo "::error::${line:0:900}"; done
+          fi
           if [ -f gradle-build.log ]; then
             grep -n -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:" gradle-build.log | head -25 \
               | while IFS= read -r line; do echo "::error::${line:0:900}"; done
