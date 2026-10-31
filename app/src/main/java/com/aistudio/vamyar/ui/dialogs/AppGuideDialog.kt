@@ -108,6 +108,14 @@ fun AppGuideDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // فیکس bug.md/SB-12: دیسکلیمر — وام‌یار ابزار ثبت شخصی است
+                Text(
+                    text = "وام‌یار ابزار ثبت شخصی است؛ مشاور مالی، حسابدار یا واسط پرداخت نیست.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
                 // Dismiss / Get Started Button
                 Button(
                     onClick = onDismiss,
