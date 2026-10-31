@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.model.DebtorShare
+import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.theme.WarningAmber
 import com.aistudio.vamyar.model.Loan
@@ -123,7 +124,7 @@ fun LoanItemCard(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
                     color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55
             ) {
                 Column(
                     modifier = Modifier
@@ -469,7 +470,7 @@ fun LoanItemCard(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
                     color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55
             ) {
                 Column(
                     modifier = Modifier
@@ -644,7 +645,7 @@ fun LoanItemCard(
                     width = if (loan.isCurrentMonthPaid) 1.5.dp else 1.dp,
                     color = if (loan.isCurrentMonthPaid) brandViolet.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55
             ) {
                 Column(
                     modifier = Modifier

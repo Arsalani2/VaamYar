@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDateHelper
 
@@ -218,7 +219,7 @@ fun InstallmentNodesView(
                         ),
                     shape = RoundedCornerShape(12.dp),
                     color = nodeBgColor,
-                    shadowElevation = if (isPaid) 2.dp else if (isCurrent) 1.dp else 0.dp
+                    shadowElevation = AppElevation.Card // فیکس bug.md/NB-55
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
