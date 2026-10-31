@@ -120,9 +120,10 @@ object NumberFormatter {
             val s = if (value % 1.0 == 0.0) {
                 value.toLong().toString()
             } else {
-                String.format(Locale.US, "%.1f", value).replace(".", "٫")
+                String.format(Locale.US, "%.1f", value)
             }
-            val digits = if (usePersian) toPersianDigits(s) else s
+            // فیکس CI ران #۵۹: جداسازی اعشار «٫» فقط با ارقام فارسی؛ با ارقام انگلیسی «.» می‌ماند
+            val digits = if (usePersian) toPersianDigits(s.replace(".", "٫")) else s
             return if (unit.isEmpty()) digits else "$digits $unit"
         }
         return sign + when {
