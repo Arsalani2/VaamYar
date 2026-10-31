@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.ui.PersonReceivableSummary
+import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.dialogs.ReminderShareDialog
 import com.aistudio.vamyar.util.NumberFormatter
@@ -98,7 +99,7 @@ fun ReceivablesScreen(
                     .testTag("receivables_summary_hero"),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
@@ -308,7 +309,7 @@ fun PartnerReceivableCard(
             .testTag("partner_card_${summary.personName}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(

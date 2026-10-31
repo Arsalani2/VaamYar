@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.SmartFinancialTip
+import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
 import com.aistudio.vamyar.ui.theme.WarningAmber
 import com.aistudio.vamyar.ui.TipType
@@ -54,7 +55,7 @@ fun SmartFinancialAdvisorCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55
     ) {
         Column(
             modifier = Modifier
@@ -120,7 +121,7 @@ fun SmartFinancialAdvisorCard(
                     shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
-                    shadowElevation = 1.dp,
+                    shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
                     modifier = Modifier.clickable { expanded = !expanded }
                 ) {
                     Row(

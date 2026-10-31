@@ -39,6 +39,8 @@ import com.aistudio.vamyar.ui.components.LoanItemCard
 import com.aistudio.vamyar.ui.components.LoanViewMode
 import com.aistudio.vamyar.ui.components.SmartFinancialAdvisorCard
 import com.aistudio.vamyar.ui.dialogs.AddEditLoanDialog
+import com.aistudio.vamyar.ui.theme.AppElevation
+
 import com.aistudio.vamyar.util.LiquidityForecast
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
@@ -208,7 +210,7 @@ fun HomeScreen(
                                 shape = RoundedCornerShape(20.dp),
                                 color = MaterialTheme.colorScheme.surface,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                shadowElevation = 1.dp,
+                                shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
@@ -292,7 +294,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             ) {
                                 Column(
@@ -330,7 +332,7 @@ fun HomeScreen(
                                         Surface(
                                             shape = RoundedCornerShape(20.dp),
                                             color = MaterialTheme.colorScheme.tertiaryContainer,
-                                            shadowElevation = 2.dp,
+                                            shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
                                                 .offset(x = 10.dp, y = (-6).dp)
@@ -348,7 +350,7 @@ fun HomeScreen(
                                         Surface(
                                             shape = RoundedCornerShape(20.dp),
                                             color = MaterialTheme.colorScheme.primary,
-                                            shadowElevation = 2.dp,
+                                            shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
                                             modifier = Modifier
                                                 .align(Alignment.BottomStart)
                                                 .offset(x = (-10).dp, y = 6.dp)
@@ -385,7 +387,7 @@ fun HomeScreen(
                                         onClick = { showAddDialog = true },
                                         shape = RoundedCornerShape(18.dp),
                                         color = Color.Transparent,
-                                        shadowElevation = 4.dp,
+                                        shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Box(
@@ -1081,7 +1083,7 @@ private fun ViewModePillButton(
         onClick = onClick,
         shape = RoundedCornerShape(9.dp),
         color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
-        shadowElevation = if (selected) 2.dp else 0.dp
+        shadowElevation = AppElevation.Card // فیکس bug.md/NB-55
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
