@@ -450,7 +450,8 @@ fun AddEditLoanDialog(
                                 Text("مرحله بعد", fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    // فیکس bug.md/NB-57: در چیدمان RTL فلشِ «بعدی» باید به سمت چپ اشاره کند
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -465,7 +466,8 @@ fun AddEditLoanDialog(
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    // فیکس bug.md/NB-57: در چیدمان RTL فلشِ «بازگشت» باید به سمت راست اشاره کند
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -484,7 +486,8 @@ fun AddEditLoanDialog(
                                 Text("مرحله بعد", fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    // فیکس bug.md/NB-57: در چیدمان RTL فلشِ «بعدی» باید به سمت چپ اشاره کند
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -499,7 +502,8 @@ fun AddEditLoanDialog(
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    // فیکس bug.md/NB-57: در چیدمان RTL فلشِ «بازگشت» باید به سمت راست اشاره کند
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -865,7 +869,8 @@ private fun StepOneFinancialContent(
                             selected = isSelected,
                             onClick = { onMonthlyAmountDigitsChange(preset.toString()) },
                             label = {
-                                Text("${NumberFormatter.formatNumber(preset, usePersianDigits)} تومان")
+                                // فیکس bug.md/NB-59: قالب حروفی کوتاه (مثل «۵ میلیون») به‌جای عدد خام
+                                Text(NumberFormatter.formatCompactWords(preset, usePersianDigits))
                             },
                             shape = RoundedCornerShape(10.dp),
                             colors = FilterChipDefaults.filterChipColors(
@@ -917,7 +922,7 @@ private fun StepOneFinancialContent(
                     }
                 }
 
-                // Segmented duration chips (6, 12, 24, 36)
+                // Segmented duration chips (6, 12, 24, 36) — فیکس bug.md/NB-58: پیلِ دورگرد مینیمال بدون تکرار «ماه»
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -928,15 +933,15 @@ private fun StepOneFinancialContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 46.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(50))
                                 .clickable { onTotalMonthsTextChange(duration.toString()) },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(50),
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "${NumberFormatter.formatNumber(duration, usePersianDigits)} ماه",
+                                    text = NumberFormatter.formatNumber(duration, usePersianDigits),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
@@ -946,18 +951,20 @@ private fun StepOneFinancialContent(
                     }
                 }
 
-                // Custom duration text field
+                // Custom duration text field — فیکس bug.md/NB-58: باکس دورگرد مینیمال + حذف «(ماه)» تکراری
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("تعداد دلخواه (ماه):", style = MaterialTheme.typography.bodySmall)
+                    Text("تعداد دلخواه:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = totalMonthsText,
                         onValueChange = { onTotalMonthsTextChange(it.filter { c -> c.isDigit() }) },
                         modifier = Modifier.width(110.dp),
                         singleLine = true,
+                        shape = RoundedCornerShape(50),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
                         isError = durationError != null,
                         supportingText = { durationError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 10.sp) } },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)

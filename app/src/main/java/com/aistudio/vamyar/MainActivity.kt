@@ -28,9 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.vamyar.model.UserProfile
 import com.aistudio.vamyar.ui.MainViewModel
+import com.aistudio.vamyar.util.FontScaleLock
 import com.aistudio.vamyar.ui.dialogs.AddEditUserDialog
 import com.aistudio.vamyar.ui.dialogs.AppGuideDialog
 import com.aistudio.vamyar.ui.screens.*
@@ -69,7 +72,12 @@ class MainActivity : ComponentActivity() {
                 preset = themePreset
             ) {
                 // Persian Right-To-Left layout
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                // فیکس bug.md/NB-60: قفل مقیاس فونت — فونت خیلی بزرگ/کوچکِ سیستم به چیدمان تحمیل نمی‌شود
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    LocalDensity provides Density(density.density, FontScaleLock.clamp(density.fontScale))
+                ) {
                     VamyarMainApp(viewModel = viewModel)
                 }
             }
