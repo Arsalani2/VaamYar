@@ -345,7 +345,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         onConfirmDeleteUser = { id -> viewModel.deleteUser(id) },
                         onSyncDateWithSystem = { viewModel.syncDateWithSystem() },
                         onSetCustomDate = { viewModel.setCustomShamsiDate(it) },
-                        onClearAllLoans = { viewModel.clearAllLoansAndStartFresh() },
+                        // فیکس bug.md/NB-66: onClearAllLoans حذف شد — تنها مسیر «بازنشانی کامل»
                         // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها
                         // شامل کاربران پاک و کاربر مبنا پیش‌فرض ساخته می‌شود.
                         onFullReset = { viewModel.fullResetAllDataAndRecreateBaseUser() },
@@ -610,3 +610,4 @@ fun UserSwitcherModalDialog(
         }
     }
 }
+

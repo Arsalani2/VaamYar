@@ -631,18 +631,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // فیکس bug.md/NB-23: توابع مردهٔ clearAllDataAndStartFresh و resetToDefaults (بدون هیچ
-    // فراخواننده‌ای در UI؛ دوباره‌کاریِ همین مسیر) حذف شدند — این تنها نقطهٔ ورود
-    // «پاکسازی تمام وام‌ها» است و clearAllDataAndResetِ بدون فراخواننده هم از ریپو حذف شد.
-    fun clearAllLoansAndStartFresh() {
-        viewModelScope.launch {
-            repository.clearAllLoansAndReset()
-        }
-    }
+    // فیکس bug.md/NB-66: clearAllLoansAndStartFresh حذف شد — دکمهٔ «پاکسازی وام‌ها»
+    // از تنظیمات برداشته شد و این تابع به‌همراه repository.clearAllLoansAndReset
+    // مسیری مرده بود؛ «بازنشانی کامل» (NB-41) تنها مسیر بازنشانی باقی‌مانده است.
 
     // فیکس bug.md/NB-41: «بازنشانی کامل برنامه» — همهٔ داده‌ها شامل کاربران پاک
     // می‌شود و برنامه در همان تراکنش یک کاربر مبنا پیش‌فرض («من») می‌سازد؛
-    // دکمهٔ جدا از «پاکسازی تمام وام‌ها» در تنظیمات (مدیریت داده‌ها و بازنشانی).
+    // تنها دکمهٔ بازنشانی در تنظیمات (NB-66: «پاکسازی وام‌ها» حذف شد).
     fun fullResetAllDataAndRecreateBaseUser() {
         viewModelScope.launch {
             repository.clearAllDataAndCreateDefaultBaseUser()
@@ -906,3 +901,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         context.sendBroadcast(intent)
     }
 }
+
