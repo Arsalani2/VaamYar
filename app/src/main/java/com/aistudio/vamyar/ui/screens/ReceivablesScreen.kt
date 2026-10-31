@@ -99,7 +99,7 @@ fun ReceivablesScreen(
                     .testTag("receivables_summary_hero"),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
@@ -309,7 +309,7 @@ fun PartnerReceivableCard(
             .testTag("partner_card_${summary.personName}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+        elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(

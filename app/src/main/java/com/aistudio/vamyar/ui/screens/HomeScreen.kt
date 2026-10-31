@@ -294,7 +294,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(28.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                                elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             ) {
                                 Column(

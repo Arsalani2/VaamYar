@@ -275,7 +275,7 @@ fun SettingsScreen(
                                 .testTag("card_users_management"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -402,7 +402,7 @@ fun SettingsScreen(
                                 .testTag("card_date_sync"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -589,7 +589,7 @@ fun SettingsScreen(
                                 .testTag("card_numbers_format"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -702,7 +702,7 @@ fun SettingsScreen(
                                 .testTag("card_theme_mode"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -757,7 +757,7 @@ fun SettingsScreen(
                                 .testTag("card_theme_presets"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -841,7 +841,7 @@ fun SettingsScreen(
                                 .testTag("card_backup_restore"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -1076,7 +1076,7 @@ fun SettingsScreen(
                                 .testTag("card_reset_management"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -1161,7 +1161,7 @@ fun SettingsScreen(
                                 .testTag("card_troubleshooting"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
@@ -1338,7 +1338,7 @@ fun SettingsScreen(
                                 .testTag("card_notifications"),
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card) // فیکس bug.md/NB-55,
+                            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Card), // فیکس bug.md/NB-55
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
