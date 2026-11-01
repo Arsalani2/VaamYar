@@ -78,6 +78,8 @@ fun HomeScreen(
 ) {
     var loanToEdit by remember { mutableStateOf<Loan?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
+    // فیکس bug.md/UI-07: الگوی آمادهٔ انتخاب‌شده (عنوان، مدت، آیکون) برای پیش‌پرکردن ویزارد
+    var pendingTemplate by remember { mutableStateOf<Triple<String, Int, String>?>(null) }
     // فیکس bug.md/NB-22: حذف وام فقط پس از تأیید صریح کاربر انجام می‌شود؛
     // ضربهٔ اول فقط این دیالوگ را باز می‌کند و انصراف هیچ تغییری نمی‌کند.
     var loanToDelete by remember { mutableStateOf<Loan?>(null) }
@@ -355,13 +357,25 @@ fun HomeScreen(
                                                 .align(Alignment.BottomStart)
                                                 .offset(x = (-10).dp, y = 6.dp)
                                         ) {
-                                            Text(
-                                                text = "یادآور هوشمند ✓",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimary,
+                                            // فیکس bug.md/UI-13: گلیف ✓ حذف → آیکون متریال
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp),
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Notifications,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                                Text(
+                                                    text = "یادآور هوشمند",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            }
                                         }
                                     }
 
@@ -429,26 +443,60 @@ fun HomeScreen(
                                         horizontalArrangement = Arrangement.SpaceEvenly,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "⚡ سریع و کاربردی",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        // فیکس bug.md/UI-13: ایموجی‌ها → آیکون‌های متریال
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Bolt,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = "سریع و کاربردی",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                         Text(text = "•", color = MaterialTheme.colorScheme.outlineVariant)
-                                        Text(
-                                            text = "🔔 افزودن هشدار",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Notifications,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = "افزودن هشدار",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                         Text(text = "•", color = MaterialTheme.colorScheme.outlineVariant)
-                                        Text(
-                                            text = "👥 تفکیک سهم شرکا",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.People,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = "تفکیک سهم شرکا",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -468,7 +516,8 @@ fun HomeScreen(
                                 ) {
                                     // Template 1: Bank Loan
                                     Surface(
-                                        onClick = { showAddDialog = true },
+                                        // فیکس bug.md/UI-07: الگو، ویزارد را با پیش‌پرکردن باز می‌کند
+                                        onClick = { pendingTemplate = Triple("وام بانکی", 36, "account_balance"); showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
@@ -502,7 +551,7 @@ fun HomeScreen(
                                             )
                                             Text(
                                                 text = "مهر، رسالت، مسکن",
-                                                fontSize = 9.sp,
+                                                fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center
                                             )
@@ -511,7 +560,8 @@ fun HomeScreen(
 
                                     // Template 2: BNPL Shopping
                                     Surface(
-                                        onClick = { showAddDialog = true },
+                                        // فیکس bug.md/UI-07: الگو، ویزارد را با پیش‌پرکردن باز می‌کند
+                                        onClick = { pendingTemplate = Triple("خرید اقساطی", 6, "shopping_bag"); showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
@@ -545,7 +595,7 @@ fun HomeScreen(
                                             )
                                             Text(
                                                 text = "اسنپ‌پی، دیجی‌پی",
-                                                fontSize = 9.sp,
+                                                fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center
                                             )
@@ -554,7 +604,8 @@ fun HomeScreen(
 
                                     // Template 3: Family/Circle
                                     Surface(
-                                        onClick = { showAddDialog = true },
+                                        // فیکس bug.md/UI-07: الگو، ویزارد را با پیش‌پرکردن باز می‌کند
+                                        onClick = { pendingTemplate = Triple("وام خانگی", 12, "savings"); showAddDialog = true },
                                         shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surface,
                                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
@@ -588,7 +639,7 @@ fun HomeScreen(
                                             )
                                             Text(
                                                 text = "صندوق‌های فامیلی",
-                                                fontSize = 9.sp,
+                                                fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center
                                             )
@@ -668,7 +719,7 @@ fun HomeScreen(
     // عقب‌ماندگی هست پرسیده می‌شود (تصمیم کاربر، بند ۵ متد فیکس NB-31).
     arrearsPrompt?.let { prompt ->
         val monthsText = prompt.arrearsMonths.joinToString("، ") { it.monthName }
-        val countText = NumberFormatter.formatNumber(prompt.arrearsMonths.size, usePersian = true)
+        val countText = NumberFormatter.formatNumber(prompt.arrearsMonths.size, usePersian = usePersianDigits) // فیکس bug.md/UI-09
         AlertDialog(
             onDismissRequest = onDismissArrearsPrompt,
             title = { Text("عقب‌ماندگی اقساط: ${prompt.loan.title}") },
@@ -700,6 +751,10 @@ fun HomeScreen(
     if (showAddDialog) {
         AddEditLoanDialog(
             loanToEdit = null,
+            // فیکس bug.md/UI-07: پیش‌پرکردن از الگوی آمادهٔ انتخاب‌شده
+            presetTitle = pendingTemplate?.first,
+            presetMonths = pendingTemplate?.second,
+            presetIconName = pendingTemplate?.third,
             initialShares = emptyList(),
             allUsers = allUsers,
             // فیکس bug.md/NB-36: چک زندهٔ عنوان تکراری
@@ -707,11 +762,12 @@ fun HomeScreen(
             currentShamsiDate = currentShamsiDate,
             usePersianDigits = usePersianDigits,
             compactThousands = compactThousands,
-            onDismiss = { showAddDialog = false },
+            onDismiss = { showAddDialog = false; pendingTemplate = null },
             onAddNewUser = onAddNewUser,
             onSave = { newLoan, shares, paidYearMonths ->
                 onSaveLoan(newLoan, shares, paidYearMonths)
                 showAddDialog = false
+                pendingTemplate = null
             }
         )
     }
@@ -1083,7 +1139,9 @@ private fun ViewModePillButton(
         onClick = onClick,
         shape = RoundedCornerShape(9.dp),
         color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
-        shadowElevation = AppElevation.Card // فیکس bug.md/NB-55
+        shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
+        // فیکس bug.md/UI-06: ناحیهٔ لمسی حداقل ۴۸dp
+        modifier = Modifier.minimumInteractiveComponentSize()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -1096,14 +1154,15 @@ private fun ViewModePillButton(
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp)
             )
-            if (selected) {
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            // فیکس bug.md/UI-12: لیبل همیشه رندر می‌شود — بدون پرش چیدمان، معنای هر
+            // گزینه هم برای حالت انتخاب‌نشده روشن است.
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
         }
     }
 }
+

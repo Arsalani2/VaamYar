@@ -193,6 +193,8 @@ fun InstallmentNodesView(
 
                 Surface(
                     modifier = Modifier
+                        // فیکس bug.md/UI-06: ناحیهٔ لمسی نودها حداقل ۴۸dp
+                        .minimumInteractiveComponentSize()
                         .widthIn(min = 52.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .then(
@@ -260,7 +262,7 @@ fun InstallmentNodesView(
 
                         Text(
                             text = NumberFormatter.formatNumber(year, usePersian = usePersianDigits),
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Normal,
                             color = when {
                                 isPaid -> Color.White.copy(alpha = 0.85f)

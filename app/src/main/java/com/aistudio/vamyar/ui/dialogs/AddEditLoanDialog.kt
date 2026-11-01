@@ -64,6 +64,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AddEditLoanDialog(
     loanToEdit: Loan? = null,
+    // فیکس bug.md/UI-07: پیش‌پرکردن ویزارد از الگوهای آمادهٔ صفحهٔ خانه
+    presetTitle: String? = null,
+    presetMonths: Int? = null,
+    presetIconName: String? = null,
     initialShares: List<DebtorShare> = emptyList(),
     initialInstallments: List<LoanInstallment> = emptyList(),
     allUsers: List<UserProfile> = emptyList(),
@@ -81,12 +85,13 @@ fun AddEditLoanDialog(
     var currentStep by remember { mutableIntStateOf(1) }
 
     // State: Title, duration, color
-    var title by remember { mutableStateOf(loanToEdit?.title ?: "") }
-    var totalMonthsText by remember { mutableStateOf(loanToEdit?.totalMonths?.toString() ?: "12") }
+    // فیکس bug.md/UI-07: مقدار اولیه از الگوی آماده (اگر پاس شده باشد)
+    var title by remember { mutableStateOf(loanToEdit?.title ?: presetTitle ?: "") }
+    var totalMonthsText by remember { mutableStateOf((loanToEdit?.totalMonths ?: presetMonths ?: 12).toString()) }
     var selectedColor by remember { mutableLongStateOf(loanToEdit?.colorHex ?: 0xFF00685FL) }
 
     // State: Icon & Shape & Custom Image
-    var selectedIconName by remember { mutableStateOf(loanToEdit?.iconName ?: "account_balance") }
+    var selectedIconName by remember { mutableStateOf(loanToEdit?.iconName ?: presetIconName ?: "account_balance") }
     var selectedIconShape by remember { mutableStateOf(loanToEdit?.iconShape ?: "ROUNDED_SQUARE") }
     var customIconPath by remember { mutableStateOf(loanToEdit?.customIconPath) }
 
@@ -848,7 +853,7 @@ private fun StepOneFinancialContent(
                     Text(
                         text = "معادل: ${NumberFormatter.formatNumber(rawMonthlyAmount * 10L, usePersianDigits)} ریال",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -1038,7 +1043,7 @@ private fun StepOneFinancialContent(
                                 Text(
                                     text = "شروع بازپرداخت منظم (سررسید روز ${NumberFormatter.formatNumber(startDate.day, usePersianDigits)}ام هر ماه)",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1328,7 +1333,7 @@ private fun StepTwoEmblemContent(
                                 text = colorLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 10.sp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1439,7 +1444,7 @@ private fun StepThreeConfirmationContent(
                                     text = "تک‌نفره",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (!isSharedMode) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (!isSharedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline,
+                                    color = if (!isSharedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
@@ -1453,7 +1458,7 @@ private fun StepThreeConfirmationContent(
                                     text = "چندنفره",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (isSharedMode) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSharedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline,
+                                    color = if (isSharedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 )
                             }
@@ -1552,14 +1557,15 @@ private fun StepThreeConfirmationContent(
                                                 Text(
                                                     text = share.shareDescription,
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.outline
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
                                         }
 
+                                        // فیکس bug.md/UI-06: ناحیهٔ لمسی ۴۸dp با ظاهر جمع‌وجور
                                         IconButton(
                                             onClick = { onRemovePartner(index) },
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.minimumInteractiveComponentSize().size(28.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
@@ -1576,7 +1582,7 @@ private fun StepThreeConfirmationContent(
 
                     if (sharesExceedMonthly) {
                         Text(
-                            text = "⚠️ مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) بیشتر است.",
+                            text = "مجموع سهم شرکا (${NumberFormatter.formatPrice(othersTotalShare, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) از مبلغ کل قسط ماهانه (${NumberFormatter.formatPrice(rawMonthlyAmount, withUnit = true, usePersian = usePersianDigits, compactThousands = compactThousands)}) بیشتر است.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -1632,8 +1638,9 @@ private fun StepThreeConfirmationContent(
                         color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ) {
+                        // فیکس bug.md/UI-08: برچسب ثابت «قرض‌الحسنه» حذف شد — فقط عنوان وام
                         Text(
-                            text = "${title.ifBlank { "وام جدید" }} · قرض‌الحسنه",
+                            text = title.ifBlank { "وام جدید" },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium,
@@ -1651,7 +1658,7 @@ private fun StepThreeConfirmationContent(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("مبلغ هر قسط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text("مبلغ هر قسط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${NumberFormatter.formatNumber(rawMonthlyAmount, usePersianDigits)}",
@@ -1659,7 +1666,7 @@ private fun StepThreeConfirmationContent(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Text("تومان", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                        Text("تومان", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                     }
 
                     Box(
@@ -1673,7 +1680,7 @@ private fun StepThreeConfirmationContent(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("مدت اقساط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text("مدت اقساط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${NumberFormatter.formatNumber(totalMonths, usePersianDigits)} ماهه",
@@ -1694,7 +1701,7 @@ private fun StepThreeConfirmationContent(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("پایان اقساط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text("پایان اقساط", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${endDate.monthName} ${NumberFormatter.formatNumber(endDate.year, usePersianDigits)}",
@@ -1722,7 +1729,7 @@ private fun StepThreeConfirmationContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Icon(
-                        imageVector = if (showScheduleTable) Icons.Default.ExpandLess else Icons.Default.ChevronLeft,
+                        imageVector = if (showScheduleTable) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)

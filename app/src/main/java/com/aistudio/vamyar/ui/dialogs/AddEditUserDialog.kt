@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance // فیکس bug.md/UI-05
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -189,23 +190,29 @@ fun AddEditUserDialog(
                         colorOptions.forEach { colorHex ->
                             val color = Color(colorHex)
                             val isSelected = selectedColor == colorHex
+                            // فیکس bug.md/UI-06: ناحیهٔ لمسی ۴۸dp با ظاهر ۳۶dp
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(color)
-                                    .clickable { selectedColor = colorHex }
-                                    .then(
-                                        if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                        else Modifier
-                                    ),
+                                    .clickable { selectedColor = colorHex },
                                 contentAlignment = Alignment.Center
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .then(
+                                            if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                            else Modifier
+                                        )
+                                )
                                 if (isSelected) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "انتخاب‌شده",
-                                        tint = Color.White,
+                                        tint = if (color.luminance() > 0.5f) Color(0xFF1F2937) else Color.White, // فیکس bug.md/UI-05
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }

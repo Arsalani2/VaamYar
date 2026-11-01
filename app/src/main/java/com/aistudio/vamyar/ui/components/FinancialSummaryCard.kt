@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.FinancialOverview
 import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
+import com.aistudio.vamyar.ui.theme.SuccessGreenDeep // فیکس bug.md/UI-04
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
 
@@ -127,7 +128,7 @@ fun FinancialSummaryCard(
                         ),
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (isAllMonthPaid) SuccessGreen else MaterialTheme.colorScheme.onSurface,
+                        color = if (isAllMonthPaid) SuccessGreenDeep else MaterialTheme.colorScheme.onSurface, // فیکس bug.md/UI-04
                         letterSpacing = (-0.5).sp
                     )
                     Text(
@@ -152,14 +153,14 @@ fun FinancialSummaryCard(
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = SuccessGreen,
+                                    tint = SuccessGreenDeep, // فیکس bug.md/UI-04
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     text = "تسویه این ماه",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = SuccessGreen
+                                    color = SuccessGreenDeep // فیکس bug.md/UI-04
                                 )
                             }
                         }
@@ -230,11 +231,11 @@ fun FinancialSummaryCard(
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = if (overview.othersRemainingUnpaid == 0L) "وصول شد ✓"
+                                text = if (overview.othersRemainingUnpaid == 0L) "وصول شد" // فیکس bug.md/UI-13: گلیف ✓ حذف
                                 else NumberFormatter.formatPrice(overview.othersRemainingUnpaid, withUnit = false, usePersian = usePersianDigits, compactThousands = compactThousands), // فیکس bug.md/NB-46
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (overview.othersRemainingUnpaid == 0L) SuccessGreen else MaterialTheme.colorScheme.error
+                                color = if (overview.othersRemainingUnpaid == 0L) SuccessGreenDeep else MaterialTheme.colorScheme.error // فیکس bug.md/UI-04
                             )
                             if (overview.othersRemainingUnpaid > 0L) {
                                 Text(

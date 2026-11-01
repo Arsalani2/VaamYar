@@ -802,7 +802,7 @@ fun SettingsScreen(
                                                             .size(24.dp)
                                                             .clip(CircleShape)
                                                             .background(preset.previewColor)
-                                                            .border(2.dp, Color.White, CircleShape)
+                                                            .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape) // فیکس UI-15: حلقهٔ سفید در تم روشن دیده نمی‌شد؛ outlineVariant در هر دو تم دیده می‌شود
                                                     )
                                                     Text(
                                                         text = preset.titleFa,
@@ -1377,7 +1377,7 @@ fun SettingsScreen(
                                 Surface(
                                     onClick = {
                                         onTestNotification()
-                                        Toast.makeText(context, "اعلان آزمایشی سررسید با موفقیت ارسال شد 🔔", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "اعلان آزمایشی سررسید با موفقیت ارسال شد", Toast.LENGTH_SHORT).show()
                                     },
                                     shape = RoundedCornerShape(16.dp),
                                     color = brandViolet,
@@ -1973,7 +1973,7 @@ fun SettingsScreen(
                                     color = SuccessGreen.copy(alpha = 0.15f)
                                 ) {
                                     Text(
-                                        text = "فایل معتبر ✓",
+                                        text = "فایل معتبر",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = SuccessGreen,
@@ -2099,7 +2099,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "⚠️ برخی موارد با «کلید جایگزین» تطبیق داده شده‌اند نه با شناسهٔ یکتا؛ در ادغام، این موارد به‌روزرسانی می‌شوند.",
+                                text = "برخی موارد با «کلید جایگزین» تطبیق داده شده‌اند نه با شناسهٔ یکتا؛ در ادغام، این موارد به‌روزرسانی می‌شوند.",
                                 color = MaterialTheme.colorScheme.error,
                                 fontSize = 11.sp,
                                 lineHeight = 16.sp,

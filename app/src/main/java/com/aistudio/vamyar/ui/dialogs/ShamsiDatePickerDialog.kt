@@ -242,13 +242,13 @@ fun ShamsiDatePickerDialog(
                     columns = GridCells.Fixed(7),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
+                        .height(272.dp), // فیکس bug.md/UI-06: سلول‌های ۴۸dp
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     // خانه‌های خالی ابتدای ماه برای تراز با روز هفته
                     items(firstDayOffset) {
-                        Box(modifier = Modifier.aspectRatio(1f))
+                        Box(modifier = Modifier.height(48.dp)) // فیکس bug.md/UI-06
                     }
 
                     items(daysInMonth) { index ->
@@ -260,7 +260,8 @@ fun ShamsiDatePickerDialog(
 
                         Box(
                             modifier = Modifier
-                                .aspectRatio(1f)
+                                .fillMaxWidth()
+                                .height(48.dp) // فیکس bug.md/UI-06: هدف لمسی ۴۸dp
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primary
