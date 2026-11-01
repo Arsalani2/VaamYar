@@ -5,6 +5,10 @@ import androidx.compose.ui.graphics.Color
 // Shared Accent Colors
 val SuccessGreen = Color(0xFF10B981)
 val WarningAmber = Color(0xFFF59E0B)
+// فیکس bug.md/UI-04: نسخه‌های تیره‌تر مخصوص «رنگ متن» (کنتراست ≥ ۴.۵:۱ روی سفید) —
+// رنگ‌های روشن فقط برای آیکون/حاشیه/پس‌زمینهٔ tinted باقی می‌مانند.
+val SuccessGreenDeep = Color(0xFF047857)
+val WarningAmberDeep = Color(0xFF92400E)
 val ErrorRed = Color(0xFFEF4444)
 val InfoBlue = Color(0xFF3B82F6)
 

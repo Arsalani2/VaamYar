@@ -117,7 +117,9 @@ $detailsText
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, "متن یادآوری کپی شد", Toast.LENGTH_SHORT).show()
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp) // فیکس bug.md/UI-14: ارتفاع استاندارد دکمه‌ها ۴۸dp
                     ) {
                         Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -135,7 +137,9 @@ $detailsText
                             context.startActivity(shareIntent)
                             onDismiss()
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp) // فیکس bug.md/UI-14: ارتفاع استاندارد دکمه‌ها ۴۸dp
                     ) {
                         Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))

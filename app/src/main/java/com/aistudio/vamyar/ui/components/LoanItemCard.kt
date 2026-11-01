@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
+import com.aistudio.vamyar.ui.theme.SuccessGreenDeep // فیکس bug.md/UI-04
 import com.aistudio.vamyar.ui.theme.WarningAmber
+import com.aistudio.vamyar.ui.theme.WarningAmberDeep // فیکس bug.md/UI-04
 import com.aistudio.vamyar.model.Loan
 import com.aistudio.vamyar.model.LoanInstallment
 import com.aistudio.vamyar.model.LoanShareCalculator
@@ -190,14 +192,14 @@ fun LoanItemCard(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = SuccessGreen,
+                                        tint = SuccessGreenDeep, // فیکس bug.md/UI-04
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
                                         text = "پرداخت شد",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = SuccessGreen
+                                        color = SuccessGreenDeep // فیکس bug.md/UI-04
                                     )
                                 }
                             }
@@ -246,8 +248,8 @@ fun LoanItemCard(
                                         color = when {
                                             loan.isCompleted -> MaterialTheme.colorScheme.onSurfaceVariant
                                             daysToDueThisMonth < 0 -> MaterialTheme.colorScheme.error
-                                            daysRemaining == 0 -> WarningAmber
-                                            else -> WarningAmber
+                                            daysRemaining == 0 -> WarningAmberDeep // فیکس bug.md/UI-04
+                                            else -> WarningAmberDeep // فیکس bug.md/UI-04
                                         }
                                     )
                                 }
@@ -365,12 +367,24 @@ fun LoanItemCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (expanded) "بستن تقویم اقساط ▲" else "مشاهده جدول اقساط ▼",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = brandViolet
-                        )
+                        // فیکس bug.md/UI-13: مثلث متنی ▼▲ → آیکون متریال
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = if (expanded) "بستن تقویم اقساط" else "مشاهده جدول اقساط",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = brandViolet
+                            )
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = brandViolet,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
 
                         // فیکس bug.md/NB-56: دکمهٔ تکراریِ وضعیتِ پرداخت از پایین کارت حذف شد —
                         // پس از پرداختِ ماه جاری فقط بج «پرداخت شد» بالای کارت می‌ماند؛
@@ -510,7 +524,7 @@ fun LoanItemCard(
                                 text = if (loan.isCurrentMonthPaid) "پرداخت شد" else "${NumberFormatter.formatNumber(loan.dueDay, usePersian = usePersianDigits)}ام",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (loan.isCurrentMonthPaid) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (loan.isCurrentMonthPaid) SuccessGreenDeep else MaterialTheme.colorScheme.onSurfaceVariant, // فیکس bug.md/UI-04
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
@@ -539,7 +553,7 @@ fun LoanItemCard(
                                 color = if (loan.isCurrentMonthPaid) MaterialTheme.colorScheme.onSurface else brandViolet
                             )
                             Spacer(modifier = Modifier.width(2.dp))
-                            Text("تومان", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("تومان", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) // فیکس bug.md/UI-11
                         }
                     }
 
@@ -577,19 +591,25 @@ fun LoanItemCard(
                         // پس از پرداخت فقط پیل «پرداخت شد» بالای کارت می‌ماند؛
                         // برگاشت قسط از نودهای تقویم (NB-47) امکان‌پذیر است.
                         if (!loan.isCurrentMonthPaid) {
+                            // فیکس bug.md/UI-06: ناحیهٔ لمسی ≥۴۸dp با ظاهر جمع‌وجور ۲۸dp
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .minimumInteractiveComponentSize()
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                                        CircleShape
-                                    )
                                     .clickable { onTogglePaidThisMonth() },
                                 contentAlignment = Alignment.Center
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                            CircleShape
+                                        )
+                                )
                                 Icon(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = null,
@@ -620,9 +640,17 @@ fun LoanItemCard(
                                     onToggleInstallmentMonth(m.year, m.month)
                                 }
                             )
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp), tint = brandViolet)
+                            // فیکس bug.md/UI-03: حذف در نمای مربعی هم ممکن است (قبلاً فقط مستطیلی)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(onClick = onDelete, modifier = Modifier.minimumInteractiveComponentSize().size(24.dp)) {
+                                    Icon(Icons.Default.Delete, contentDescription = "حذف", modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                                IconButton(onClick = onEdit, modifier = Modifier.minimumInteractiveComponentSize().size(24.dp)) {
+                                    Icon(Icons.Default.Edit, contentDescription = "ویرایش", modifier = Modifier.size(15.dp), tint = brandViolet)
                                 }
                             }
                         }
@@ -750,17 +778,23 @@ fun LoanItemCard(
                             }
 
                             // Quick Action Button
+                            // فیکس bug.md/UI-06: ناحیهٔ لمسی ≥۴۸dp با ظاهر ۳۶dp
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .minimumInteractiveComponentSize()
                                     .clip(CircleShape)
-                                    .background(
-                                        if (loan.isCurrentMonthPaid) brandViolet
-                                        else MaterialTheme.colorScheme.outlineVariant
-                                    )
                                     .clickable { onTogglePaidThisMonth() },
                                 contentAlignment = Alignment.Center
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (loan.isCurrentMonthPaid) brandViolet
+                                            else MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                )
                                 Icon(
                                     imageVector = if (loan.isCurrentMonthPaid) Icons.Default.Check else Icons.Default.Add,
                                     contentDescription = null,
@@ -794,7 +828,20 @@ fun LoanItemCard(
                                     onToggleInstallmentMonth(m.year, m.month)
                                 }
                             )
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            // فیکس bug.md/UI-03: حذف در نمای نموداری هم ممکن است (قبلاً فقط مستطیلی)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = onDelete,
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("حذف وام", fontSize = 11.sp)
+                                }
                                 TextButton(onClick = onEdit) {
                                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = brandViolet)
                                     Spacer(modifier = Modifier.width(4.dp))

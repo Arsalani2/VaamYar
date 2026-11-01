@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.vamyar.ui.SmartFinancialTip
@@ -122,7 +123,9 @@ fun SmartFinancialAdvisorCard(
                     color = MaterialTheme.colorScheme.surface, // فیکس bug.md/NB-45
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                     shadowElevation = AppElevation.Card, // فیکس bug.md/NB-55
-                    modifier = Modifier.clickable { expanded = !expanded }
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize() // فیکس bug.md/UI-06: هدف لمسی ≥۴۸dp
+                        .clickable { expanded = !expanded }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -209,7 +212,8 @@ fun SmartFinancialAdvisorCard(
                                 text = topTip.description,
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
+                                maxLines = 1, // فیکس UI-17
+                                overflow = TextOverflow.Ellipsis // فیکس bug.md/UI-17: برش نیم‌گلیف حذف شد
                             )
                         }
                     }
@@ -218,8 +222,8 @@ fun SmartFinancialAdvisorCard(
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                            modifier = Modifier.clickable { onActionClick?.invoke(topTip) }
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            // فیکس bug.md/UI-17: کلیک تودرتو حذف شد — کل کارت همین اکشن را اجرا می‌کند
                         ) {
                             Text(
                                 text = actionLabel,

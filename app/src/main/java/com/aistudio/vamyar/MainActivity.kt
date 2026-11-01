@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance // فیکس bug.md/UI-05
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -57,6 +58,10 @@ enum class AppTab(
     RECEIVABLES("مطالبات", Icons.Filled.People, Icons.Outlined.People),
     SETTINGS("تنظیمات", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
+
+// فیکس bug.md/UI-05: متن/آیکون روی سواچ‌های روشن کاربر (طلایی/نارنجی) باید تیره باشد
+private fun onColorOf(bg: Color): Color =
+    if (bg.luminance() > 0.5f) Color(0xFF1F2937) else Color.White
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -198,6 +203,7 @@ fun VamyarMainApp(viewModel: MainViewModel) {
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                         modifier = Modifier
                             .padding(end = 8.dp)
+                            .minimumInteractiveComponentSize() // فیکس bug.md/UI-06
                             .clickable { showUserPickerModal = true }
                             .testTag("user_switcher_pill")
                     ) {
@@ -233,8 +239,9 @@ fun VamyarMainApp(viewModel: MainViewModel) {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 3.dp,
+                // فیکس bug.md/UI-16: windowInsetsPadding اضافه حذف شد — NavigationBar
+                // خودش inset سیستمی را اعمال می‌کند و این پدینگ، نوار خالی دوبل می‌ساخت.
                 modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .testTag("bottom_nav_bar")
             ) {
                 AppTab.values().forEach { tab ->
@@ -519,7 +526,7 @@ fun UserSwitcherModalDialog(
                                     ) {
                                         Text(
                                             text = user.name.take(1),
-                                            color = Color.White,
+                                            color = onColorOf(avatarColor), // فیکس bug.md/UI-05
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 17.sp
                                         )
@@ -610,4 +617,5 @@ fun UserSwitcherModalDialog(
         }
     }
 }
+
 

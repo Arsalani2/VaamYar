@@ -30,6 +30,7 @@ import com.aistudio.vamyar.model.DebtorShare
 import com.aistudio.vamyar.ui.PersonReceivableSummary
 import com.aistudio.vamyar.ui.theme.AppElevation
 import com.aistudio.vamyar.ui.theme.SuccessGreen
+import com.aistudio.vamyar.ui.theme.SuccessGreenDeep // فیکس bug.md/UI-04
 import com.aistudio.vamyar.ui.dialogs.ReminderShareDialog
 import com.aistudio.vamyar.util.NumberFormatter
 import com.aistudio.vamyar.util.ShamsiDate
@@ -161,7 +162,7 @@ fun ReceivablesScreen(
                             ),
                             fontSize = 30.sp,
                             fontWeight = FontWeight.Black,
-                            color = if (remainingUnpaid == 0L && totalReceivableAmount > 0) SuccessGreen else MaterialTheme.colorScheme.onSurface,
+                            color = if (remainingUnpaid == 0L && totalReceivableAmount > 0) SuccessGreenDeep else MaterialTheme.colorScheme.onSurface, // فیکس bug.md/UI-04
                             letterSpacing = (-0.5).sp
                         )
                         Text(
@@ -210,7 +211,7 @@ fun ReceivablesScreen(
                             text = "باقی‌مانده: ${NumberFormatter.formatPrice(remainingUnpaid, usePersian = usePersianDigits, compactThousands = compactThousands)}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (remainingUnpaid == 0L) SuccessGreen else brandViolet
+                            color = if (remainingUnpaid == 0L) SuccessGreenDeep else brandViolet // فیکس bug.md/UI-04
                         )
                     }
                 }
@@ -367,13 +368,25 @@ fun PartnerReceivableCard(
                             color = SuccessGreen.copy(alpha = 0.12f),
                             border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.15f))
                         ) {
-                            Text(
-                                text = "تسویه کامل این ماه ✓",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SuccessGreen,
+                            // فیکس bug.md/UI-04 + UI-13: گلیف ✓ → آیکون متریال؛ متن با رنگ تیرهٔ خوانا
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = SuccessGreenDeep,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "تسویه کامل این ماه",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SuccessGreenDeep
+                                )
+                            }
                         }
                     } else {
                         Text(
@@ -522,7 +535,7 @@ private fun ReceivableShareRow(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "${NumberFormatter.formatNumber(share.dueDay, usePersian = usePersianDigits)}م ماه",
+                            text = "${NumberFormatter.formatNumber(share.dueDay, usePersian = usePersianDigits)}ام هر ماه",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
